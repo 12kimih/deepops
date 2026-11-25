@@ -13,7 +13,8 @@ nav_bar:
   - {title: {{ svc.title | to_json }}, url: {{ svc.path | to_json }}, icon: {{ svc.icon | default('fas://external-link-alt') | to_json }}, new_tab: true}
 {% endfor %}
 {% if open_ondemand_overview %}
-# The overview page: one widget (open_ondemand_overview_widget), rendered from the facts.
+# The overview page: one widget (cluster_overview, open_ondemand_widget_file), rendered from
+# the facts (open_ondemand_overview).
 custom_pages:
   cluster:
     rows:

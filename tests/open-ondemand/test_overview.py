@@ -35,6 +35,14 @@ class Overview(unittest.TestCase):
         self.assertIn("<td>n1</td><td>8</td><td>2</td><td>gpu:t:2</td>", widget)
         self.assertNotIn("<%=", widget, "no Ruby in the widget")
 
+    def test_the_commands_it_names_are_the_published_ones(self):
+        widget = render(
+            (TEMPLATES / "cluster-overview.html.erb.j2").read_text(),
+            values({**FACTS, "commands": ["sq", "x-y"]}),
+        )
+        self.assertIn("<code>sq</code>, <code>x-y</code>, and Slurm's <code>sinfo</code>", widget)
+        self.assertNotIn("<code>qos</code>", widget, "never a typed list")
+
     def test_no_facts_no_page(self):
         menu = yaml.safe_load(render((TEMPLATES / "ondemand-menu.yml.j2").read_text(), values({})))
         self.assertNotIn("custom_pages", menu)

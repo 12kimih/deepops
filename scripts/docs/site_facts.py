@@ -459,7 +459,11 @@ def facts(config):
         "dates": schedule(config),
         "quota": quota_limits(config, s),
         "environment": environment(config),
-        "cluster": cluster(config),
+        # the commands the overview page names: the ones the cluster publishes
+        "cluster": {
+            **cluster(config),
+            "commands": [c for c in s.get("cluster_tools_commands") or [] if isinstance(c, str)],
+        },
         "chat": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "bot": bot(s),
         "login": login_limits(config, s),

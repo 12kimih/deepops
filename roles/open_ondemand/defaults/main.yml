@@ -83,8 +83,9 @@ open_ondemand_nav_groups: [apps, files, jobs, clusters]
 
 # The cluster's overview, a portal page behind the login (OOD custom_pages and a
 # dashboard widget): {nodes: [{name, cpus, memory_mb, gres}], partitions: [{name, nodes,
-# max_time}]}, the private facts deepops scripts/docs/site_facts.py writes ("cluster"),
-# never typed. Empty: no page. Its title in the top menu:
+# max_time}], commands: [the cluster's published commands]}, the private facts deepops
+# scripts/docs/site_facts.py writes ("cluster"), never typed. Empty: no page. Its title
+# in the top menu:
 open_ondemand_overview: {}
 open_ondemand_overview_title: Cluster
 

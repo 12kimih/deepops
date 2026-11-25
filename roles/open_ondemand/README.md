@@ -7,8 +7,9 @@ and release-note upgrade steps. Debian family, Ubuntu 24.04 and later.
 
 What it sets up:
 
-- **Pinned packages.** `ondemand`, `ondemand-dex` and `nodejs` (22, from
-  NodeSource; OOD 4.2 needs it and Ubuntu does not ship it) at fixed versions.
+- **Pinned packages.** `ondemand`, `ondemand-dex` and `nodejs` (from NodeSource: the
+  Node.js major OnDemand depends on, which Ubuntu does not ship) at the versions in
+  `open_ondemand_version`, `open_ondemand_dex_version` and `open_ondemand_nodejs_version`.
   Each repository key is fetched with a fixed checksum and its fingerprint is
   checked before apt trusts it.
 - **One port, TLS only.** Apache listens only on `open_ondemand_port`, with the
@@ -84,7 +85,7 @@ the portal host.
 | `open_ondemand_login_host` | `'{{ inventory_hostname }}'` |  |
 | `open_ondemand_proxied_services` | `[]` | A local web service published under a path of the portal, behind its login, e.g. Grafana: {path: /grafana/, upstream: "http://127.0.0.1:3000/grafana/", user_header: X-WEBAUTH-USER, title: Grafana, icon: "fas://chart-line"}. The upstream keeps the same path (the role refuses another: a service served from its sub path redirects a stripped request back to it, forever). The portal sets user_header to the logged-in user and drops any value a client sends; a title puts a link to it in the portal's top menu. Empty = none. |
 | `open_ondemand_nav_groups` | `[apps, files, jobs, clusters]` | The portal's top menu (OOD's nav_bar; a list replaces OOD's own menu): these, OOD's names for the pinned apps and its app groups, then a link to each proxied service with a title. |
-| `open_ondemand_overview` | `{}` | The cluster's overview, a portal page behind the login (OOD custom_pages and a dashboard widget): {nodes: [{name, cpus, memory_mb, gres}], partitions: [{name, nodes, max_time}]}, the private facts deepops scripts/docs/site_facts.py writes ("cluster"), never typed. Empty: no page. Its title in the top menu: |
+| `open_ondemand_overview` | `{}` | The cluster's overview, a portal page behind the login (OOD custom_pages and a dashboard widget): {nodes: [{name, cpus, memory_mb, gres}], partitions: [{name, nodes, max_time}], commands: [the cluster's published commands]}, the private facts deepops scripts/docs/site_facts.py writes ("cluster"), never typed. Empty: no page. Its title in the top menu: |
 | `open_ondemand_overview_title` | `Cluster` |  |
 | `open_ondemand_backup_dir` | `/var/backups/open-ondemand` | Where the role keeps a copy of /etc/ood (and /var/www/ood when it rebuilds a broken install) before changing them. |
 | `open_ondemand_data_paths` | `['{{ open_ondemand_backup_dir }}']` | Data the component never removes, present or absent. |
