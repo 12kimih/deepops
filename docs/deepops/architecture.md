@@ -230,6 +230,7 @@ overwrite it; `roles/requirements.yml` lists only what is used unmodified.
 │   ├── rsyslog_server
 │   ├── runai
 │   ├── scratch_space
+│   ├── scratch_space_defaults
 │   ├── serial_console
 │   ├── shared_space
 │   ├── shared_space_defaults

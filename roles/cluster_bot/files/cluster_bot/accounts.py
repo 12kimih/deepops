@@ -53,6 +53,12 @@ class RosterFeature(Feature):
         text, _ = self._read(self.s["roster"])
         return load(text)
 
+    def _accounts(self):
+        """The accounts the site declares (slurm_accounting_file), {} when it declares none."""
+        if not self.s.get("accounting"):
+            return {}
+        return (load(self._read(self.s["accounting"])[0]) or {}).get("accounts") or {}
+
     def _roster(self):
         return self._document()["people"]
 
@@ -68,7 +74,7 @@ class JoinFeature(RosterFeature):
 
     def teams(self):
         """The accounts a new person may pick: those without children, but the excluded."""
-        accounts = (load(self._read(self.s["accounting"])[0]) or {}).get("accounts") or {}
+        accounts = self._accounts()
         parents = {(a or {}).get("parent") for a in accounts.values()}
         return sorted(n for n in accounts if n not in parents and n not in set(self.s.get("exclude", [])))
 
@@ -81,14 +87,14 @@ class JoinFeature(RosterFeature):
             raise Refused(str(e)) from None
         if req["user"] in self._roster():
             raise Refused(f"{req['user']}은(는) 이미 있는 아이디입니다")
-        accounts = (load(self._read(self.s["accounting"])[0]) or {}).get("accounts") or {}
+        accounts = self._accounts()
         if req["account"] not in accounts:
             raise Refused(f"{req['account']} 팀이 없습니다")
         return "admin", "새 계정은 관리자가 승인합니다"
 
     def apply(self, req):
         text, sha = self._read(self.s["roster"])
-        accounts = (load(self._read(self.s["accounting"])[0]) or {}).get("accounts") or {}
+        accounts = self._accounts()
         try:
             new, uid = self.people.roster_add(text, req["user"], req["account"], req.get("name"), req.get("slack"),
                                               self.s["reserved"], accounts)  # fmt: skip

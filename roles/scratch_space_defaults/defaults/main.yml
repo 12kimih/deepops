@@ -1,0 +1,9 @@
+---
+# The scratch space (roles/scratch_space), named once for the roles that tell people
+# about it: the cluster bot's collaboration folders form names the place and its
+# cleanup.
+
+# The scratch filesystem's mount point on this host.
+scratch_space_root: /scratch
+# A file unused this long is listed for removal (roles/scratch_space: the cleanup).
+scratch_space_stale_days: "{{ cluster_user_stale_days }}"

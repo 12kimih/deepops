@@ -282,7 +282,13 @@ class Edit(unittest.TestCase):
         shutil.copy(
             ROOT / "config.example" / "files" / "slurm" / "accounting.yml", self.dir / "files" / "slurm"
         )
+        (self.dir / "group_vars").mkdir()
+        self.point("{{ inventory_dir }}/files/slurm/accounting.yml")
         self.before = self.roster.read_text()
+
+    def point(self, value):
+        """The site's slurm_accounting_file, as config/group_vars sets it."""
+        (self.dir / "group_vars" / "slurm-cluster.yml").write_text(f'slurm_accounting_file: "{value}"\n')
 
     def run_people(self, *args):
         script = ROOT / "scripts" / "deepops" / "people.py"
@@ -309,6 +315,20 @@ class Edit(unittest.TestCase):
                      ["eve", "--account", "team-a"]):  # fmt: skip
             self.assertEqual(self.run_people("add", str(self.roster), *args).returncode, 1, args)
         self.assertEqual(self.roster.read_text(), self.before)
+
+    def test_the_accounting_file_is_where_the_site_points(self):
+        """It was taken from files/slurm/accounting.yml whatever slurm_accounting_file said."""
+        (self.dir / "slurm").mkdir()
+        (self.dir / "files" / "slurm" / "accounting.yml").rename(self.dir / "slurm" / "teams.yml")
+        self.point("{{ inventory_dir }}/slurm/teams.yml")
+        self.assertEqual(
+            self.run_people(
+                "add", str(self.roster), "eve", "--account", "nosuch", "--slack", "U0X"
+            ).returncode,
+            1,
+        )
+        done = self.run_people("add", str(self.roster), "eve", "--account", "team-a", "--slack", "U0X")
+        self.assertEqual(done.returncode, 0, done.stderr)
 
     def test_leave_keeps_the_uid_and_drops_access(self):
         self.assertEqual(self.run_people("leave", str(self.roster), "alice").returncode, 0)

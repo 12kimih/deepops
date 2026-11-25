@@ -250,10 +250,7 @@ slurm_job_submit_policy:
   gpus_per_node: []
   gpu_nodes_shared: false
   interactive_gpu_qos: ""
-# QoS, accounts and members declared in one YAML file (see
-# config.example/files/slurm/accounting.yml); the controller converges the accounting
-# database to it with the slurm_accounting module. Empty = accounting is not managed.
-slurm_accounting_file: ""
+# The accounting file, slurm_accounting_file: roles/slurm_paths (the cluster bot reads it too).
 # Also delete the QoS, accounts and associations the file does not list. Off by default:
 # they are reported, and a run with -e slurm_accounting_prune=true --check --diff shows
 # exactly what would go.

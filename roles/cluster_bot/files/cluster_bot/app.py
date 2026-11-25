@@ -260,7 +260,9 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             )
             client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
             return
-        client.views_open(trigger_id=body["trigger_id"], view=projects_blocks.new_form())
+        client.views_open(
+            trigger_id=body["trigger_id"], view=projects_blocks.new_form(cfg["projects"]["places"])
+        )
 
     # Shared data (cluster_bot.data): the request form, and the button of its notices.
     def data_command(body, client):
@@ -335,7 +337,9 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
     @app.action("project.new")
     def project_new(ack, body, client):
         ack()
-        client.views_open(trigger_id=body["trigger_id"], view=projects_blocks.new_form())
+        client.views_open(
+            trigger_id=body["trigger_id"], view=projects_blocks.new_form(cfg["projects"]["places"])
+        )
 
     @app.action("project.join")
     def project_join(ack, body, client):

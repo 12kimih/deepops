@@ -190,10 +190,16 @@ class Blocks(unittest.TestCase):
         self.assertIsNone(projects_blocks.join_form({"vision": self.PROJECTS["vision"]}, "alice"))
 
     def test_forms_name_the_fields_their_handlers_read(self):
-        self.assertEqual([b.get("block_id") for b in projects_blocks.new_form()["blocks"][:6]],
+        places = {"home": "/data/shared", "scratch": "/fast", "scratch_stale_days": 30}
+        self.assertEqual([b.get("block_id") for b in projects_blocks.new_form(places)["blocks"][:6]],
                          ["name", "purpose", "place", "owners", "members", "viewers"])  # fmt: skip
-        place = projects_blocks.new_form()["blocks"][2]["element"]
+        place = projects_blocks.new_form(places)["blocks"][2]["element"]
         self.assertEqual([o["value"] for o in place["options"]], ["home", "scratch"])
+        # The cluster's own places and cleanup period, never a typed /scratch or 60 days.
+        labels = [o["text"]["text"] for o in place["options"]]
+        self.assertTrue(labels[0].startswith("/data/shared: "), labels)
+        self.assertIn("/fast: ", labels[1])
+        self.assertIn("30일", labels[1])
         manage = projects_blocks.manage_form("vision")
         self.assertEqual((manage["private_metadata"], [b["block_id"] for b in manage["blocks"]]),
                          ("vision", ["person", "role"]))  # fmt: skip
