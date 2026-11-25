@@ -6,6 +6,9 @@ import re
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
+
+import yaml
 
 from common import HERE, run_tool
 from cluster_tools import gpu_usage, render, slurm
@@ -84,7 +87,7 @@ class ReportTests(unittest.TestCase):
         span = job["time"]["end"] - job["time"]["start"]
         for expr, at in api.asked:
             self.assertEqual(at, job["time"]["end"])
-            self.assertIn(f'{{job_id="{job["job_id"]}"}}[{max(span, gpu_usage.STEP)}s]', expr)
+            self.assertIn(f'{{job_id="{job["job_id"]}"}}[{max(span, gpu_usage.step())}s]', expr)
             self.assertTrue(expr.startswith("max by (host, device) ("))
 
     def test_an_array_task_is_selected_by_its_array_name(self):
@@ -100,7 +103,7 @@ class ReportTests(unittest.TestCase):
         api = FakePrometheus(GPU)
         gpu_usage.report(job, "prometheus", api, now=job["time"]["start"] + 30)
         self.assertEqual(api.asked[0][1], job["time"]["start"] + 30)
-        self.assertIn(f"[{gpu_usage.STEP}s]", api.asked[0][0], "never a window under one sample")
+        self.assertIn(f"[{gpu_usage.step()}s]", api.asked[0][0], "never a window under one sample")
 
     def test_each_source_can_be_asked_for_alone(self):
         job = with_slurm_gpu_figures(gpu_job())
@@ -119,6 +122,37 @@ class ReportTests(unittest.TestCase):
         self.assertIn("no samples", empty["notes"][-1])
         job["time"]["start"] = 0
         self.assertIn("not started", gpu_usage.report(job, "prometheus", FakePrometheus(GPU), 0)["notes"][-1])
+
+
+class StepTests(unittest.TestCase):
+    """The shortest window is the allocation writer's interval, read from the site facts
+    the role publishes from slurm_metrics_interval: a hand-kept 60 stayed 60 when the
+    interval changed, and a shorter window than one sample finds none."""
+
+    def test_spans_in_seconds_and_minutes(self):
+        self.assertEqual(
+            [gpu_usage.seconds(s) for s in ("60s", "2min", "90", "3m", "30 s")], [60, 120, 90, 180, 30]
+        )
+        with self.assertRaises(AttributeError):
+            gpu_usage.seconds("1h30")
+
+    def test_the_window_follows_the_published_interval(self):
+        with mock.patch.object(gpu_usage, "site_info", lambda: {"gpu_allocation_interval": "2min"}):
+            self.assertEqual(gpu_usage.step(), 120)
+        with mock.patch.object(gpu_usage, "site_info", dict):
+            self.assertEqual(gpu_usage.step(), gpu_usage.DEFAULT_STEP)
+
+    def test_the_role_publishes_the_timer_s_interval(self):
+        root = HERE.parents[1]
+        derived = yaml.safe_load((root / "roles/cluster_tools_lib/defaults/main.yml").read_text())
+        self.assertEqual(
+            derived["cluster_tools_lib_derived_info"]["gpu_allocation_interval"],
+            "{{ slurm_metrics_interval }}",
+        )
+        timer = (root / "roles/slurm_metrics/templates/slurm-gpu-metrics.timer.j2").read_text()
+        self.assertIn("OnUnitActiveSec={{ slurm_metrics_interval }}", timer)
+        shared = yaml.safe_load((root / "roles/prometheus_paths/defaults/main.yml").read_text())
+        self.assertEqual(gpu_usage.seconds(shared["slurm_metrics_interval"]), gpu_usage.DEFAULT_STEP)
 
 
 class CpuTests(unittest.TestCase):

@@ -27,6 +27,10 @@ prometheus_exporters:
 node_exporter_rootfs: /host
 # How often Prometheus scrapes, which Grafana also needs to size its queries.
 prometheus_cfg_scrape_interval: 15s
+# How often the controller writes Slurm's GPU allocation (roles/slurm_metrics' timer), a
+# systemd time span in seconds or minutes ("60s", "2min"): gpu-usage reads it as the
+# shortest window that holds a sample (cluster_tools_lib_derived_info).
+slurm_metrics_interval: 60s
 # node_exporter's textfile collector directory, which every textfile writer fills.
 node_exporter_prom_dir: /run/prometheus
 # A textfile that changes only when a role runs (a fact the deploy knows, roles/

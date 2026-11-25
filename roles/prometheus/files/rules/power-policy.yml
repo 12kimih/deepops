@@ -1,7 +1,9 @@
 ---
 # The hosts' power management held at full performance (roles/power_policy textfile
-# metrics, cluster_tools.power_policy, run every 15 minutes): a setting the kernel will
-# not take, one that something keeps switching back, and the runs stopping.
+# metrics, cluster_tools.power_policy, run every power_policy_interval): a setting the
+# kernel will not take, one that something keeps switching back, and the runs stopping.
+# The waits below count runs of that interval's default (tests/monitoring
+# test_alert_rules checks them against it): a site that lengthens it lengthens them.
 groups:
   - name: power-policy
     rules:
@@ -18,7 +20,7 @@ groups:
             are what nvidia-smi refused (`journalctl -u power-policy` says which call).
             A sysfs setting the kernel refuses is the firmware's (ASPM, a BIOS power
             profile): set its performance profile in the BIOS or BMC.
-      # Four runs in a row each found it off and set it back.
+      # Several runs in a row each found it off and set it back.
       # Refused ones are PowerPolicyRefused's: off, but nothing set them back.
       - alert: PowerPolicyKeepsBeingReset
         expr: power_policy_off - power_policy_refused > 0

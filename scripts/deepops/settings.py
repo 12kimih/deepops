@@ -4,6 +4,7 @@ config that overrides it. One model for config_lint and the deploy preview.
 
     settings.py diff [--from REV] [--config-from REV]   what a deploy would change, per host
     settings.py show HOST                               every setting HOST resolves, and where from
+    settings.py show HOST NAME...                       those settings' values alone, one a line
 
 A role's defaults own a setting's default (ours, a Galaxy role's or Kubespray's), and a
 config directory (config/ or config.example/) states only what differs. A host resolves
@@ -599,7 +600,16 @@ def cmd_show(args):
     if args.host not in config.hosts:
         print(f"{args.host} is not in {args.config}/inventory", file=sys.stderr)
         return 2
-    for name, (value, where) in sorted(config.resolve(args.host, owners()).items()):
+    resolved = config.resolve(args.host, owners())
+    if args.names:  # for a script: the value alone, and an unset name fails
+        unset = [name for name in args.names if name not in resolved or resolved[name][0] is MISSING]
+        if unset:
+            print(f"not set for {args.host}: {', '.join(unset)}", file=sys.stderr)
+            return 1
+        for name in args.names:
+            print(show(resolved[name][0]))
+        return 0
+    for name, (value, where) in sorted(resolved.items()):
         print(f"{name}: {show(value)}  ({where})")
     return 0
 
@@ -614,6 +624,7 @@ def main(argv=None):
     diff.set_defaults(func=cmd_diff)
     show_p = sub.add_parser("show", help="every setting a host resolves")
     show_p.add_argument("host")
+    show_p.add_argument("names", nargs="*", metavar="NAME", help="print only these settings' values")
     show_p.set_defaults(func=cmd_show)
     args = parser.parse_args(argv)
     return args.func(args)

@@ -48,7 +48,9 @@ class GpuDashboardTests(unittest.TestCase):
 
     def test_queries_against_kubernetes_and_slurm_series(self):
         # GPU and node exporter IPs intentionally differ. An unrelated node
-        # catches a selector that accidentally drops the chosen-host filter.
+        # catches a selector that accidentally drops the chosen-host filter. A Slurm
+        # target carries the host label Prometheus' scrape sets (roles/prometheus), and
+        # the dashboard finds it by that, on any port.
         cases = [
             (
                 "kubernetes",
@@ -57,6 +59,7 @@ class GpuDashboardTests(unittest.TestCase):
                 "192.0.2.20:9100",
                 ',kubernetes_node="gpu-worker"',
                 "gpu-worker",
+                "",
             ),
             (
                 "kubernetes-custom-ports",
@@ -65,18 +68,19 @@ class GpuDashboardTests(unittest.TestCase):
                 "192.0.2.20:19100",
                 ',kubernetes_node="gpu-worker"',
                 "gpu-worker",
-            ),
-            (
-                "slurm",
-                "slurm-worker.example",
-                "slurm-worker.example:9400",
-                "slurm-worker.example:9100",
                 "",
-                "slurm-worker",
             ),
-            ("slurm-ip-inventory", "192.0.2.30", "192.0.2.30:9400", "192.0.2.30:9100", "", "slurm-worker"),
         ]
-        for layout, hostname, gpu, node, gpu_labels, nodename in cases:
+        for layout, host, gpu_port, node_port in (
+            ("slurm", "slurm-worker.example", 9400, 9100),
+            ("slurm-ip-inventory", "192.0.2.30", 9400, 9100),
+            ("slurm-custom-ports", "slurm-worker.example", 19400, 19100),
+        ):
+            label = f',host="{host}"'
+            cases.append(
+                (layout, host, f"{host}:{gpu_port}", f"{host}:{node_port}", label, "slurm-worker", label)
+            )
+        for layout, hostname, gpu, node, gpu_labels, nodename, node_labels in cases:
             with self.subTest(layout=layout), tempfile.TemporaryDirectory() as temp:
                 rules = []
                 expected = []
@@ -94,7 +98,7 @@ class GpuDashboardTests(unittest.TestCase):
                     expr = query[len("query_result(") : -1].replace("$hostname", hostname)
                     rules.append({"record": "dashboard_" + name, "expr": expr})
                     if name == "node_instance":
-                        labels = f'instance="{node}",nodename="{nodename}"'
+                        labels = f'instance="{node}",nodename="{nodename}"{node_labels}'
                         sample_value = 1
                     else:
                         labels = f'instance="{gpu}"{gpu_labels}'
@@ -166,7 +170,7 @@ class GpuDashboardTests(unittest.TestCase):
                         "values": "100 100",
                     },
                     {
-                        "series": f'node_uname_info{{instance="{node}",nodename="{nodename}"}}',
+                        "series": f'node_uname_info{{instance="{node}",nodename="{nodename}"{node_labels}}}',
                         "values": "1 1",
                     },
                     {"series": f'node_load1{{instance="{node}"}}', "values": "2 2"},
