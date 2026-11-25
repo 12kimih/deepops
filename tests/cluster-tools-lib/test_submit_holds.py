@@ -46,6 +46,24 @@ class HoldTests(unittest.TestCase):
         )
         self.assertEqual(submit_holds.text({}, NOW), f"generated {NOW}\n")
 
+    def test_the_metrics_carry_how_long_job_submit_lua_trusts_the_file(self):
+        # SubmitHoldsStale compares the last run with half of it, so the alert and
+        # job_submit.lua read one value (submit_holds_max_age).
+        out = submit_holds.metrics({}, {**DISK, "max_age": 1800}, NOW)
+        self.assertIn("submit_holds_max_age_seconds{} 1800\n", out)
+        rules = (ROOT / "roles/prometheus/files/rules/submit-holds.yml").read_text()
+        self.assertIn("> submit_holds_max_age_seconds / 2", rules)
+        self.assertNotIn("max_age_seconds", submit_holds.metrics({}, DISK, NOW))
+
+    def test_a_config_written_before_max_age_still_loads(self):
+        with tempfile.TemporaryDirectory() as d:
+            old = {**DISK, "prometheus_url": "http://x", "file": "/f", "textfile": "/t"}
+            cfg = Path(d, "c.json")
+            cfg.write_text(json.dumps(old))
+            self.assertNotIn("max_age", submit_holds.load_config(str(cfg)))
+            cfg.write_text(json.dumps({**old, "max_age": 1800}))
+            self.assertEqual(submit_holds.load_config(str(cfg))["max_age"], 1800)
+
     def test_a_failed_read_keeps_the_last_file(self):
         with tempfile.TemporaryDirectory() as d:
             cfg, holds, prom = Path(d, "c.json"), Path(d, "holds"), Path(d, "h.prom")

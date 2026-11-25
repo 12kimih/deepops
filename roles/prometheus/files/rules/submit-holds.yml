@@ -1,15 +1,15 @@
 ---
 # The submission holds (roles/submit_holds, cluster_tools.submit_holds): job_submit.lua
-# trusts their file for half an hour, then holds no one, so a writer that stopped is said
-# well before.
+# trusts their file for submit_holds_max_age seconds, then holds no one, so a writer that
+# stopped is said at half of it (the writer's submit_holds_max_age_seconds).
 groups:
   - name: submit-holds
     rules:
       - alert: SubmitHoldsStale
-        expr: time() - submit_holds_last_success_timestamp_seconds > 900
+        expr: time() - submit_holds_last_success_timestamp_seconds > submit_holds_max_age_seconds / 2
         labels: {severity: warning}
         annotations:
-          summary: "The submission holds on {{ $labels.host }} have not been worked out for 15 minutes"
+          summary: "The submission holds on {{ $labels.host }} have not been worked out for {{ $value | humanizeDuration }}"
           description: >-
-            After 30 minutes job_submit.lua holds no one. `journalctl -u submit-holds` and
+            Past submit_holds_max_age, twice this alert's wait, job_submit.lua holds no one. `journalctl -u submit-holds` and
             `systemctl list-timers submit-holds.timer` on the host (Prometheus reachable?).

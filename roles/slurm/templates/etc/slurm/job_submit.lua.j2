@@ -84,6 +84,7 @@ local GPUS_PER_NODE         = { {{ p.gpus_per_node | map('int') | join(', ') }} 
 local GPU_NODES_SHARED      = {{ lua_bool(p.gpu_nodes_shared) }}
 local INTERACTIVE_GPU_QOS   = {{ lua_str(p.interactive_gpu_qos) }}
 local SUBMIT_HOLDS_FILE     = {{ lua_str(job_submit_holds_file | default('')) }}
+local SUBMIT_HOLDS_MAX_AGE  = {{ job_submit_holds_max_age | int }}
 {% raw %}
 -- Derived once at load, from the [1] block above.
 --   GPU_TYPE_PARTITION    type      -> the partition list to route that type to
@@ -549,10 +550,11 @@ end
 -- someone at a disk hard limit (roles/submit_holds). The file is a line
 -- "generated <unix time>", then "<uid> <reason>" per person. It is read at most every
 -- HOLDS_REREAD seconds (Slurm keeps this script's state between calls) and trusted for
--- HOLDS_MAX_AGE: a file its writer stopped refreshing, a missing one or one that cannot
--- be read holds no one, so a broken writer never stops everyone, nor keeps someone
--- held who has freed their space. Only new submissions are held; running jobs go on.
-local HOLDS_REREAD, HOLDS_MAX_AGE = 60, 1800
+-- SUBMIT_HOLDS_MAX_AGE seconds (submit_holds_max_age): a file its writer stopped
+-- refreshing, a missing one or one that cannot be read holds no one, so a broken writer
+-- never stops everyone, nor keeps someone held who has freed their space. Only new
+-- submissions are held; running jobs go on.
+local HOLDS_REREAD = 60
 local holds = {read = nil, by_uid = {}}
 
 local function read_holds(now)
@@ -560,7 +562,7 @@ local function read_holds(now)
     local f = io.open(SUBMIT_HOLDS_FILE, "r")
     if not f then return by_uid end
     local stamp = tonumber(string.match(f:read("*l") or "", "^generated%s+(%d+)"))
-    if stamp and now - stamp <= HOLDS_MAX_AGE then
+    if stamp and now - stamp <= SUBMIT_HOLDS_MAX_AGE then
         for line in f:lines() do
             local uid, why = string.match(line, "^(%d+)%s+(.+)$")
             if uid then by_uid[tonumber(uid)] = why end

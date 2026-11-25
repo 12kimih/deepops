@@ -121,13 +121,14 @@ with the reason (where, how much, `quota -s` to look); their running jobs go on.
 | `submit_holds_disk` | Holds a person at a hard limit too (and the disk report says what a hard limit means for Slurm). Off by default |
 | `submit_holds_from` | `YYYY-MM-DD`: no one is held before this date, the grace for everyone already at a limit when the holds are turned on; the disk report and its DMs say from when. `""` holds at once |
 | `submit_holds_interval` | How often the holds are worked out again (5 minutes) |
+| `submit_holds_max_age` | How long, in seconds, `job_submit.lua` trusts the holds file after it was written; `SubmitHoldsStale` warns at half of it |
 
 A timer on the controllers reads the disk quota metrics from Prometheus (the same
 figures and the same "at a hard limit" as the daily disk report) and writes
 `/etc/slurm/submit-holds`; the rendered `job_submit.lua` reads that file at most once a
-minute. A file not refreshed for half an hour, a missing one or one that cannot be read
+minute. A file not refreshed for `submit_holds_max_age` seconds, a missing one or one that cannot be read
 holds no one, so a monitoring outage never stops everyone's jobs nor keeps someone held
-who has freed space; `SubmitHoldsStale` warns after 15 minutes without a run. A site's
+who has freed space; `SubmitHoldsStale` warns at half of it without a run. A site's
 own `job_submit.lua` (not the role's template) does not read the holds.
 
 Turning them on: set the switch and the date, run

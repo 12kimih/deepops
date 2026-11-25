@@ -10,8 +10,8 @@
 submit_holds_state: present
 
 # How often the holds are worked out again (systemd OnUnitActiveSec). job_submit.lua
-# trusts the file for half an hour and an alert fires after 15 minutes without a run
-# (SubmitHoldsStale): keep this well under both.
+# trusts the file for submit_holds_max_age (roles/deploy_defaults) and an alert fires
+# after half of it without a run (SubmitHoldsStale): keep this well under both.
 submit_holds_interval: 5min
 
 # Roster-shaped mapping (login -> {ends, status}) whose ends hold people (default: the

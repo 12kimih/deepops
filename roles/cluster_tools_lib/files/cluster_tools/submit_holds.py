@@ -13,14 +13,14 @@ Held, their new jobs refused with the reason while running jobs go on:
   everyone already at a limit when it turns disk holds on.
 
 The file is a line "generated <unix time>", then "<uid> <reason>" per person held; the
-rendered job_submit.lua reads it at most once a minute and trusts it for half an hour,
-so a writer that stopped holds no one once it is stale (an alert says so:
-SubmitHoldsStale). A run that cannot read Prometheus still writes the ends holds and
+rendered job_submit.lua reads it at most once a minute and trusts it for `max_age`
+seconds (submit_holds_max_age), so a writer that stopped holds no one once it is stale;
+the metrics carry `max_age` for the alert that says so first (SubmitHoldsStale). A run that cannot read Prometheus still writes the ends holds and
 keeps the last file's disk holds, exits 1 and leaves the metrics (so the alert fires).
 A login the host cannot resolve is skipped, said on standard error.
 
 CONFIG: prometheus_url, file (the holds), disk, disk_from, ends, textfile
-(node_exporter's).
+(node_exporter's), max_age (optional: a config written before it gives no such metric).
 Python 3.9 or newer, standard library only.
 """
 
@@ -38,6 +38,7 @@ from .prometheus import Prometheus
 CONFIG_KEYS = {
     "prometheus_url": str, "file": str, "disk": bool, "disk_from": (int, float), "ends": dict, "textfile": str,
 }  # fmt: skip
+CONFIG_OPTIONAL = {"max_age": int}
 # How an ends hold's reason begins: what a run that could not read the disk metrics
 # tells apart from the disk holds it keeps.
 ENDED = "Your membership ended on"
@@ -45,7 +46,7 @@ ENDED = "Your membership ended on"
 
 def load_config(path):
     """The config, checked whole (cluster_tools.config)."""
-    return config.require(path, CONFIG_KEYS)
+    return config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
 
 
 def uid_of(login):
@@ -127,13 +128,14 @@ def text(held, now):
 
 
 def metrics(held, cfg, now):
-    return render(
-        {
-            key("submit_holds_people"): len(held),
-            key("submit_holds_grace_until_timestamp_seconds"): int(cfg["disk_from"]),
-            key("submit_holds_last_success_timestamp_seconds"): int(now),
-        }
-    )
+    values = {
+        key("submit_holds_people"): len(held),
+        key("submit_holds_grace_until_timestamp_seconds"): int(cfg["disk_from"]),
+        key("submit_holds_last_success_timestamp_seconds"): int(now),
+    }
+    if "max_age" in cfg:
+        values[key("submit_holds_max_age_seconds")] = cfg["max_age"]
+    return render(values)
 
 
 def main(argv=None):
