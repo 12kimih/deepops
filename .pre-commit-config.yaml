@@ -60,9 +60,9 @@ repos:
         entry: scripts/deepops/sensitive_guard.py message
         language: system
         stages: [commit-msg]
-      # Plain ASCII, no tool-attribution trailers (scripts/deepops/commit_message.py).
+      # The commit message standard (scripts/deepops/commit_message.py).
       - id: commit-message
-        name: commit message (ASCII, no attribution trailers)
+        name: commit message (the standard in scripts/deepops/commit_message.py)
         entry: scripts/deepops/commit_message.py message
         language: system
         stages: [commit-msg]

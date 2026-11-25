@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
-"""Commit messages in these repositories (deepops and the site config) are plain ASCII
-and carry no tool-attribution trailers.
+"""Commit messages in these repositories (deepops, the site config and the user docs)
+follow one standard:
+
+- a subject "<type>(<scope>): <summary>" (Conventional Commits; a merge's "Merge ..."
+  as git writes it), at most 72 characters, without a period at the end, never a
+  work-in-progress one (wip, fixup!, squash!);
+- a blank line 2, and body lines of at most 72 characters (an indented line, such as
+  code, a table row, and a line of one long word such as a URL, are as they are);
+- plain ASCII, without tool-attribution trailers or trailing spaces.
 
 A message is read by every tool that shows history (terminals, mail, logs in other
 encodings) and stays in history for good: rewriting it later means rewriting every
@@ -33,22 +40,54 @@ ATTRIBUTION = re.compile(
 )
 # git's scissors line: what follows it is not part of the message (commit -v).
 SCISSORS = re.compile(r"^# -+ >8 -+$")
+TYPES = ("feat", "fix", "docs", "refactor", "test", "chore", "ci", "build", "perf", "revert", "style")
+SUBJECT = re.compile(rf"^({'|'.join(TYPES)})(\([a-z0-9][a-z0-9_./,+-]*\))?!?: \S")
+WIP = re.compile(r"(?i)(\bwip\b|^fixup! |^squash! )")
+WIDTH = 72
+VERBATIM = re.compile(r"^(\s|\|)")  # an indented line (code, a list's own layout), a table row
 HOOK_MODES = {"commit-msg": "message", "pre-push": "push"}
+
+
+def subject_problems(subject: str) -> list[str]:
+    if subject.startswith("Merge "):
+        return []
+    found = []
+    if not SUBJECT.match(subject):
+        found.append(f"subject: not '<type>(<scope>): <summary>' with a type of {', '.join(TYPES)}")
+    if len(subject) > WIDTH:
+        found.append(f"subject: {len(subject)} characters, at most {WIDTH}")
+    if subject.rstrip().endswith("."):
+        found.append("subject: ends with a period")
+    if WIP.search(subject):
+        found.append("subject: work in progress (wip, fixup!, squash!)")
+    return found
 
 
 def problems(message: str) -> list[str]:
     """What is wrong with one message; comment lines and the scissors part are not in it."""
-    found = []
-    for number, line in enumerate(message.splitlines(), 1):
+    lines = []
+    for line in message.splitlines():
         if SCISSORS.match(line):
             break
-        if line.startswith("#"):
-            continue
+        if not line.startswith("#"):
+            lines.append(line)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if not lines or not lines[0].strip():
+        return ["an empty subject"]
+    found = subject_problems(lines[0])
+    if len(lines) > 1 and lines[1].strip():
+        found.append("line 2: not blank (the subject is one line)")
+    for number, line in enumerate(lines, 1):
         odd = sorted({c for c in line if ord(c) > 127})
         if odd:
             found.append(f"line {number}: non-ASCII {''.join(odd)!r}: {line.strip()[:80]}")
         if ATTRIBUTION.match(line.strip()):
             found.append(f"line {number}: a tool-attribution trailer: {line.strip()[:80]}")
+        if line != line.rstrip():
+            found.append(f"line {number}: trailing space")
+        if number > 2 and len(line) > WIDTH and not VERBATIM.match(line) and len(line.split()) > 1:
+            found.append(f"line {number}: {len(line)} characters, at most {WIDTH}")
     return found
 
 
@@ -102,8 +141,8 @@ def main(argv: list[str]) -> int:
                 bad += len(found)
     if bad:
         print(
-            "commit-message: write the message in plain ASCII without tool-attribution "
-            "trailers (git commit --amend for the last commit; rebase for earlier ones).",
+            "commit-message: write the message to the standard above (scripts/deepops/"
+            "commit_message.py): git commit --amend for the last commit, rebase for earlier ones.",
             file=sys.stderr,
         )
         return 1

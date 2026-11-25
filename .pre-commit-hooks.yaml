@@ -27,3 +27,15 @@
   pass_filenames: false
   always_run: true
   stages: [manual]
+- id: commit-message
+  name: commit message (the standard in scripts/deepops/commit_message.py)
+  entry: scripts/deepops/commit_message.py message
+  language: script
+  stages: [commit-msg]
+- id: commit-message-push
+  name: commit messages (commits to push)
+  entry: scripts/deepops/commit_message.py push
+  language: script
+  pass_filenames: false
+  always_run: true
+  stages: [pre-push]

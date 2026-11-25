@@ -172,6 +172,10 @@ and an r615+ driver the role will not install for you. See
 Move a shared checkout (the clone deploys run from, and its config) only with
 `scripts/deepops/sync.py`: it fast-forwards both and refuses while a deploy runs.
 
+Commit messages follow one standard, checked on commit and push
+(`scripts/deepops/commit_message.py`): a `<type>(<scope>): <summary>` subject of at
+most 72 characters, a blank line, a body wrapped at 72, plain ASCII.
+
 Run before pushing: `scripts/check.sh` (every check CI runs; the pre-commit hook
 runs `scripts/check.sh --fast`). `scripts/push.sh` rebases onto origin/main, runs the
 full check and pushes; worktrees check at once, and a push whose base moved meanwhile is checked again first. Public CI runs lint,

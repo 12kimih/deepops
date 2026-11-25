@@ -63,7 +63,8 @@ class GuardTest(unittest.TestCase):
         for name, content in files.items():
             (self.repo / name).write_text(content)
             self.git("add", name)
-        self.git("commit", "-q", "-m", message)
+        # The pre-push hook checks the message standard too (commit_message.py).
+        self.git("commit", "-q", "-m", f"test: {message}")
 
     def guard(self, *args, stdin=None, env=None):
         run = subprocess.run(
@@ -160,11 +161,11 @@ class GuardTest(unittest.TestCase):
         self.git("add", "blob.dat")
         code, out = self.guard("staged")
         self.assertEqual((code, "blob.dat (binary)" in out), (1, True))
-        self.git("commit", "-qm", "bin")
+        self.git("commit", "-qm", "test: bin")
         self.assertEqual(self.guard("history", "HEAD", "^HEAD~1")[0], 1)
         self.assertEqual(self.guard("tree")[0], 1)
         self.git("rm", "-q", "blob.dat")
-        self.git("commit", "-qm", "rm")
+        self.git("commit", "-qm", "test: rm")
         # An added line that starts with "++ " is a line, not a file header.
         (self.repo / "p.txt").write_text("++ port 48123\nfine\n")
         self.git("add", "p.txt")
