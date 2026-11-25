@@ -26,6 +26,8 @@ Generators:
   tree:DIR              what is directly under DIR: its directories holding tracked
                         files, its submodules and its tracked files, as a tree
   role-tree             tree:roles (Galaxy's roles/galaxy left out)
+  os-matrix             the operating system releases each part supports, from the tables
+                        that decide it (slurm_deb_build_images, the nvidia-dgx release tables)
   components            every component of the registry (roles/deploy_defaults/vars/main.yml):
                         its role, the switches and groups that place it, what it needs
                         and whether its removal is explicit
@@ -539,7 +541,23 @@ def gen_partitions(_arg, page=None):
     return "\n".join(rows) + f"\n\n{'GPU 합계' if ko else 'GPUs in all'}: {summary}\n"
 
 
+def gen_os_matrix(_arg, _page=None):
+    def keys(path, name):
+        return ", ".join(yaml.safe_load((ROOT / path).read_text(encoding="utf-8"))[name]) or "-"
+
+    rows = [
+        ("Slurm cluster (the packages are built per release, `slurm_deb_build_images`)",
+         keys("roles/slurm/defaults/main.yml", "slurm_deb_build_images"), "-"),
+        ("NVIDIA DGX software (`nvidia-dgx`)",
+         keys("roles/nvidia-dgx/vars/main.yml", "dgx_ubuntu_releases"),
+         keys("roles/nvidia-dgx/vars/redhat.yml", "dgx_redhat_repo_setup_rpms")),
+    ]  # fmt: skip
+    out = ["| Part | Ubuntu | Red Hat Enterprise Linux / Rocky Linux |", "|---|---|---|"]
+    return "\n".join(out + [f"| {a} | {b} | {c} |" for a, b, c in rows]) + "\n"
+
+
 GENERATORS = {
+    "os-matrix": gen_os_matrix,
     "components": gen_components,
     "exporters": gen_exporters,
     "dashboards": gen_dashboards,
