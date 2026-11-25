@@ -69,6 +69,7 @@ cluster_bot_connect:
   login_host: "{{ cluster_info.login_host | default('') }}"
   ssh_port: "{{ cluster_info.ssh_port | default(22) }}"
   portal_url: "{{ open_ondemand_url if slurm_install_open_ondemand else '' }}"
+  dashboard_url: "{{ grafana_root_url }}"  # also the channel guides' and Home tab's Grafana link
   docs_url: "{{ cluster_info.docs_url | default('') }}"
 # Accounts never offered to a new person (accounts without children are offered).
 cluster_bot_join_exclude: [root, admin]

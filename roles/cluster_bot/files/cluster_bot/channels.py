@@ -7,9 +7,11 @@ site, written by the docs' build), so the text people read in Slack has one sour
 
 ROLE is a channel's purpose (slack_channels: announce, help, status, admin); the names
 are the site's (config), never the docs'. "[[#ROLE]]" in the text is that channel: a
-mention in the canvas, its name in a purpose or topic.
+mention in the canvas, its name in a purpose or topic. "[[url:NAME]]" is a service's
+address (portal, dashboard), which the public site never holds: the bot's config gives
+it, and a line or bookmark whose address the bot has not is left out.
 
-round_(fetch, slack, names, state_path, today, log) converges each channel the site
+round_(fetch, slack, names, state_path, today, log, urls) converges each channel the site
 describes and the config names:
 - the purpose and the topic, set only when they differ;
 - the canvas: created once, its ID kept; replaced in full when its text changed and once
@@ -28,6 +30,7 @@ import re
 from . import state
 
 MENTION = re.compile(r"\[\[#([a-z]+)\]\]")
+URL = re.compile(r"\[\[url:([a-z]+)\]\]")
 
 
 def channel_ids(slack):
@@ -44,22 +47,36 @@ def channel_ids(slack):
             return out
 
 
-def _text(text, names, ids=None):
-    """TEXT with each [[#ROLE]] as that channel: a canvas mention (IDS given) or its name."""
+def _text(text, names, ids=None, urls=None):
+    """TEXT with each [[#ROLE]] as that channel: a canvas mention (IDS given) or its name;
+    each [[url:NAME]] as URLS[NAME], and a line with one the bot has not left out."""
 
     def repl(m):
         name = names[m.group(1)]
         return f"![](#{ids[name.lstrip('#')]})" if ids is not None else name
 
-    return MENTION.sub(repl, text)
+    urls = urls or {}
+    lines = [line for line in text.split("\n") if all(urls.get(u) for u in URL.findall(line))]
+    return URL.sub(lambda m: urls[m.group(1)], MENTION.sub(repl, "\n".join(lines)))
+
+
+def service_urls(connect):
+    """{NAME: address} of the [[url:NAME]] the bot fills, from its config's connect."""
+    return {"portal": connect.get("portal_url", ""), "dashboard": connect.get("dashboard_url", "")}
+
+
+def _url(link, urls):
+    """A bookmark's LINK with its [[url:NAME]] filled, or "" when the bot has not it."""
+    wanted = URL.findall(link)
+    return URL.sub(lambda m: urls[m.group(1)], link) if all(urls.get(u) for u in wanted) else ""
 
 
 def _failed(error, *codes):
     return any(code in str(error) for code in codes)
 
 
-def _canvas(slack, cid, info, spec, names, ids, path, role, today, log):
-    title, markdown = spec["title"], _text(spec["markdown"], names, ids)
+def _canvas(slack, cid, info, spec, names, ids, path, role, today, log, urls):
+    title, markdown = spec["title"], _text(spec["markdown"], names, ids, urls)
     digest = hashlib.sha256(f"{title}\0{markdown}".encode()).hexdigest()
     content = json.dumps({"type": "markdown", "markdown": markdown})
     with state.locked(path, {}) as st:
@@ -103,9 +120,9 @@ def _lock(slack, canvas_id, cid, role, log):
         log(f"{role}: canvas {canvas_id} could not be made read-only: {e}")
 
 
-def _bookmarks(slack, cid, wanted, path, role):
+def _bookmarks(slack, cid, wanted, path, role, urls):
     existing = {b["id"]: b for b in slack.call("bookmarks.list", channel_id=cid).get("bookmarks", [])}
-    want = {b["title"]: b for b in wanted}
+    want = {b["title"]: {**b, "url": url} for b in wanted if (url := _url(b["url"], urls))}
     with state.locked(path, {}) as st:
         mine = st.setdefault("bookmarks", {}).setdefault(role, {})
         for title, bid in list(mine.items()):
@@ -125,7 +142,7 @@ def _bookmarks(slack, cid, wanted, path, role):
                 slack.call("bookmarks.edit", channel_id=cid, bookmark_id=bid, link=b["url"], emoji=b["emoji"])
 
 
-def round_(fetch, slack, names, state_path, today, log):
+def round_(fetch, slack, names, state_path, today, log, urls=None):
     guides = (fetch() or {}).get("channels") or {}
     ids = channel_ids(slack)
     for role, spec in sorted(guides.items()):
@@ -141,10 +158,10 @@ def round_(fetch, slack, names, state_path, today, log):
                 ("purpose", "conversations.setPurpose"),
                 ("topic", "conversations.setTopic"),
             ):
-                value = _text(spec[field], names)
+                value = _text(spec[field], names, urls=urls)
                 if (info.get(field) or {}).get("value", "") != value:
                     slack.call(method, channel=cid, **{field: value})
-            _canvas(slack, cid, info, spec["canvas"], names, ids, state_path, role, today, log)
-            _bookmarks(slack, cid, spec.get("bookmarks") or [], state_path, role)
+            _canvas(slack, cid, info, spec["canvas"], names, ids, state_path, role, today, log, urls or {})
+            _bookmarks(slack, cid, spec.get("bookmarks") or [], state_path, role, urls or {})
         except Exception as e:  # noqa: BLE001 - one channel's failure leaves the others
             log(f"{role}: {e}")

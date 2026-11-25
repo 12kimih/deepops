@@ -86,6 +86,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 #  login_host: "{{ cluster_info.login_host | default('') }}"
 #  ssh_port: "{{ cluster_info.ssh_port | default(22) }}"
 #  portal_url: "{{ open_ondemand_url if slurm_install_open_ondemand else '' }}"
+#  dashboard_url: "{{ grafana_root_url }}"
 #  docs_url: "{{ cluster_info.docs_url | default('') }}"
 
 # Hourly GPU usage report and idle-GPU nudges, a weekly per-person summary of GPU-hours

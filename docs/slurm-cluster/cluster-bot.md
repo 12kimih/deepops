@@ -97,7 +97,10 @@ is created once and replaced in full when its text changes and once a day, so a 
 edit lasts a day at most; it is kept read-only for the channel's members (a refusal is
 logged in the bot's journal). Only the bookmarks the bot added are kept in step; one a
 person added stays. Invite the bot to every channel it guides: setting a topic needs a
-member, and a private channel's canvas too.
+member, and a private channel's canvas too. The public site holds no service address: a
+guide writes `[[url:portal]]` or `[[url:dashboard]]`, and the bot fills it from
+`cluster_bot_connect` (`portal_url`, `dashboard_url`: `grafana_root_url`, the same address
+the GPU usage report links). A line or bookmark whose address the bot has not is left out.
 
 ### How the bot acts on other hosts
 
@@ -150,8 +153,10 @@ as one short reason per group of hosts, with what an administrator does about it
 
 The bot signs the App's token with the system's `openssl`; tokens last an hour.
 
-The Home tab (the bot's profile in Slack) shows each person whether job notices reach
-them, with a switch to turn them off or on, and their collaboration folders.
+The Home tab (the bot's profile in Slack) shows each person a button for each service
+`cluster_bot_connect` gives an address (the web portal, Grafana, the user docs), whether
+job notices reach them, with a switch to turn them off or on, and their collaboration
+folders.
 
 Job notices (`roles/job_notice`, switch `slurm_enable_job_notices`, on by default):
 Slurm's MailProg on the controllers is `job-notice`, which sends a job's notice as a
