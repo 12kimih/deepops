@@ -7,7 +7,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("site_facts", ROOT / "scripts/docs/site_facts.py")
@@ -64,16 +63,30 @@ class Facts(unittest.TestCase):
         )
 
 
+class Resolved(unittest.TestCase):
+    def test_a_setting_renders_over_only_the_names_it_uses(self):
+        raw = {"a": 2, "b": "{{ a * 3 }}", "c": ["{{ b }}", "x"], "d": {"k": "{{ b }}"},
+               "host": "{{ ansible_hostname }}", "loop": "{{ loop }}", "secret": object(), "e": "{{ secret }}"}  # fmt: skip
+        self.assertEqual(sf.resolved("b", raw), 6)
+        self.assertEqual(sf.resolved("c", raw), [6, "x"])
+        self.assertEqual(sf.resolved("d", raw), {"k": 6})
+        for name in ("host", "loop", "secret", "e", "unset"):
+            self.assertIsNone(sf.resolved(name, raw), name)
+
+
 class Slurm(unittest.TestCase):
     def test_preemption_times_follow_killwait_from_the_sites_template(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = site(tmp)
             (config / "files/slurm").mkdir(parents=True)
-            (config / "files/slurm/slurm.conf").write_text("ClusterName=c\nKillWait=45\n")
+            (config / "files/slurm/slurm.conf").write_text("ClusterName=c\nKillWait=45\nResumeTimeout=600\n")
             got = sf.slurm_values(config)
         self.assertEqual(
-            got, {"kill_wait_seconds": 45, "preempt_grace_seconds": 45, "sigkill_after_seconds": 90}
-        )
+            got,
+            {"kill_wait_seconds": 45, "preempt_grace_seconds": 45, "sigkill_after_seconds": 90,
+             "resume_timeout_seconds": 600},
+        )  # fmt: skip
+        self.assertNotIn("resume_timeout_seconds", sf.PUBLIC["slurm"], "an admin timing")
 
     def test_without_a_site_template_the_roles(self):
         self.assertIn("kill_wait_seconds", sf.slurm_values(None))
@@ -94,17 +107,10 @@ class Cluster(unittest.TestCase):
         self.assertNotIn("192.0.2.1", json.dumps(got), "no address")
         self.assertNotIn("cluster", sf.PUBLIC, "infrastructure stays private")
 
-    def test_the_overview_names_the_published_commands(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            config = site(tmp)
-            (config / "group_vars/slurm-cluster.yml").write_text(
-                'cluster_tools_commands: "{{ cluster_tools_builtin }}"\n'
-            )
-            got = sf.facts(config)["cluster"]["commands"]
-        builtin = yaml.safe_load((ROOT / "roles/cluster_tools/defaults/main.yml").read_text())[
-            "cluster_tools_builtin"
-        ]
-        self.assertEqual(got, builtin)
+    def test_the_portal_reads_the_same_filter(self):
+        # open_ondemand_overview: "{{ lookup('file', slurm_conf_template) | slurm_conf_cluster }}"
+        filters = sf._slurm_conf.FilterModule().filters()
+        self.assertIs(filters["slurm_conf_cluster"], sf._slurm_conf.slurm_conf_cluster)
 
 
 class Quota(unittest.TestCase):

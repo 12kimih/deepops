@@ -57,19 +57,18 @@ step() {
 step "ansible.cfg has only known settings" ansible-config validate
 step "Galaxy collections and roles match roles/requirements.yml" "${python}" scripts/deepops/galaxy.py --check
 step "style is normalized" "${python}" scripts/deepops/normalize-ansible-style.py --check .
+# deepops' pages, and the site config's (DEEPOPS_CONFIG_DIR) when it has some.
 step "generated docs are current" "${python}" scripts/docs/generate.py --check
 step "generated dashboards are current" "${python}" scripts/dashboards/build.py --check
 step "generated component playbook rules are current" "${python}" scripts/deepops/component_playbooks.py --check
 step "role templates parse as Jinja" "${python}" scripts/deepops/check-template-syntax.py
 step "people rosters are valid (config.example, and config if present)" "${python}" scripts/deepops/people.py check
 step "configs state only what differs, nothing set goes unread, docs name real paths and settings" "${python}" scripts/deepops/config_lint.py
-# The docs' data files (scripts/docs/site_facts.py), when a checkout of each is named:
-# the user docs site's (DEEPOPS_DOCS_SITE) and the admin docs' (the site config's).
+# The user docs site's data file (scripts/docs/site_facts.py), when a checkout of it is
+# named (DEEPOPS_DOCS_SITE).
 if [ -n "${DEEPOPS_DOCS_SITE:-}" ]; then
-    facts=(--public "${DEEPOPS_DOCS_SITE}/data/site.json")
-    config_dir="${DEEPOPS_CONFIG_DIR:-config}"
-    [ -d "${config_dir}/admin-docs" ] && facts+=(--private "${config_dir}/admin-docs/_data/site.json")
-    step "the docs' data files match the code and the site config" "${python}" scripts/docs/site_facts.py "${facts[@]}" --check
+    step "the user docs' data file matches the code and the site config" \
+        "${python}" scripts/docs/site_facts.py --public "${DEEPOPS_DOCS_SITE}/data/site.json" --check
 fi
 # Linters judge the files git tracks, staged ones included (git add a new file to have it
 # checked): what CI checks and what a commit contains, never another session's

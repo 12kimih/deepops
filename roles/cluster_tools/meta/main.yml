@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: cluster_tools_lib
+  - role: cluster_tools_defaults  # cluster_tools_builtin, cluster_tools_commands
   - role: user_environment_defaults  # user_environment_entries (the profile.d files)
 
 galaxy_info:

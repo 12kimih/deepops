@@ -51,7 +51,7 @@ class ProgramTests(unittest.TestCase):
 
     def test_every_built_in_command_is_the_module_it_publishes(self):
         # roles/cluster_tools publishes NAME as cluster_tools.<NAME, - as _>.
-        defaults = yaml.safe_load((ROOT / "roles/cluster_tools/defaults/main.yml").read_text())
+        defaults = yaml.safe_load((ROOT / "roles/cluster_tools_defaults/defaults/main.yml").read_text())
         for name in defaults["cluster_tools_builtin"]:
             with self.subTest(command=name):
                 module = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}")

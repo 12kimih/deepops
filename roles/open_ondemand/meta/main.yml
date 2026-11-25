@@ -15,3 +15,4 @@ dependencies:
   - role: prometheus_paths  # node_exporter_prom_dir
   - role: directory_defaults  # the LDAP server, CA, suffix and dex reader for Dex
   - role: open_ondemand_defaults  # the portal's name, port and URL
+  - role: cluster_tools_defaults  # cluster_tools_commands (the overview names them)

@@ -487,6 +487,22 @@ def site_tree(config_dir, rev=None):
     return Tree(config_dir, rev=rev, tracked_only=False)
 
 
+def site_rev(config_dir):
+    """The revision of the site config CONFIG_DIR a check reads, or None for its working
+    tree. The site's own commit hook (scripts/deepops/config-pre-commit.sh) passes what is
+    being committed (DEEPOPS_SITE_REV, a tree); deepops' commit hook (pre-commit sets
+    PRE_COMMIT) reads the site as committed (HEAD), when it has a commit: one session's
+    half-done edit there must not block every other's commit."""
+    if os.environ.get("DEEPOPS_SITE_REV"):
+        return os.environ["DEEPOPS_SITE_REV"]
+    if not (os.environ.get("PRE_COMMIT") and (Path(config_dir) / ".git").exists()):
+        return None
+    head = subprocess.run(
+        ["git", "rev-parse", "-q", "--verify", "HEAD"], cwd=config_dir, capture_output=True, env=CLEAN_ENV
+    )
+    return "HEAD" if head.returncode == 0 else None
+
+
 def changes(old, old_owners, new, new_owners, hosts=None):
     """{host: [(name, before, after, where)]} for every value that differs between two
     (Config, owners) states, for HOSTS (default: every host either state has)."""

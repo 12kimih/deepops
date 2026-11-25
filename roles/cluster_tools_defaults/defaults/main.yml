@@ -1,0 +1,10 @@
+---
+# The people's cluster commands, named once for every role that reads them:
+# roles/cluster_tools (publishes them) and roles/open_ondemand (the overview page names
+# them). Each is described by its own definition (cluster_tools.<name, - as _>.COMMAND).
+
+# Every command deepops ships.
+cluster_tools_builtin: [sq, qos, gpu-usage, scratch-space]
+# The ones this site publishes, by name, of cluster_tools_builtin. Empty publishes none and
+# removes what was published.
+cluster_tools_commands: []
