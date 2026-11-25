@@ -128,8 +128,6 @@ def main(argv: list[str]) -> int:
     else:
         if opts.mode == "push":
             sets = push_revs()
-            if sets is None:
-                return 0
         else:
             if not opts.args:
                 parser.error("range takes revisions, e.g. origin/main..HEAD")

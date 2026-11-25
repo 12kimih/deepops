@@ -294,11 +294,7 @@ def main() -> int:
                 kept.append(line)
         scan.text("commit message", "\n".join(kept))
     elif opts.mode == "push":
-        sets = push_revs()
-        if sets is None:
-            print("sensitive-guard: push: no refs to check were given", file=sys.stderr)
-            return 2
-        for revs in sets:
+        for revs in push_revs():
             scan.commits(revs)
     elif opts.mode == "history":
         if not opts.args:
