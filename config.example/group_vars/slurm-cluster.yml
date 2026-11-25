@@ -498,10 +498,8 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 # Login banner -- what people see when they SSH in. One short line each; the guide
 # carries the detail.
 #cluster_tools_motd_title: "my cluster"  # example
-#cluster_tools_motd_commands:  # example
-#  - { name: sq,         text: "your jobs, who holds what, why jobs wait, what is free" }
-#  - { name: qos,        text: "your QoS: what it preempts, how full its quota is" }
-#  - { name: sinfo,      text: "partition and node state" }
+#cluster_tools_motd_commands: "{{ cluster_tools_commands }}"
+#cluster_tools_motd_commands: "{{ cluster_tools_commands + [{'name': 'sinfo', 'text': 'partition and node state'}] }}"  # example
 #cluster_tools_motd_links:  # example
 #  - { name: "{{ cluster_info.docs_url }}", text: "the guide: getting started, recipes, policy" }
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }

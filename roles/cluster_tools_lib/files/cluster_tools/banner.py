@@ -10,6 +10,7 @@ main() reads the banner settings as JSON on stdin and writes the fragment to std
 the cluster_tools role. Python 3.9 or newer, standard library only.
 """
 
+import importlib
 import json
 import sys
 
@@ -19,8 +20,21 @@ from . import render
 _ROLES = {"title": "acc", "name": "part", "link": "info", "text": "sub", "rule": "rule"}
 
 
+def described(entry):
+    """{name, text} for a banner row: a cluster command by its name alone (sq) says what
+    its own definition says (cluster_tools.<name, - as _>.COMMAND.summary), so the banner
+    never restates it; any other row is {name, text} as given."""
+    if isinstance(entry, dict):
+        return entry
+    command = importlib.import_module(f"{__package__}.{entry.replace('-', '_')}").COMMAND
+    return {"name": entry, "text": command.summary}
+
+
 def script(title, commands=(), links=(), flavour=render.DEFAULT_FLAVOUR, color=True):
-    """The fragment for TITLE, COMMANDS and LINKS, each a list of {name, text}."""
+    """The fragment for TITLE, COMMANDS and LINKS: a list of rows, each {name, text} or the
+    name of a cluster command (described())."""
+    commands = [described(c) for c in commands]
+    links = [described(c) for c in links]
     name = render.flavour_name(flavour)
     if not name:
         raise ValueError(f"unknown flavour {flavour!r}; choose one of {', '.join(render.FLAVOURS)}")
