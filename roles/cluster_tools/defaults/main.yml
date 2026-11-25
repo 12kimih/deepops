@@ -61,10 +61,14 @@ cluster_tools_profile_name: z10-cluster-tools
 # empty title removes the fragment. Debian/Ubuntu mechanism -- a node without
 # update-motd.d is skipped.
 #
-# Both lists take {name, text}. Keep each text to one short line: this is read at
-# every login, and the detail belongs behind one of the commands it lists.
+# Both lists take rows of {name, text}, or the name of a cluster command alone (sq),
+# which the banner describes from the command's own definition (cluster_tools.banner).
+# By default the banner lists every published command (cluster_tools_commands) that way,
+# so a command added or dropped shows or goes without a second edit. Keep each text to
+# one short line: this is read at every login, and the detail belongs behind one of the
+# commands it lists.
 cluster_tools_motd_title: ""
-cluster_tools_motd_commands: []
+cluster_tools_motd_commands: "{{ cluster_tools_commands }}"
 cluster_tools_motd_links: []
 
 # Catppuccin flavour for the banner -- mocha, macchiato, frappe or latte -- from the

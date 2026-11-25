@@ -38,6 +38,16 @@ class BannerTests(unittest.TestCase):
             self.assertIn(render.Theme("latte").c[role], script)
         self.assertEqual(ANSI.sub("", shown(script)), shown(banner.script("t", COMMANDS, LINKS, color=False)))
 
+    def test_a_command_named_alone_says_what_its_own_definition_says(self):
+        from cluster_tools import gpu_usage, sq
+
+        out = shown(banner.script("t", ["sq", "gpu-usage", {"name": "sinfo", "text": "nodes"}], color=False))
+        self.assertIn(sq.COMMAND.summary, out)
+        self.assertIn(gpu_usage.COMMAND.summary, out)
+        self.assertIn("sinfo", out)
+        with self.assertRaises(ModuleNotFoundError):
+            banner.script("t", ["no-such-command"], color=False)
+
     def test_unknown_flavour_fails_loudly(self):
         with self.assertRaisesRegex(ValueError, "unknown flavour"):
             banner.script("t", COMMANDS, flavour="solarized")
