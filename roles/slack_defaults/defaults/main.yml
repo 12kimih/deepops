@@ -16,7 +16,7 @@ slack_email_domain: ""
 # The channels by what they are for:
 #   status    what everyone may look at: the hourly and weekly GPU usage, storage
 #   admin     what an administrator has to act on
-#   help      where people ask for help and make requests (scratch space, unbans)
+#   help      where people ask for help and make requests (accounts, unbans, shared data)
 #   announce  notices and release notes
 slack_channels:
   status: "#gpu-usage"
