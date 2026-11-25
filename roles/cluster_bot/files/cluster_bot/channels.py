@@ -5,11 +5,11 @@ site, written by the docs' build), so the text people read in Slack has one sour
     channels.json  {"channels": {ROLE: {"purpose", "topic", "canvas": {"title", "markdown"},
                                         "bookmarks": [{"title", "url", "emoji"}]}}}
 
-ROLE is a channel's purpose (slack_channels: announce, help, status, admin); the names
-are the site's (config), never the docs'. "[[#ROLE]]" in the text is that channel: a
-mention in the canvas, its name in a purpose or topic. "[[url:NAME]]" is a service's
-address (portal, dashboard), which the public site never holds: the bot's config gives
-it, and a line or bookmark whose address the bot has not is left out.
+ROLE is a channel's purpose, a key of slack_channels; the names are the site's (config),
+never the docs'. "[[#ROLE]]" in the text is that channel: a mention in the canvas, its
+name in a purpose or topic. "[[url:NAME]]" is a service's address (NAME from
+service_urls), which the public site never holds: the bot's config gives it, and a line
+or bookmark whose address the bot has not is left out.
 
 round_(fetch, slack, names, state_path, today, log, urls) converges each channel the site
 describes and the config names:
