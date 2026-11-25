@@ -1,6 +1,14 @@
-"""slurm_timer_problems: Slurm's timers that must agree, checked on a rendered slurm.conf.
+"""Facts read from a slurm.conf.
 
     {{ lookup('template', slurm_conf_template) | slurm_timer_problems }}   -> [] when fine
+    {{ lookup('file', slurm_conf_template) | slurm_conf_cluster }}       -> {nodes, partitions}
+
+slurm_conf_cluster: the nodes (name, CPUs, memory, GPUs) and partitions (nodes, time limit)
+its literal NodeName and PartitionName lines list, templates left out. The portal's
+overview page (open_ondemand_overview) and the admin docs (scripts/docs/site_facts.py
+cluster) both read it, so neither types the cluster.
+
+slurm_timer_problems: Slurm's timers that must agree, checked on a rendered slurm.conf.
 
 Each timer is set on its own line, but several only work in relation to another, and
 nothing in Slurm refuses a pair that disagrees: it drains nodes or aborts jobs at run
@@ -67,6 +75,27 @@ def slurm_timer_problems(conf):
     return problems
 
 
+def _pairs(line):
+    """KEY=VALUE words of a slurm.conf line, templates left out."""
+    line = re.sub(r"\{\{.*?\}\}|\{%.*?%\}", "", line)
+    return dict(w.split("=", 1) for w in line.split() if "=" in w)
+
+
+def slurm_conf_cluster(conf):
+    nodes, partitions = [], []
+    for line in str(conf).splitlines():
+        if line.startswith("NodeName=") and "{%" not in line.split()[0]:
+            kv = _pairs(line)
+            nodes.append({"name": kv["NodeName"], "cpus": int(kv.get("CPUs", 0) or 0),
+                          "memory_mb": int(kv.get("RealMemory", 0) or 0), "gres": kv.get("Gres", "")})  # fmt: skip
+        elif line.startswith("PartitionName="):
+            kv = _pairs(line)
+            partitions.append(
+                {"name": kv["PartitionName"], "nodes": kv.get("Nodes", ""), "max_time": kv.get("MaxTime", "")}
+            )
+    return {"nodes": nodes, "partitions": partitions}
+
+
 class FilterModule:
     def filters(self):
-        return {"slurm_timer_problems": slurm_timer_problems}
+        return {"slurm_timer_problems": slurm_timer_problems, "slurm_conf_cluster": slurm_conf_cluster}

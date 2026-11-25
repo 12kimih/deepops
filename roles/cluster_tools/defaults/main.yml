@@ -19,13 +19,11 @@ cluster_tools_bin_dir: /usr/local/bin
 # several commands must agree on, instead of a copy each that drifts apart.
 cluster_tools_libs: []  # cluster_tools_lib_dir comes from cluster_tools_lib (a dependency)
 
-# Built-in commands to publish, by name: any of cluster_tools_builtin, each described by
-# its own definition (cluster_tools.<name, - as _>.COMMAND.summary). Each is installed by
-# cluster_tools_lib with the rest of the cluster's Python; this role adds the command
+# The commands to publish (cluster_tools_commands, of cluster_tools_builtin) are named in
+# roles/cluster_tools_defaults, which the portal's overview reads too. Each is installed
+# by cluster_tools_lib with the rest of the cluster's Python; this role adds the command
 # wrapper and bash completion asked of the command itself, so both always match the
-# installed version. Empty publishes none and removes what was published.
-cluster_tools_commands: []
-cluster_tools_builtin: [sq, qos, gpu-usage, scratch-space]
+# installed version.
 cluster_tools_completion_dir: /usr/share/bash-completion/completions
 
 # Commands this role published are listed in cluster_tools_manifest, and one dropped from

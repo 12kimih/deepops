@@ -94,21 +94,8 @@ READ_ELSEWHERE = {"ansible_user", "ansible_host", "ansible_python_interpreter", 
 
 
 def site_rev():
-    """The revision of CONFIG to read, or None for its working tree. The site's own
-    commit hook (scripts/deepops/config-pre-commit.sh) passes what is being committed
-    (DEEPOPS_SITE_REV, a tree); our commit hook reads the site as committed (HEAD), when
-    CONFIG has a commit (a fresh repository has nothing committed to read yet)."""
-    if os.environ.get("DEEPOPS_SITE_REV"):
-        return os.environ["DEEPOPS_SITE_REV"]
-    if not (os.environ.get("PRE_COMMIT") and (CONFIG / ".git").exists()):
-        return None
-    head = subprocess.run(
-        ["git", "rev-parse", "-q", "--verify", "HEAD"],
-        cwd=CONFIG,
-        capture_output=True,
-        env=settings.CLEAN_ENV,
-    )
-    return "HEAD" if head.returncode == 0 else None
+    """The revision of CONFIG to read (settings.site_rev), or None for its working tree."""
+    return settings.site_rev(CONFIG)
 
 
 def configs():

@@ -2,7 +2,8 @@
 # The site config's commit hook (scripts/setup.sh links it into config/.git/hooks): the
 # settings checks of scripts/deepops/config_lint.py run on what is being committed, so
 # a value a deploy would refuse (a retired setting, a removal the registry does not
-# know, a setting nothing reads) never reaches the clone deploys run from.
+# know, a setting nothing reads) never reaches the clone deploys run from; and its
+# pages' generated blocks (scripts/docs/generate.py) must match the settings committed.
 #
 # Both sides are read as committed: the site at its staged tree, deepops at its HEAD in
 # a throwaway worktree, so work in progress in either clone blocks no one's commit.
@@ -21,5 +22,6 @@ trap 'drop_tree "${deepops}" "${work}/deepops"; rm -rf "${work}"' EXIT
 export_tree "${deepops}" HEAD "${work}/deepops"
 
 cd "${work}/deepops"
-DEEPOPS_CONFIG_DIR="${site}" DEEPOPS_SITE_REV="${tree}" \
-    "${deepops}/.venv/bin/python" scripts/deepops/config_lint.py redundant dead shadow retired removals
+export DEEPOPS_CONFIG_DIR="${site}" DEEPOPS_SITE_REV="${tree}"
+"${deepops}/.venv/bin/python" scripts/deepops/config_lint.py redundant dead shadow retired removals
+"${deepops}/.venv/bin/python" scripts/docs/generate.py --check --site

@@ -1,5 +1,6 @@
 """roles/open_ondemand's cluster overview: a portal page behind the login (custom_pages
-and a widget) rendered from the private facts, never typed; none without facts."""
+and a widget) rendered from the site's slurm.conf (slurm_conf_cluster), never typed;
+none without facts."""
 
 import sys
 import unittest
@@ -16,9 +17,10 @@ FACTS = {"nodes": [{"name": "n1", "cpus": 8, "memory_mb": 2048, "gres": "gpu:t:2
          "partitions": [{"name": "p", "nodes": "n1", "max_time": "1-00:00:00"}]}  # fmt: skip
 
 
-def values(overview):
+def values(overview, commands=()):
     return {"ansible_managed": "managed", "open_ondemand_nav_groups": ["apps"], "open_ondemand_proxied_services": [],
-            "open_ondemand_overview": overview, "open_ondemand_overview_title": "Cluster"}  # fmt: skip
+            "open_ondemand_overview": overview, "open_ondemand_overview_title": "Cluster",
+            "cluster_tools_commands": list(commands)}  # fmt: skip
 
 
 class Overview(unittest.TestCase):
@@ -38,7 +40,7 @@ class Overview(unittest.TestCase):
     def test_the_commands_it_names_are_the_published_ones(self):
         widget = render(
             (TEMPLATES / "cluster-overview.html.erb.j2").read_text(),
-            values({**FACTS, "commands": ["sq", "x-y"]}),
+            values(FACTS, ["sq", "x-y"]),
         )
         self.assertIn("<code>sq</code>, <code>x-y</code>, and Slurm's <code>sinfo</code>", widget)
         self.assertNotIn("<code>qos</code>", widget, "never a typed list")

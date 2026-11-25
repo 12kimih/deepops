@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""The facts the user and admin docs show, from the code and the site config: one data
-file each, so no page types a value its source already holds.
+"""The facts the user and admin docs show, from the code and the site config, so no page
+types a value its source already holds.
 
-    site_facts.py [--config DIR] --public FILE [--private FILE] [--check]
+    site_facts.py [--config DIR] --public FILE [--check]
 
-The public file goes to the user docs site, which is published: it carries only the
-keys in PUBLIC (a test holds the generator to it), never addresses, secrets or the
-site's own limits. The private file (admin docs, in the private config repo) carries
-every fact. With --check nothing is written; a file that differs from what would be
-written is named and the exit status is 1.
+The public file goes to the user docs site, a repository of its own, which is
+published: it carries only the keys in PUBLIC (a test holds the generator to it), never
+addresses, secrets or the site's own limits. The admin docs (the site config's pages)
+read every fact straight from facts(), through scripts/docs/generate.py's fact: blocks.
+With --check nothing is written; a file that differs from what would be written is
+named and the exit status is 1.
 
 Facts:
   commands  the people's cluster commands (cluster_tools_builtin) and their options,
@@ -36,7 +37,8 @@ Facts:
             while slurm_enable_login_private_dirs is on
   slurm     KillWait from the slurm.conf template the site renders, and what preemption
             gives a job: GraceTime, which every preempted QoS has equal to KillWait
-            (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait)
+            (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait);
+            ResumeTimeout and HealthCheckInterval (private: the admin docs' timings)
   quota     each counted filesystem with limits (the hosts' disk_quota_filesystems):
             block_hard and its warn level in TiB, inode_hard (its own, or block_hard's TiB
             times disk_quota_inodes_per_tib) and its warn level (cluster_user_warn_fraction)
@@ -51,7 +53,8 @@ Facts:
             only an entry whose values are paths or URLs. A value derived from other
             settings (SHARED_HF_HUB_CACHE: model_cache_hub) is resolved as Ansible would
   cluster   the nodes (CPUs, memory, GPUs) and partitions (their nodes, time limit) the
-            site's slurm.conf template lists (private: the portal's overview page)
+            site's slurm.conf template lists (private; plugins/filter/slurm_conf.py, which
+            the portal's overview page reads too)
   chat      the Slack channels by purpose (slack_channels, {role: name}) and the
             administrators' group handle (slack_admin_group): names people see in Slack
             anyway; the group's ID stays private
@@ -65,7 +68,7 @@ Facts:
 
 A site value set in the config overrides a role default. A template is rendered (Jinja,
 over the settings already known, until nothing more resolves); one that needs what only
-a host knows (groups, facts, an Ansible filter) is left out (the private file says which).
+a host knows (groups, facts, an Ansible filter) is left out.
 """
 
 import importlib
@@ -77,6 +80,7 @@ import sys
 from pathlib import Path
 
 import jinja2
+import jinja2.meta
 import jinja2.nativetypes
 import yaml
 
@@ -86,13 +90,19 @@ sys.path.insert(0, str(ROOT / "scripts/deepops"))
 import cli  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
-# The one function every reader of the users' environment uses, loaded from its file:
-# plugins/filter on sys.path would shadow the standard library with its secrets.py.
-_spec = importlib.util.spec_from_file_location(
-    "user_environment", ROOT / "plugins/filter/user_environment.py"
-)
-_user_env = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_user_env)
+
+def _filter(name):
+    """A filter plugin's module, loaded from its file: plugins/filter on sys.path would
+    shadow the standard library with its secrets.py."""
+    spec = importlib.util.spec_from_file_location(name, ROOT / "plugins/filter" / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# The one function each reader of the users' environment, and of the cluster, uses.
+_user_env = _filter("user_environment")
+_slurm_conf = _filter("slurm_conf")
 
 # The submit policy's switches (slurm_job_submit_policy, roles/slurm's job_submit.lua),
 # each a policy fact of its name: what the job rules on the user pages say holds.
@@ -226,6 +236,40 @@ def _render(text, values):
         return None
 
 
+def resolved(name, raw, _seen=frozenset()):
+    """RAW[NAME] as Ansible renders it over the other values of RAW (one host's settings,
+    scripts/deepops/settings.py), rendering only the names it uses; None when it is unset,
+    vaulted, or needs what only a host knows. Strings inside lists and dicts too."""
+    if name not in raw or name in _seen:
+        return None
+    seen = _seen | {name}
+
+    def one(value):
+        if isinstance(value, dict):
+            out = {k: one(v) for k, v in value.items()}
+            return None if any(out[k] is None and value[k] is not None for k in value) else out
+        if isinstance(value, list):
+            out = [one(v) for v in value]
+            return None if any(o is None and v is not None for o, v in zip(out, value)) else out
+        if not isinstance(value, str):
+            return value if value is None or isinstance(value, (bool, int, float)) else None
+        if "{{" not in value and "{%" not in value:
+            return value
+        try:
+            used = jinja2.meta.find_undeclared_variables(_JINJA.parse(value))
+        except jinja2.TemplateError:
+            return None
+        values = {}
+        for n in used:
+            v = resolved(n, raw, seen)
+            if v is None:
+                return None
+            values[n] = v
+        return _render(value, values)
+
+    return one(raw[name])
+
+
 def _resolve(value, settings_):
     """VALUE rendered over the settings; None when a template stays (Ansible's to
     resolve). Dicts are resolved field by field."""
@@ -285,47 +329,40 @@ def commands(names):
     return out
 
 
-def _slurm_conf(config):
+def _slurm_conf_path(config):
     site = Path(config) / "files/slurm/slurm.conf" if config else None
     return site if site and site.exists() else ROOT / "roles/slurm/templates/etc/slurm/slurm.conf"
-
-
-def _pairs(line):
-    """KEY=VALUE words of a slurm.conf line, templates left out."""
-    line = re.sub(r"\{\{.*?\}\}|\{%.*?%\}", "", line)
-    return dict(w.split("=", 1) for w in line.split() if "=" in w)
 
 
 def cluster(config):
     """{nodes: [{name, cpus, memory_mb, gres}], partitions: [{name, nodes, max_time}]} from
     the literal NodeName and PartitionName lines of the site's slurm.conf template."""
-    nodes, partitions = [], []
-    for line in _slurm_conf(config).read_text().splitlines():
-        if line.startswith("NodeName=") and "{%" not in line.split()[0]:
-            kv = _pairs(line)
-            nodes.append({"name": kv["NodeName"], "cpus": int(kv.get("CPUs", 0) or 0),
-                          "memory_mb": int(kv.get("RealMemory", 0) or 0), "gres": kv.get("Gres", "")})  # fmt: skip
-        elif line.startswith("PartitionName="):
-            kv = _pairs(line)
-            partitions.append(
-                {"name": kv["PartitionName"], "nodes": kv.get("Nodes", ""), "max_time": kv.get("MaxTime", "")}
-            )
-    return {"nodes": nodes, "partitions": partitions}
+    return _slurm_conf.slurm_conf_cluster(_slurm_conf_path(config).read_text())
+
+
+# Timings the admin docs state, as slurm.conf sets them literally (seconds).
+SLURM_SECONDS = {
+    "resume_timeout_seconds": "ResumeTimeout",
+    "health_check_interval_seconds": "HealthCheckInterval",
+}
 
 
 def slurm_values(config):
     """KillWait from the site's slurm.conf template (config/files/slurm/slurm.conf), else
-    the role's, and the preemption times that follow from it."""
-    template = _slurm_conf(config)
-    m = re.search(r"(?m)^\s*KillWait\s*=\s*(\d+)\s*$", template.read_text())
-    if not m:
-        return {}
-    kill_wait = int(m.group(1))
-    return {
-        "kill_wait_seconds": kill_wait,
-        "preempt_grace_seconds": kill_wait,
-        "sigkill_after_seconds": 2 * kill_wait,
-    }
+    the role's, the preemption times that follow from it, and SLURM_SECONDS."""
+    text = _slurm_conf_path(config).read_text()
+
+    def seconds(key):
+        m = re.search(rf"(?m)^\s*{key}\s*=\s*(\d+)\s*$", text)
+        return int(m.group(1)) if m else None
+
+    out = {field: seconds(key) for field, key in SLURM_SECONDS.items() if seconds(key) is not None}
+    kill_wait = seconds("KillWait")
+    if kill_wait is not None:
+        out.update(
+            kill_wait_seconds=kill_wait, preempt_grace_seconds=kill_wait, sigkill_after_seconds=2 * kill_wait
+        )
+    return out
 
 
 def schedule(config):
@@ -482,11 +519,7 @@ def facts(config):
         "quota": quota_limits(config, s),
         "environment": environment(config),
         "threads": {"variables": s.get("user_environment_thread_variables") or []},
-        # the commands the overview page names: the ones the cluster publishes
-        "cluster": {
-            **cluster(config),
-            "commands": [c for c in s.get("cluster_tools_commands") or [] if isinstance(c, str)],
-        },
+        "cluster": cluster(config),
         "chat": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "bot": bot(s),
         "login": login_limits(config, s),
@@ -531,25 +564,17 @@ def main(argv=None):
     ap = cli.parser(__doc__)
     ap.add_argument("--config", default=os.environ.get("DEEPOPS_CONFIG_DIR", str(ROOT / "config")))
     ap.add_argument("--public", required=True)
-    ap.add_argument("--private")
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args(argv)
     config = args.config if Path(args.config).is_dir() else None
-    every = facts(config)
-    stale = []
-    for path, data in ((args.public, public(every)), (args.private, every)):
-        if not path:
-            continue
-        text = render(data)
-        if args.check:
-            if not Path(path).exists() or Path(path).read_text() != text:
-                stale.append(path)
-        else:
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-            Path(path).write_text(text)
-    for path in stale:
+    path, text = Path(args.public), render(public(facts(config)))
+    if not args.check:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    elif not path.exists() or path.read_text() != text:
         print(f"{path} is stale: run scripts/docs/site_facts.py and commit it", file=sys.stderr)
-    return 1 if stale else 0
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
