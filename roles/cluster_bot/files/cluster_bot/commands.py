@@ -53,6 +53,9 @@ API_SCOPES = {
     "chat.postMessage": "chat:write",
     "chat.postEphemeral": "chat:write",
     "chat.update": "chat:write",
+    "chat.delete": "chat:write",  # a notice post whose notice the docs dropped (.notices)
+    "auth.test": None,  # the bot's own IDs: which posts are its own (.notices)
+    "bots.info": "users:read",
     "chat.getPermalink": None,  # the link of a logged DM (cluster_tools.slack): no scope
     "conversations.open": "im:write",
     "pins.add": "pins:write",
@@ -60,6 +63,9 @@ API_SCOPES = {
     # The channel guides (cluster_bot.channels) and the latest notice's pin (.notices).
     "conversations.list": ("channels:read", "groups:read"),
     "conversations.info": ("channels:read", "groups:read"),
+    # The notice posts in the announcement channel, found again and kept like notices.json.
+    "conversations.history": ("channels:history", "groups:history"),
+    "conversations.replies": ("channels:history", "groups:history"),
     "conversations.setPurpose": ("channels:write.topic", "groups:write.topic"),
     "conversations.setTopic": ("channels:write.topic", "groups:write.topic"),
     "conversations.canvases.create": "canvases:write",
@@ -82,12 +88,14 @@ SCOPES = {
     "pins:write": "pin the live ban list in the administrators' channel, and the latest notice",
     "channels:read": "find each guided channel's ID by its name, and its topic and canvas",
     "groups:read": "the same for a private channel (the administrators')",
+    "channels:history": "find the bot's notice posts in the announcement channel, to edit or remove them",
+    "groups:history": "the same for a private channel",
     "channels:write.topic": "set each guided channel's purpose and topic (narrower than channels:manage)",
     "groups:write.topic": "the same for a private channel",
     "canvases:write": "each guided channel's canvas: create, replace, keep read-only",
     "bookmarks:read": "see which of the bot's own bookmarks are still there",
     "bookmarks:write": "keep each guided channel's bookmarks, the bot's own only",
-    "users:read": "users.lookupByEmail needs it beside users:read.email",
+    "users:read": "users.lookupByEmail needs it beside users:read.email; the bot's own app (bots.info)",
     "users:read.email": "find a person's Slack member by <login>@<domain> when the roster has no ID",
     "usergroups:read": "find the administrators' user group's ID by its handle (roles/slack_defaults)",
 }

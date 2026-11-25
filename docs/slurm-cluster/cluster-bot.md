@@ -98,12 +98,31 @@ each notice in `slack_channels.announce` once, on its date. A notice comes as Ma
 of their own and check each commit with this repository's `notice-render` hook
 (`scripts/deepops/notice_render.py`), so a notice the bot could not show fails where it
 is written. A notice still published as Slack blocks is posted as it is. The docs repository holds no Slack
-credential; the announcement goes through this app. Its first look posts nothing: every
-notice already due counts as announced, so a new deploy never repeats one; a notice
-dated later still goes out on its date. A site it cannot reach is tried again at the
-next look. A notice reworded on the site after it went out is edited in place
-(`chat.update`), so the post says what the site says. The announcement channel keeps one
-pinned notice: the newest the bot posted (the one before is unpinned).
+credential; the announcement goes through this app.
+
+The bot keeps the announcement channel like `notices.json` (`cluster_bot.notices`):
+each notice due has one post, showing it as today's code renders it. A notice reworded
+on the site, or rendered differently by a newer `rich`, edits its post in place
+(`chat.update`), once. A notice the site dropped has its post deleted, with the bot's own
+replies under it (a person's reply stays, under Slack's "deleted" mark), and so does a
+second post of one notice. The newest post is the one pinned. Each post carries Slack
+message metadata (`event_type` `cluster_notice`, the notice's id), so the bot finds its
+posts exactly. Its first look posts nothing: every notice already due counts as
+announced, so a new deploy never repeats one. A notice dated later still goes out on its
+date, and one whose post someone deleted is not posted again. An export with no notice
+changes nothing. A post of another app or a person is never touched.
+
+A post from before the metadata (an older bot's, or this app's webhook's) is found by
+its button to the notice's page, or by its title. The bot's rounds leave those as they
+are; you change them with one run, after reading what it would do, as the bot's user:
+
+    sudo -u <cluster_bot_user> env PYTHONPATH=<deepops_dir>/cluster-bot/lib:<cluster_tools_lib_dir> \
+      <deepops_dir>/cluster-bot/venv/bin/python -m cluster_bot.notices /etc/cluster-bot/config.json --dry-run
+
+The dry run prints each `update`, `delete` (with the replies it takes), `post`, `pin`,
+`missing` and `foreign` (another app's post, left) and changes nothing, the record
+neither. The same command without `--dry-run` does it; from then on those posts carry
+metadata. A post the app may not change (`cant_update_message`) is said and left.
 
 The channels' guides: each channel `slack_channels` names gets its purpose, topic, a
 canvas (the channel's README tab) and bookmarks from `<docs_url>/channels.json` (the docs
