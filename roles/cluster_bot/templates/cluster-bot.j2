@@ -1,0 +1,21 @@
+#!/bin/sh
+{{ ansible_managed | comment }}
+# roles/cluster_bot: the administrators' command, run with sudo. It runs the bot's code as
+# the bot's user, with the interpreter, path and config of its unit (cluster-bot.service).
+#
+#   cluster-bot notices --dry-run   say what a notices round would do to the announcement
+#                                   channel (edit, delete, post, pin); change nothing
+#   cluster-bot notices             do it, the posts from before metadata too
+set -eu
+usage() { echo "usage: cluster-bot notices [--dry-run]" >&2; exit 2; }
+[ "$#" -ge 1 ] || usage
+case "$1" in
+  notices) shift ;;
+  *) usage ;;
+esac
+if [ "$(id -u)" -ne 0 ]; then
+  echo "cluster-bot: run it with sudo (it reads the bot's token as {{ cluster_bot_user }})" >&2
+  exit 1
+fi
+exec runuser -u {{ cluster_bot_user | quote }} -- env PYTHONPATH={{ _cluster_bot_pythonpath | quote }} \
+  {{ _cluster_bot_python | quote }} -m cluster_bot.notices {{ _cluster_bot_config | quote }} "$@"
