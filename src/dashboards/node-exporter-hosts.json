@@ -65,6 +65,18 @@
   "id": null,
   "links": [
     {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": [
+        "deepops"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "icon": "external link"
+    },
+    {
       "icon": "external link",
       "tags": [],
       "targetBlank": true,
@@ -15464,6 +15476,7 @@
   "refresh": "1m",
   "schemaVersion": 41,
   "tags": [
+    "deepops",
     "node-exporter",
     "upstream"
   ],

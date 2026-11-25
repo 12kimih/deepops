@@ -4,6 +4,7 @@
   "id": null,
   "description": "Who drives the NFS exports and the server's disks, by node, job and login, before and after iocost.",
   "tags": [
+    "deepops",
     "storage"
   ],
   "editable": false,
@@ -31,7 +32,20 @@
   "annotations": {
     "list": []
   },
-  "links": [],
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": [
+        "deepops"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "icon": "external link"
+    }
+  ],
   "panels": [
     {
       "type": "row",
@@ -71,7 +85,17 @@
           "color": {
             "mode": "palette-classic"
           },
-          "min": 0
+          "min": 0,
+          "links": [
+            {
+              "title": "GPU node",
+              "url": "/d/gpu-nodes?var-hostname=${__field.labels.host}&${__url_time_range}"
+            },
+            {
+              "title": "Host",
+              "url": "/d/node-exporter-hosts?var-nodename=${__field.labels.host}&${__url_time_range}"
+            }
+          ]
         },
         "overrides": []
       },
@@ -137,7 +161,17 @@
           "color": {
             "mode": "palette-classic"
           },
-          "min": 0
+          "min": 0,
+          "links": [
+            {
+              "title": "GPU node",
+              "url": "/d/gpu-nodes?var-hostname=${__field.labels.host}&${__url_time_range}"
+            },
+            {
+              "title": "Host",
+              "url": "/d/node-exporter-hosts?var-nodename=${__field.labels.host}&${__url_time_range}"
+            }
+          ]
         },
         "overrides": []
       },
@@ -216,7 +250,21 @@
           "color": {
             "mode": "palette-classic"
           },
-          "min": 0
+          "min": 0,
+          "links": [
+            {
+              "title": "This job",
+              "url": "/d/slurm-gpu-allocation?var-job_id=${__field.labels.job_id}&${__url_time_range}"
+            },
+            {
+              "title": "GPU node",
+              "url": "/d/gpu-nodes?var-hostname=${__field.labels.host}&${__url_time_range}"
+            },
+            {
+              "title": "Host",
+              "url": "/d/node-exporter-hosts?var-nodename=${__field.labels.host}&${__url_time_range}"
+            }
+          ]
         },
         "overrides": []
       },

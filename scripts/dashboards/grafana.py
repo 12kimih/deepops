@@ -31,6 +31,31 @@ STATE_COLORS = {
 }
 
 
+# Every shipped dashboard carries this tag; each one's header lists the others by it.
+TAG = "deepops"
+# The dashboards a link opens, by uid (tests/monitoring/test_dashboards.py: each a
+# shipped dashboard that has the variable the link sets).
+GPU_NODES = "gpu-nodes"  # one GPU node: var hostname
+HOSTS = "node-exporter-hosts"  # one host, any kind: var nodename
+GPU_ALLOCATION = "slurm-gpu-allocation"  # jobs and their GPUs: vars user, job_id
+
+
+def link(title, uid, **variables):
+    """A data link to dashboard UID with VARIABLES set (a value may be a Grafana
+    expression such as ${__value.raw}), over the same time range."""
+    params = "".join(f"var-{name}={value}&" for name, value in variables.items())
+    return {"title": title, "url": f"/d/{uid}?{params}${{__url_time_range}}"}
+
+
+def host_links(value):
+    """A host's two dashboards, for a cell or a series that names it."""
+    return [link("GPU node", GPU_NODES, hostname=value), link("Host", HOSTS, nodename=value)]
+
+
+def job_links(value):
+    return [link("This job", GPU_ALLOCATION, job_id=value)]
+
+
 def query(expr, legend="", *, instant=False, table=False, ref=None):
     target = {"expr": expr, "legendFormat": legend, "datasource": DATASOURCE}
     if instant:
@@ -96,8 +121,10 @@ def timeseries(
     colors=None,
     no_value=None,
     fill=None,
+    links=(),
 ):
-    """Lines (or a stack) over time. `negative` names a series, or /regex/, drawn below the axis."""
+    """Lines (or a stack) over time. `negative` names a series, or /regex/, drawn below the axis.
+    `links` are data links on every series (link(), host_links(), job_links())."""
     custom = {
         "drawStyle": "line",
         "lineWidth": 1,
@@ -115,6 +142,8 @@ def timeseries(
         defaults["decimals"] = decimals
     if no_value:
         defaults["noValue"] = no_value
+    if links:
+        defaults["links"] = list(links)
     overrides = _color_overrides(colors or {})
     if negative:
         matcher = (
@@ -243,12 +272,29 @@ def bars(title, expr, by, *, unit="percentunit", w=12, h=8, description="", max=
 
 
 def table(
-    title, expr, columns, *, w=24, h=8, description="", sort=None, value=None, no_value="None", colors=None
+    title,
+    expr,
+    columns,
+    *,
+    w=24,
+    h=8,
+    description="",
+    sort=None,
+    value=None,
+    no_value="None",
+    colors=None,
+    links=None,
 ):
     """An instant table with exactly `columns`, in that order. `value` = (name, unit, colour scheme)
     names and formats the query's value column; `colors` = {column: {regex: colour}} colours
-    text cells by what they say."""
-    overrides = []
+    text cells by what they say; `links` = {column: [link, ...]} makes its cells links."""
+    overrides = [
+        {
+            "matcher": {"id": "byName", "options": column},
+            "properties": [{"id": "links", "value": list(items)}],
+        }
+        for column, items in (links or {}).items()
+    ]
     for column, rules in (colors or {}).items():
         mappings = [
             {"type": "regex", "options": {"pattern": pattern, "result": {"color": color, "index": i}}}
@@ -375,13 +421,34 @@ def query_variable(name, expr, regex, *, label=None, hide=False):
     }
 
 
+def label_variable(name, metric, label, *, label_text=None):
+    """A multi-select variable of LABEL's values on METRIC over the time range, All by
+    default; queries match it with label=~"$name"."""
+    return {
+        "name": name,
+        "label": label_text,
+        "type": "query",
+        "datasource": "$datasource",
+        "query": {"query": f"label_values({metric}, {label})", "refId": f"{name}-values"},
+        "definition": f"label_values({metric}, {label})",
+        "refresh": 2,
+        "hide": 0,
+        "includeAll": True,
+        "allValue": ".*",
+        "multi": True,
+        "sort": 3,
+        "options": [],
+        "current": {"selected": True, "text": ["All"], "value": ["$__all"]},
+    }
+
+
 def dashboard(uid, title, panels, *, tags, description, variables=(), refresh="1m", time_from="now-24h"):
     return {
         "uid": uid,
         "title": title,
         "id": None,
         "description": description,
-        "tags": list(tags),
+        "tags": [TAG, *tags],
         "editable": False,
         "graphTooltip": 1,
         "refresh": refresh,
@@ -390,9 +457,22 @@ def dashboard(uid, title, panels, *, tags, description, variables=(), refresh="1
         "timezone": "browser",
         "templating": {"list": [datasource_variable(), *variables]},
         "annotations": {"list": []},
-        "links": [],
+        "links": [DASHBOARDS_LINK],
         "panels": layout(panels),
     }
+
+
+# The header's menu of every shipped dashboard, keeping the time range.
+DASHBOARDS_LINK = {
+    "title": "Dashboards",
+    "type": "dashboards",
+    "tags": [TAG],
+    "asDropdown": True,
+    "keepTime": True,
+    "includeVars": False,
+    "targetBlank": False,
+    "icon": "external link",
+}
 
 
 def render(dash):
