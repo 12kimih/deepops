@@ -4,7 +4,7 @@
 # them). Each is described by its own definition (cluster_tools.<name, - as _>.COMMAND).
 
 # Every command deepops ships.
-cluster_tools_builtin: [sq, qos, gpu-usage, scratch-space]
+cluster_tools_builtin: [sq, qos, gpu-usage, scratch-space, disk-usage]
 # The ones this site publishes, by name, of cluster_tools_builtin. Empty publishes none and
 # removes what was published.
 cluster_tools_commands: []

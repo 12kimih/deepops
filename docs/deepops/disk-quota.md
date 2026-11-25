@@ -102,6 +102,13 @@ runs it at low priority (`disk_quota_scan_on_calendar`). The scratch space is we
 its own daily cleanup walk (`roles/scratch_space`), never a second one: list it in
 `disk_quota_scan` never.
 
+Each person sees their own share of the same figures with `disk-usage` (a
+`cluster_tools_commands` entry, `cluster_tools.disk_usage`): their space and files on each
+counted filesystem against the warn level and the limit, their folders worth cleaning, and
+how much their jobs and logins read and wrote over the last `--hours` (roles/io_usage).
+It reads Prometheus, as the report does. The Grafana dashboard Storage / per person
+(`storage-person`) draws the same queries over time, for the person its User variable picks.
+
 Look at the distribution, then choose hard limits that leave the filesystem's other
 users (the controller's database, the logs) a reserve: roughly, the space users may
 share divided by how many could fill theirs at once. Alerts report when the usage stops

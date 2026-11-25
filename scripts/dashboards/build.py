@@ -12,13 +12,14 @@ import gpu_nodes
 import slurm_gpu_allocation
 import slurm_scheduler
 import storage_io
+import storage_person
 from grafana import render
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deepops"))
 import cli  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-DASHBOARDS = [gpu_nodes, slurm_scheduler, slurm_gpu_allocation, storage_io]
+DASHBOARDS = [gpu_nodes, slurm_scheduler, slurm_gpu_allocation, storage_io, storage_person]
 
 
 def main(argv):
