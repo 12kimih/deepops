@@ -48,6 +48,7 @@ sys.modules.setdefault("slack_sdk", types.ModuleType("slack_sdk"))
 sys.modules.setdefault(
     "slack_sdk.errors", types.SimpleNamespace(SlackApiError=type("SlackApiError", (Exception,), {}))
 )
+from cluster_tools import rich  # noqa: E402
 from cluster_bot import app  # noqa: E402
 from cluster_tools import job_notice  # noqa: E402
 from cluster_tools.slack import MEMBER  # noqa: E402
@@ -158,7 +159,9 @@ class Handlers(unittest.TestCase):
         admin = posts["#admin"]
         self.assertTrue(admin["text"].startswith("<!subteam^SADMINS> "))
         self.assertEqual(
-            admin["blocks"][0]["text"]["text"], "<!subteam^SADMINS>", "the blocks notify, not the text"
+            admin["blocks"][0]["elements"][0]["elements"],
+            [{"type": "usergroup", "usergroup_id": "SADMINS"}],
+            "the blocks notify, not the text",
         )
         self.assertNotIn("SADMINS", posts["#help"]["text"])
 
@@ -170,7 +173,7 @@ class Handlers(unittest.TestCase):
         post("the list", [{"type": "section", "text": {"type": "mrkdwn", "text": "the list"}}], pin=True)
         notice, pinned = (c.kwargs for c in client.chat_postMessage.call_args_list)
         self.assertTrue(notice["text"].startswith("<!subteam^SADMINS> "))
-        self.assertEqual(notice["blocks"][0]["text"]["text"], "<!subteam^SADMINS>")
+        self.assertEqual(rich.read(notice["blocks"][:1]), "<!subteam^SADMINS>")
         self.assertEqual(pinned["text"], "the list")
         self.assertEqual(len(pinned["blocks"]), 1)
 
@@ -322,7 +325,7 @@ class Handlers(unittest.TestCase):
     def test_the_home_tab_says_how_to_ask_for_help(self):
         self.call("event", "app_home_opened", event={"tab": "home", "user": "UALICE"})
         view = self.client.views_publish.call_args.kwargs["view"]
-        text = "\n".join(b["text"]["text"] for b in view["blocks"] if b.get("type") == "section")
+        text = rich.read(view["blocks"])
         self.assertIn("#help", text)
         self.assertIn("스레드", text)
         self.assertIn("@admins 잡이", text, "a ready-made example that tags the group")

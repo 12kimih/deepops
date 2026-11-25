@@ -2,6 +2,8 @@
 
 import time
 
+from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+
 from .blocks import button, field
 
 KIND_NAMES = {"datasets": "데이터셋", "models": "모델 가중치", "containers": "컨테이너 이미지"}
@@ -23,10 +25,9 @@ def form(kinds):
         "submit": {"type": "plain_text", "text": "신청"},
         "close": {"type": "plain_text", "text": "취소"},
         "blocks": [
-            {"type": "context", "elements": [{"type": "mrkdwn", "text":
-                "여러 사람이 쓰는 공개 데이터를 한 곳에 한 번만 받아 둡니다. 관리자가 승인하면 공유 계정이 "
+            rich.context("여러 사람이 쓰는 공개 데이터를 한 곳에 한 번만 받아 둡니다. 관리자가 승인하면 공유 계정이 "
                 "공개된 https 주소에서 받아 올리고, 모두 읽을 수 있습니다. 받은 파일은 올라온 그대로 둡니다 "
-                "(압축 파일은 풀지 않습니다: 작은 파일 여러 개는 공유 스토리지를 느리게 합니다)."}]},
+                "(압축 파일은 풀지 않습니다: 작은 파일 여러 개는 공유 스토리지를 느리게 합니다)."),
             field("category", "종류", {"type": "static_select", "options": [_option(k) for k in kinds]}),
             field("name", "이름 (폴더 이름: 영문 소문자, 숫자, . _ -)", {"type": "plain_text_input", "max_length": 64}),
             field("url", "공개된 https 주소", text),
@@ -54,7 +55,7 @@ def notice_dm(key, path, unused_days, removal):
     """The requester's notice: (text, blocks) with the button that keeps it."""
     text = (f"{path}을(를) {unused_days}일 동안 쓴다고 알린 사람이 없습니다. "
             f"계속 쓰면 아래 버튼을 눌러 주세요. 아니면 {_date(removal)}에 지웁니다.")  # fmt: skip
-    return text, [{"type": "section", "text": {"type": "mrkdwn", "text": text}},
+    return text, [rich.section(text),
                   {"type": "actions", "elements": [button("계속 씁니다", "data.use", key, style="primary")]}]  # fmt: skip
 
 
@@ -62,7 +63,7 @@ def notice_channel(key, path, requester, removal):
     """The help channel's notice: (text, blocks), anyone who uses it presses the button."""
     text = (f"공유 데이터 {path} ({requester} 요청)을(를) {_date(removal)}에 지웁니다. "
             "쓰고 있다면 버튼을 눌러 주세요.")  # fmt: skip
-    return text, [{"type": "section", "text": {"type": "mrkdwn", "text": text}},
+    return text, [rich.section(text),
                   {"type": "actions", "elements": [button("저도 씁니다", "data.use", key)]}]  # fmt: skip
 
 

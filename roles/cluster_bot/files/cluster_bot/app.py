@@ -36,14 +36,13 @@ import time
 from datetime import date
 from pathlib import Path
 
+from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 from cluster_tools.slack import DmLog, Slack  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 
 from . import (
     accounts_blocks,
     bans_blocks,
-    channels as guides,
     commands,
-    notices as docs_notices,
     data_blocks,
     home_blocks,
     onboarding,
@@ -52,6 +51,12 @@ from . import (
     state,
 )
 from . import blocks as shared
+from . import (
+    channels as guides,
+)
+from . import (
+    notices as docs_notices,
+)
 from .accounts import JoinFeature, LeaveFeature, leaving_deadlines
 from .bans import SERVICE as BANS
 from .bans import UnbanFeature, address, watch
@@ -107,7 +112,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         req = outcome.request
         thread = req.get("thread_ts")
         text = f"<@{slack_id}> {engine.describe(req)}: {outcome.text}" if req else outcome.text
-        client.chat_postMessage(channel=channels["help"], text=text, thread_ts=thread)
+        client.chat_postMessage(channel=channels["help"], thread_ts=thread, **rich.message(text))
         dm(slack_id, outcome.text, kind="request", log=log)
 
     def submit(client, slack_id, req):
@@ -117,7 +122,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             approvers = engine.approvers(outcome.key)
             first = client.chat_postMessage(
                 channel=channels["help"],
-                text=f"<@{slack_id}> {engine.describe(req)}: 승인 대기",
+                **rich.message(f"<@{slack_id}> {engine.describe(req)}: 승인 대기"),
             )
             # Held for some people (a project's owners): each gets the buttons in a DM;
             # otherwise the administrators, in their channel.
@@ -126,7 +131,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
                 text, blocks = outcome.text, shared.held(f"<@{slack_id}>", outcome.text, outcome.key)
                 if place == channels["admin"]:
                     text, blocks = shared.mentioning(cfg["admin_mention"], text, blocks)
-                    client.chat_postMessage(channel=place, text=text, blocks=blocks)
+                    client.chat_postMessage(channel=place, **rich.message(text, blocks))
                 else:
                     dm(place, text, blocks, kind="approval", log=True)
             engine.note(outcome.key, slack_id=slack_id, thread_ts=first["ts"])
@@ -178,7 +183,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             text = "이 클러스터는 Slack 계정 신청을 받지 않습니다."
             if join:
                 text = "이미 계정이 있습니다.\n" + onboarding.connect_text(connect, user_of(body["user_id"]))
-            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
+            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], **rich.message(text))
             return
         client.views_open(trigger_id=body["trigger_id"], view=accounts_blocks.join_form(join.teams()))
 
@@ -196,7 +201,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         user = user_of(body["user_id"])
         if join is None or not user:
             client.chat_postEphemeral(
-                channel=body["channel_id"], user=body["user_id"], text="정리할 계정이 없습니다."
+                channel=body["channel_id"], user=body["user_id"], **rich.message("정리할 계정이 없습니다.")
             )
             return
         view = accounts_blocks.leave_form(user, body["user_id"] in admins, time.strftime("%Y-%m-%d"))
@@ -219,7 +224,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         if unban is None or not user_of(body["user_id"]):
             text = ("사람 명부에 이 Slack 계정이 없습니다. 관리자에게 알려 주세요." if unban
                     else "이 클러스터는 Slack으로 차단 해제 신청을 받지 않습니다.")  # fmt: skip
-            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
+            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], **rich.message(text))
             return
         client.views_open(trigger_id=body["trigger_id"], view=bans_blocks.unban_form())
 
@@ -258,7 +263,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
                 if project
                 else "이 클러스터는 공동작업 폴더 신청을 받지 않습니다."
             )
-            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
+            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], **rich.message(text))
             return
         client.views_open(
             trigger_id=body["trigger_id"], view=projects_blocks.new_form(cfg["projects"]["places"])
@@ -269,7 +274,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         if data is None or not user_of(body["user_id"]):
             text = ("명부에 이 Slack 계정이 없습니다." if data
                     else "이 클러스터는 Slack으로 공유 데이터 신청을 받지 않습니다.")  # fmt: skip
-            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
+            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], **rich.message(text))
             return
         client.views_open(trigger_id=body["trigger_id"], view=data_blocks.form(data.kinds))
 
@@ -311,9 +316,9 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
     def help_command(body, client):
         client.chat_postEphemeral(
             channel=body["channel_id"], user=body["user_id"],
-            text=commands.help_lines(
+            **rich.message(commands.help_lines(
                 command, engine.features, home_blocks.help_text(channels["help"], cfg.get("admin_group", ""))
-            ),
+            )),
         )  # fmt: skip
 
     # The one slash command (cfg command, /cluster): every request is a subcommand, the
@@ -438,7 +443,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         else:
             outcome = engine.deny(action["value"], f"<@{admin}>")
         client.chat_update(
-            channel=body["channel"]["id"], ts=body["message"]["ts"], text=outcome.text, blocks=[]
+            channel=body["channel"]["id"], ts=body["message"]["ts"], **rich.message(outcome.text)
         )
         if outcome.request.get("slack_id"):
             tell(client, outcome.request["slack_id"], outcome, log=True)
@@ -483,7 +488,7 @@ def admin_messages(client, channel, mention=""):
     def post(text, blocks, pin=False):
         if not pin:  # a notice to act on mentions the administrators; a pinned list does not
             text, blocks = shared.mentioning(mention, text, blocks)
-        sent = client.chat_postMessage(channel=channel, text=text, blocks=blocks)
+        sent = client.chat_postMessage(channel=channel, **rich.message(text, blocks))
         message = {"channel": sent["channel"], "ts": sent["ts"]}
         if pin:
             try:
@@ -496,7 +501,7 @@ def admin_messages(client, channel, mention=""):
 
     def update(message, text, blocks):
         try:
-            client.chat_update(channel=message["channel"], ts=message["ts"], text=text, blocks=blocks)
+            client.chat_update(channel=message["channel"], ts=message["ts"], **rich.message(text, blocks))
         except SlackApiError as e:
             if e.response.get("error") in ("message_not_found", "cant_update_message"):
                 return False
@@ -522,17 +527,17 @@ def data_rounds(client, dms, data, cfg, slack_of):
                 text, blocks = data_blocks.notice_dm(key, path, unused, removal)
                 dms.dm(who, text, blocks, kind="data-unused", login=login)
             text, blocks = data_blocks.notice_channel(key, path, entry.get("requester"), removal)
-            client.chat_postMessage(channel=channels["help"], text=text, blocks=blocks)
+            client.chat_postMessage(channel=channels["help"], **rich.message(text, blocks))
         elif event == "removed":
             text = data_blocks.removed(path, unused, grace)
             if who:
                 dms.dm(who, text, kind="data-removed", login=login)
-            client.chat_postMessage(channel=channels["admin"], text=text)
+            client.chat_postMessage(channel=channels["admin"], **rich.message(text))
         elif event == "failed_removal":
             text, blocks = shared.mentioning(
                 cfg["admin_mention"], f"{path}을(를) 지우지 못했습니다: {error}", []
             )
-            client.chat_postMessage(channel=channels["admin"], text=text, blocks=blocks or None)
+            client.chat_postMessage(channel=channels["admin"], **rich.message(text, blocks or None))
 
     def round_():
         with state.locked(settings["seen"], {}) as seen:

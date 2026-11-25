@@ -9,6 +9,9 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files")
+)  # cluster_tools, which the bot imports
 from cluster_bot import data  # noqa: E402
 from cluster_bot.requests import Failed, Refused  # noqa: E402
 

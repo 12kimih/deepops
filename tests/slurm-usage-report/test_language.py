@@ -1,4 +1,5 @@
-"""Everything the reports say to people (the status channel's posts, the DMs) is Korean:
+"""Everything the reports say to people (the status channel's posts, the DMs) is Korean,
+and shows no Markdown marker (tests/lib/slack_text: "*3개*의" in mrkdwn shows its stars):
 no English word outside the names it shows (GPU, Slurm, Grafana, a node's state), a
 command or path in backticks, a link, a mention or an emoji. The administrators' channel
 and what sbatch prints stay English, as every terminal message does."""
@@ -14,8 +15,11 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
-from cluster_tools import disk_report, io_report  # noqa: E402
+from cluster_tools import disk_report, io_report, rich  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "tests/lib"))
+from slack_text import problems  # noqa: E402
 
 # The disk tests' Prometheus stand-in, the same site.
 _spec = importlib.util.spec_from_file_location("disk_fixture", Path(__file__).with_name("test_disk.py"))
@@ -38,7 +42,7 @@ FIXTURE = {
     "data",
     "old",
 }
-DROP = re.compile(r"```.*?```|`[^`]*`|<[^>]*>|:[a-z_]+:|/\S*", re.S)
+DROP = re.compile(r"```.*?```|`[^`]*`|<[^>]*>|\(https?://\S+\)|:[a-z_]+:|/\S*", re.S)
 
 
 def english(text):
@@ -50,15 +54,16 @@ def english(text):
 
 
 def strings(node):
+    """What a message shows: its blocks as cluster_tools.rich reads them, or its text."""
     if isinstance(node, dict):
-        return " ".join(strings(v) for k, v in node.items() if k not in ("type", "action_id", "style"))
+        return rich.read([node])
     if isinstance(node, (list, tuple)):
         return " ".join(strings(v) for v in node)
     return node if isinstance(node, str) else ""
 
 
 def who(user, mention):
-    return f"<@U{user}>" if mention else user
+    return f"<@U{user.upper()}>" if mention else user
 
 
 def a_job(jid, user, idle):
@@ -70,6 +75,13 @@ def a_job(jid, user, idle):
 class Language(unittest.TestCase):
     def assertKorean(self, what, text):
         self.assertEqual(english(text), [], f"{what}: {text[:300]}")
+
+    def assertShown(self, what, message):
+        """MESSAGE (blocks, or a text sent as one) shows no Markdown marker (tests/lib/slack_text)."""
+        if isinstance(message, str):
+            message = rich.message(message)
+            message = (message["text"], message["blocks"])
+        self.assertEqual(problems(message, what), [])
 
     def test_the_check_finds_english(self):
         self.assertEqual(
@@ -88,6 +100,10 @@ class Language(unittest.TestCase):
                 "dashboard_url": "https://grafana.example/"}  # fmt: skip
         cfg = {"idle_util_threshold": 5, "idle_hours": 2, "notify": ["mention"], "cancel_after_hours": 6}
         (text, summary), thread = report.render(data, cfg, who)
+        self.assertShown("card", (text, summary))
+        for _, blocks in thread:
+            self.assertShown("thread", blocks)
+        self.assertShown("cancel", report.cancelled_note(jobs[:1], cfg, who))
         self.assertKorean("text", text)
         self.assertKorean("card", strings(summary))
         for _, blocks in thread:
@@ -97,6 +113,7 @@ class Language(unittest.TestCase):
     def test_the_weekly_summary(self):
         rows = [{"user": "alice", "held": 120, "idle": 90}, {"user": "bob", "held": 10, "idle": 0}]
         self.assertKorean("weekly", strings(report.render_week(rows, who, 5)))
+        self.assertShown("weekly", report.render_week(rows, who, 5))
         self.assertKorean("weekly, none", strings(report.render_week([], who, 5)))
 
     def test_the_disk_report_and_its_thread(self):
@@ -105,6 +122,9 @@ class Language(unittest.TestCase):
         for hold in (None, 0, disk_fixture.NOW + disk_report.DAY):
             (text, card), thread = disk_report.render(data, who, 2, people={"alice", "bob"}, hold=hold, fill=fill,
                                                       stale_days=60)  # fmt: skip
+            self.assertShown("disk card", (text, card))
+            for _, blocks in thread:
+                self.assertShown("disk thread", blocks)
             self.assertKorean("text", text)
             self.assertKorean("card", strings(card))
             for _, blocks in thread:
@@ -115,16 +135,20 @@ class Language(unittest.TestCase):
         for row in disk_report.over_warn(data):
             self.assertKorean("disk DM", disk_report.dm_text(row, disk_report.hold_note(0, disk_fixture.NOW)))
             self.assertKorean("disk DM", disk_report.dm_text(row))
+            self.assertShown("disk DM", disk_report.dm_text(row, disk_report.hold_note(0, disk_fixture.NOW)))
         entry = {"files": 3, "bytes": 2**31, "next": disk_fixture.NOW, "stale_days": 60, "deferred": 2}
         self.assertKorean("purge DM", disk_report.purge_dm_text(("n1", "alice"), entry))
+        self.assertShown("purge DM", disk_report.purge_dm_text(("n1", "alice"), entry))
         item = {"host": "n1", "mount": "/home", "direction": "write", "rate": 4e8, "capacity": 8e8, "minutes": 15,
                 "jobs": [("10", "alice", 3e8), ("11", "bob", 5e7)]}  # fmt: skip
         for rank in (0, 1):
             self.assertKorean("I/O DM", io_report.dm_text(item, rank, ""))
+            self.assertShown("I/O DM", io_report.dm_text(item, rank, ""))
         defaults = yaml.safe_load((ROOT / "roles/slurm_usage_report/defaults/main.yml").read_text())
         jobs = report.job_lines([a_job("1", "alice", True)])
         for key in ("slurm_usage_report_dm_text", "slurm_usage_report_cancel_warn_text"):
             self.assertKorean(key, defaults[key].format(jobs=jobs, count=1, hours="2"))
+            self.assertShown(key, defaults[key].format(jobs=jobs, count=1, hours="2"))
         self.assertKorean("io_advice", defaults["slurm_usage_report_io_advice"])
 
 

@@ -13,8 +13,9 @@ ROLE = Path(__file__).resolve().parents[2] / "roles/cluster_bot"
 sys.path.insert(0, str(ROLE / "files"))
 sys.path.insert(0, str(ROLE.parent / "cluster_tools_lib/files"))
 sys.path.insert(0, str(ROLE.parents[1] / "tests/lib"))
-from fake_slack import FakeDM  # noqa: E402
+from cluster_tools import rich  # noqa: E402
 from cluster_bot import accounts, accounts_blocks, app, reminders, state  # noqa: E402
+from fake_slack import FakeDM  # noqa: E402
 
 DAY = 86400
 
@@ -122,7 +123,7 @@ class LogicTests(unittest.TestCase):
         client, sent = Client(), {}
         day_before = time.mktime(datetime.datetime(2027, 2, 28, 9).timetuple())
         reminders.remind(sources, client, SLACK_OF, sent, day_before)
-        text = client.sent[0]["blocks"][0]["text"]["text"]
+        text = rich.read(client.sent[0]["blocks"][:1])
         self.assertIn("내일이", text)
         self.assertIn("2027-02-28", text)
         self.assertIn("2027-03-30부터는 로그인이 막힙니다", text)

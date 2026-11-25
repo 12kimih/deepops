@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
 sys.path.insert(0, str(ROOT / "tests/lib"))
 import bounds  # noqa: E402
 import in_tree  # noqa: E402

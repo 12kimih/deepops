@@ -12,11 +12,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
 sys.path.insert(0, str(ROOT / "tests/lib"))
 import in_tree  # noqa: E402
-from fake_slack import FakeDM  # noqa: E402
 import yaml  # noqa: E402
 from cluster_bot import projects, projects_blocks, requests  # noqa: E402
+from fake_slack import FakeDM  # noqa: E402
 
 people = in_tree.load("plugins/filter/people.py")
 

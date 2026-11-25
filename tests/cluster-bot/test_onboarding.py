@@ -12,6 +12,7 @@ from jinja2 import Environment
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
 from cluster_bot import onboarding  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "tests/lib"))

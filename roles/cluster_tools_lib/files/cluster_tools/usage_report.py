@@ -36,7 +36,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from . import config, disk_report, io_report, notices
+from . import config, disk_report, io_report, notices, rich
 from .config import ConfigError
 from .files import write_atomic
 from .prometheus import Prometheus
@@ -198,7 +198,7 @@ def render_week(rows, who, threshold, days=WEEK_DAYS, top=WEEK_TOP):
         "쓰지 않는 GPU는 `scancel <JOBID>`로 반납해 주세요."
     )
     return head, [{"type": "header", "text": {"type": "plain_text", "text": head[:150]}}] + sections(body) + [
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": note}]}
+        rich.context(note)
     ]
 
 
@@ -294,11 +294,11 @@ def render(report, cfg, who):
     )
     status = ":large_green_circle:" if not idle and not report["reasons"] else ":large_yellow_circle:"
     fields = [
-        f"*할당된 GPU*\n{alloc} / {total}장 ({100 * alloc / total:.0f}%)",
-        f"*평균 사용률*\n{avg}",
-        f"*GPU를 쓰지 않는 잡*\n{len(idle)}개" + (" :zzz:" if idle else ""),
-        f"*기다리는 잡*\n{pend_jobs}개, GPU {pend_gpus}장",
-        f"*쓸 수 없는 노드 (drain, down)*\n{len(report['reasons'])}대"
+        f"**할당된 GPU**\n{alloc} / {total}장 ({100 * alloc / total:.0f}%)",
+        f"**평균 사용률**\n{avg}",
+        f"**GPU를 쓰지 않는 잡**\n{len(idle)}개" + (" :zzz:" if idle else ""),
+        f"**기다리는 잡**\n{pend_jobs}개, GPU {pend_gpus}장",
+        f"**쓸 수 없는 노드 (drain, down)**\n{len(report['reasons'])}대"
         + (" :warning:" if report["reasons"] else ""),
     ]
     footer = "자세한 내용은 스레드에 있습니다"
@@ -306,14 +306,14 @@ def render(report, cfg, who):
         footer += f"  |  <{report['dashboard_url']}|Grafana>"
     summary = [
         {"type": "header", "text": {"type": "plain_text", "text": f"\U0001f4ca GPU 사용 현황  {stamp}"}},
-        {"type": "section", "fields": [{"type": "mrkdwn", "text": f} for f in fields]},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": f"{status}  {footer}"}]},
+        rich.fields(*fields),
+        rich.context(f"{status}  {footer}"),
     ]
 
     blocks = []
     if idle:
         rule = f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게"
-        lines = [f":zzz: *GPU를 쓰지 않는 잡*  _{rule}_"]
+        lines = [f":zzz: **GPU를 쓰지 않는 잡**  _{rule}_"]
         owners = by_owner(idle)
         for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
             jobs = owners[user]
@@ -331,7 +331,7 @@ def render(report, cfg, who):
         rows = [(n, st, since.replace("T", " ")[:16], u, why) for n, st, since, u, why in report["reasons"]]
         blocks.extend(
             sections(
-                ":warning: *쓸 수 없는 노드 (drain, down)*\n"
+                ":warning: **쓸 수 없는 노드 (drain, down)**\n"
                 + table(("노드", "상태", "언제부터", "누가", "사유"), rows)
             )
         )
@@ -348,7 +348,7 @@ def render(report, cfg, who):
         ]
         blocks.extend(
             sections(
-                ":hourglass_flowing_sand: *기다리는 잡*\n"
+                ":hourglass_flowing_sand: **기다리는 잡**\n"
                 + table(("사용자", "잡", "GPU", "가장 오래", "사유"), rows)
             )
         )
@@ -359,7 +359,7 @@ def render(report, cfg, who):
             by_user[j["user"]].append(j)
     if by_user:
         blocks.append({"type": "divider"})
-        blocks.extend(sections(":busts_in_silhouette: *사람별 실행 중인 GPU 잡*"))
+        blocks.extend(sections(":busts_in_silhouette: **사람별 실행 중인 GPU 잡**"))
     for user, ujobs in sorted(by_user.items(), key=lambda kv: -sum(len(j["gpus"]) for j in kv[1])):
         n = sum(len(j["gpus"]) for j in ujobs)
         rows = []
@@ -382,7 +382,7 @@ def render(report, cfg, who):
                     note,
                 )
             )
-        head = f"*{user}*  GPU {n}장 ({100 * n / total:.1f}%)  |  잡 {len(ujobs)}개"
+        head = f"**{user}**  GPU {n}장 ({100 * n / total:.1f}%)  |  잡 {len(ujobs)}개"
         blocks.extend(
             sections(f"{head}\n{table(('잡', 'GPU', '노드', '시간', 'QOS', '사용률', '메모리', ''), rows)}")
         )
@@ -646,7 +646,7 @@ def render_repeaters(users, weeks, jobs, cfg):
     for u in users:
         hist = ", ".join(f"{w['idle']:,.0f} of {w['held']:,.0f} h" for w in weeks[u][-cfg["repeat_weeks"] :])
         running = ", ".join(f"`{j['label']}` ({len(j['gpus'])} GPU)" for j in jobs if j["user"] == u)
-        parts.append(f"*{u}*: idle GPU-hours by week {hist}. Now: {running or 'no jobs'}.")
+        parts.append(f"**{u}**: idle GPU-hours by week {hist}. Now: {running or 'no jobs'}.")
     steps = (
         "What to do: 1) message them with these numbers and ask what the jobs wait on; "
         "2) check their jobs (`sq`, the Grafana job panels) for GPUs held while the work runs on CPU or "
@@ -655,9 +655,7 @@ def render_repeaters(users, weeks, jobs, cfg):
         f"Thresholds: {cfg['repeat_idle_gpu_hours']:g} idle GPU-hours and {cfg['repeat_idle_share']:.0%} "
         "of the hours held, each week."
     )
-    blocks = sections("\n".join(parts)) + [
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": steps}]}
-    ]
+    blocks = sections("\n".join(parts)) + [rich.context(steps)]
     return head, blocks
 
 

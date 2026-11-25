@@ -30,6 +30,7 @@ Python 3.9 or newer, standard library only.
 
 from datetime import datetime
 
+from . import rich
 from .render import size
 from .slack import MAX_BLOCKS, bar, sections, table
 
@@ -192,7 +193,7 @@ def projects_past(data):
                 f" (한도 {size(entry['hard'])})" if entry["hard"] else ""
             )
         mark = ":no_entry:" if kind == "hard" else ":warning:"
-        lines.append(f"{mark} *{project}* {where(host, fs)}에서: {size(used)}, {state}")
+        lines.append(f"{mark} **{project}** {where(host, fs)}에서: {size(used)}, {state}")
     return lines
 
 
@@ -216,9 +217,9 @@ def change(now, before):
 def disk_line(key, disk):
     """One line on a disk: how full, what is free, how the free space changed in a day."""
     if not disk["size"] or disk["avail"] is None:
-        return f"*{where(*key)}*  디스크 수치가 없습니다 (node_exporter)"
+        return f"**{where(*key)}**  디스크 수치가 없습니다 (node_exporter)"
     used = disk["size"] - disk["avail"]
-    line = f"*{where(*key)}*  `{bar(100 * used / disk['size'])}`  {size(disk['size'])} 중 {size(disk['avail'])} 남음"
+    line = f"**{where(*key)}**  `{bar(100 * used / disk['size'])}`  {size(disk['size'])} 중 {size(disk['avail'])} 남음"
     if disk["avail_before"] is not None:
         line += f", 하루 사이 사용량 {change(used, disk['size'] - disk['avail_before'])}"
     return line
@@ -304,7 +305,7 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
     card += sections("\n".join(disk_line(k, d) for k, d in data["disks"].items()))
     if rows:
         card += sections(
-            "*경고 수준을 넘은 사용량*\n"
+            "**경고 수준을 넘은 사용량**\n"
             + "\n".join(
                 past_line(r, who, mention is None or row_key(r) in mention, hold_note(hold, data["now"]))
                 for r in rows
@@ -312,12 +313,12 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
         )
     shared = projects_past(data)
     if shared:
-        card += sections("*경고 수준을 넘은 프로젝트*\n" + "\n".join(shared))
+        card += sections("**경고 수준을 넘은 프로젝트**\n" + "\n".join(shared))
     if fill:
         card += sections(
-            "*가득 차 가는 공간*: 가장 많이 쓰시는 분들께 부탁드립니다. 비울 수 있는 것을 비워 주세요\n"
+            "**가득 차 가는 공간**: 가장 많이 쓰시는 분들께 부탁드립니다. 비울 수 있는 것을 비워 주세요\n"
             + "\n".join(
-                f":large_orange_circle: *{where(*key)}* {100 * frac:.0f}% 사용 중: "
+                f":large_orange_circle: **{where(*key)}** {100 * frac:.0f}% 사용 중: "
                 + ", ".join(f"{who(u, fill_key(key) in fill_mention)} {size(used)}" for u, used in users)
                 for key, frac, users in fill
             )
@@ -330,7 +331,7 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
     notes = [f"경고 수준은 알려 드리기만 하고, 한도에 닿으면 바로 쓰기가 막힙니다. {HOW}"]
     if stale:
         notes.append(f"최근 보고가 없어 예전 수치입니다: {', '.join(stale)}.")
-    card.append({"type": "context", "elements": [{"type": "mrkdwn", "text": " ".join(notes)}]})
+    card.append(rich.context(" ".join(notes)))
 
     detail = []
     for key in data["disks"]:
@@ -353,7 +354,7 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
             tail = f"\n외 {len(rest)}{'명' if people else '개 계정'}, 모두 {size(sum(e['used'] for _, e in rest))}"
         if others:
             tail += "\n" + others_line(others)
-        head = f":file_cabinet: *{where(*key)}*: {len(mine)}{'명' if people else '개 계정'} 중 많이 쓰는 순"
+        head = f":file_cabinet: **{where(*key)}**: {len(mine)}{'명' if people else '개 계정'} 중 많이 쓰는 순"
         detail += sections(f"{head}\n{table(('사용자', '사용량', '하루', '경고', '한도'), body)}{tail}")
     if data["projects"]:
         body = [
@@ -367,13 +368,11 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
             )
             for (h, f, p), e in sorted(data["projects"].items())
         ]
-        head = ":open_file_folder: *프로젝트* (한도 하나를 함께 쓰는 디렉터리)"
+        head = ":open_file_folder: **프로젝트** (한도 하나를 함께 쓰는 디렉터리)"
         detail += sections(f"{head}\n{table(('프로젝트', '위치', '사용량', '하루', '경고', '한도'), body)}")
     for key, rows in sorted((data.get("cleanup") or {}).items()):
         body = [(c["path"], c["user"], size(c["bytes"]), f"{c['unused_days']}일") for c in rows]
-        head = (
-            f":broom: *{where(*key)}*: 정리하면 좋을 폴더 ({stale_days}일 넘게 쓰지 않은 것, 크고 오래된 순)"
-        )
+        head = f":broom: **{where(*key)}**: 정리하면 좋을 폴더 ({stale_days}일 넘게 쓰지 않은 것, 크고 오래된 순)"
         detail += sections(f"{head}\n{table(('폴더', '주인', '크기', '안 쓴 기간'), body)}")
     thread = [("디스크 사용량 자세히", detail[i : i + MAX_BLOCKS]) for i in range(0, len(detail), MAX_BLOCKS)]
     return (text, card), thread
