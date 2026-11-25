@@ -7,6 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("site_facts", ROOT / "scripts/docs/site_facts.py")
 sf = importlib.util.module_from_spec(spec)
@@ -91,6 +93,18 @@ class Cluster(unittest.TestCase):
         self.assertEqual(got["partitions"], [{"name": "p", "nodes": "n1", "max_time": "1-00:00:00"}])
         self.assertNotIn("192.0.2.1", json.dumps(got), "no address")
         self.assertNotIn("cluster", sf.PUBLIC, "infrastructure stays private")
+
+    def test_the_overview_names_the_published_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            (config / "group_vars/slurm-cluster.yml").write_text(
+                'cluster_tools_commands: "{{ cluster_tools_builtin }}"\n'
+            )
+            got = sf.facts(config)["cluster"]["commands"]
+        builtin = yaml.safe_load((ROOT / "roles/cluster_tools/defaults/main.yml").read_text())[
+            "cluster_tools_builtin"
+        ]
+        self.assertEqual(got, builtin)
 
 
 class Quota(unittest.TestCase):

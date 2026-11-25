@@ -2,7 +2,7 @@
 <div class="card mb-3">
   <div class="card-header"><h3 class="h5 mb-0">{{ open_ondemand_overview_title | e }}</h3></div>
   <div class="card-body">
-    <p>Live state: <code>sq</code>, <code>qos</code>, <code>sinfo</code> in a shell.</p>
+    <p>Live state in a shell:{% for c in open_ondemand_overview.commands | default([]) %} <code>{{ c | e }}</code>,{% endfor %} and Slurm's <code>sinfo</code>.</p>
     <table class="table table-sm">
       <thead><tr><th>Node</th><th>CPUs</th><th>Memory (GiB)</th><th>GPUs</th></tr></thead>
       <tbody>
