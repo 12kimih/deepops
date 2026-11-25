@@ -560,6 +560,8 @@ do
         f:write(stamp and ("generated " .. stamp .. "\n") or "", table.concat(lines, "\n"), "\n")
         f:close()
     end
+    local max_age = tonumber(PLUGIN:match("local SUBMIT_HOLDS_MAX_AGE%s*=%s*(%d+)"))
+    assert(max_age and max_age > 120, "no SUBMIT_HOLDS_MAX_AGE line in " .. plugin_path)
     local n
     PLUGIN, n = PLUGIN:gsub('local SUBMIT_HOLDS_FILE%s*=%s*"[^"]*"', 'local SUBMIT_HOLDS_FILE = "' .. path .. '"', 1)
     assert(n == 1, "no SUBMIT_HOLDS_FILE line in " .. plugin_path)
@@ -578,9 +580,11 @@ do
     check("S4 read at most once a minute", submit(t), slurm.ERROR)
     now = now + 60
     check("S4 then read again: released", submit({partition = "cpu"}), slurm.SUCCESS)
-    write(now - 1801, {"1000 held"})
+    write(now + 60 - max_age, {"1000 held"})
     now = now + 60
-    check("S5 a file not refreshed for 30 min holds no one", submit({partition = "cpu"}), slurm.SUCCESS)
+    check("S5 a file just within submit_holds_max_age holds", submit({partition = "cpu"}), slurm.ERROR)
+    now = now + 60
+    check("S5 then past it, it holds no one", submit({partition = "cpu"}), slurm.SUCCESS)
     write(nil, {"1000 held"})
     now = now + 60
     check("S6 a file without its stamp holds no one", submit({partition = "cpu"}), slurm.SUCCESS)

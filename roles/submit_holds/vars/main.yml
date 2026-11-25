@@ -10,6 +10,7 @@ _submit_holds_cfg:
   disk_from: "{{ submit_holds_from_time | int }}"
   ends: "{{ submit_holds_people | people_leaving(people_leave_grace_days) }}"
   textfile: "{{ _submit_holds_textfile }}"
+  max_age: "{{ submit_holds_max_age | int }}"
 
 # What this component installs, for its record (roles/component_record): the timer and
 # its service before their files. The holds file goes too, so a removal holds no one, and

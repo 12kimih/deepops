@@ -116,6 +116,9 @@ submit_holds_disk: false
 # are turned on: before it no one is held, and the disk report says from when they will
 # be. "" holds at once.
 submit_holds_from: ""
+# How long, in seconds, the rendered job_submit.lua trusts the holds file after it was
+# written: a writer that stopped then holds no one. SubmitHoldsStale warns at half of it.
+submit_holds_max_age: 1800
 # The per-job private directories on an XFS filesystem of their own, sized for Slurm's
 # --tmp (roles/job_scratch), on slurm-node: off by default (it preallocates disk);
 # deploy it while the nodes run no jobs

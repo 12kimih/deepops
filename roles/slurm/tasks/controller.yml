@@ -243,6 +243,7 @@
     mode: "0644"
   vars:
     job_submit_holds_file: "{{ slurm_submit_holds_file if deepops_components.submit_holds | default('absent') == 'present' else '' }}"
+    job_submit_holds_max_age: "{{ submit_holds_max_age }}"
   when:
     - "'lua' in (slurm_job_submit_plugins)"
     - slurm_job_submit_template is match('.*[.]j2$')

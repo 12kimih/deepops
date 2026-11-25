@@ -1056,11 +1056,13 @@ tests:
         alertname: TlsCertificateExpired
         exp_alerts: []
 
-  - name: submission holds not worked out for 15 minutes warn
+  - name: submission holds not worked out for half of submit_holds_max_age warn
     interval: 1m
     input_series:
       - series: 'submit_holds_last_success_timestamp_seconds{host="ctl", instance="ctl:9100"}'
         values: '0x30'
+      - series: 'submit_holds_max_age_seconds{host="ctl", instance="ctl:9100"}'
+        values: '1800x30'
     alert_rule_test:
       - eval_time: 14m
         alertname: SubmitHoldsStale
@@ -1070,8 +1072,8 @@ tests:
         exp_alerts:
           - exp_labels: {severity: warning, host: ctl, instance: "ctl:9100"}
             exp_annotations:
-              summary: "The submission holds on ctl have not been worked out for 15 minutes"
-              description: "After 30 minutes job_submit.lua holds no one. `journalctl -u submit-holds` and `systemctl list-timers submit-holds.timer` on the host (Prometheus reachable?)."
+              summary: "The submission holds on ctl have not been worked out for 16m 0s"
+              description: "Past submit_holds_max_age, twice this alert's wait, job_submit.lua holds no one. `journalctl -u submit-holds` and `systemctl list-timers submit-holds.timer` on the host (Prometheus reachable?)."
 
   - name: disk quota usage that stops, or never starts, being reported warns
     interval: 1m

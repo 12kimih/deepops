@@ -4,7 +4,8 @@ the Lua tests run on exactly what deploys.
 
     python3 roles/slurm/tests/render_job_submit.py POLICY.yml > job_submit.lua
 
-POLICY.yml holds slurm_job_submit_policy. The template uses plain Jinja only (no Ansible
+POLICY.yml holds slurm_job_submit_policy; the holds' trust comes from deploy_defaults
+(submit_holds_max_age), as roles/slurm/tasks/controller.yml passes it. The template uses plain Jinja only (no Ansible
 filters), so jinja2 renders it the same way Ansible's template module does.
 """
 
@@ -15,12 +16,14 @@ import jinja2
 import yaml
 
 ROLE = Path(__file__).resolve().parents[1]
+DEPLOY_DEFAULTS = ROLE.parent / "deploy_defaults" / "defaults" / "main.yml"
 
 
 def render(policy):
     env = jinja2.Environment(undefined=jinja2.StrictUndefined, keep_trailing_newline=True, trim_blocks=True)
     template = env.from_string((ROLE / "templates" / "etc" / "slurm" / "job_submit.lua.j2").read_text())
-    return template.render(slurm_job_submit_policy=policy)
+    max_age = yaml.safe_load(DEPLOY_DEFAULTS.read_text())["submit_holds_max_age"]
+    return template.render(slurm_job_submit_policy=policy, job_submit_holds_max_age=max_age)
 
 
 if __name__ == "__main__":
