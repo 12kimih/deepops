@@ -221,6 +221,7 @@ PACKAGE_DIRS = {
     "/etc/containers": "podman", "/etc/unbound/unbound.conf.d": "unbound", "/etc/fail2ban/jail.d": "fail2ban",
     "/etc/nhc": "nhc_configure", "/etc/nhc/scripts": "nhc_configure", "/var/yp": "nis",
     "/usr/share/bash-completion/completions": "bash-completion",
+    "/etc/security/namespace.d": "libpam-modules", "/usr/share/pam-configs": "libpam-runtime",
 }  # fmt: skip
 
 # A backslash in a Python string literal that does not start a known escape.
@@ -392,6 +393,7 @@ WORLD_WRITABLE_OK = {
     "roles/slurm_paths/defaults/main.yml": "slurm_job_private_dirs names the directories Slurm makes private per job",
     "roles/user_environment_defaults/defaults/main.yml": "users' job values in the job's own /tmp; the user's tools write there",
     "roles/slurm/tasks/prolog_epilog.yml": "the assert that refuses a job value in a /tmp not private to each job names them",
+    "roles/login_private_dirs/defaults/main.yml": "login_private_dirs_paths names the directories PAM makes private per login",
 }
 # file -> why it keeps Ansible's backup copy
 BACKUP_OK = {

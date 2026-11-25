@@ -1,0 +1,15 @@
+---
+# pam-auth-update's profile (pam-auth-update(8): local profiles go in /usr/share/pam-configs).
+login_private_dirs_profile: deepops-login-private-dirs
+login_private_dirs_profile_file: /usr/share/pam-configs/{{ login_private_dirs_profile }}
+login_private_dirs_namespace_file: /etc/security/namespace.d/deepops-login-private-dirs.conf
+login_private_dirs_tmpfiles_file: /etc/tmpfiles.d/deepops-login-private-dirs.conf
+# Each directory's instances, one per person, under <dir>-inst.
+login_private_dirs_parents: "{{ login_private_dirs_paths | map('regex_replace', '$', '-inst') | list }}"
+
+# What this component installs, for its record (roles/component_record). The instance
+# directories are not among them: they hold people's files.
+login_private_dirs_items:
+  - "file:{{ login_private_dirs_profile_file }}"
+  - "file:{{ login_private_dirs_namespace_file }}"
+  - "file:{{ login_private_dirs_tmpfiles_file }}"

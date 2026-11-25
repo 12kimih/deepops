@@ -1,0 +1,17 @@
+---
+# Each person's own /tmp and /var/tmp at login (roles/login_private_dirs). Every host it
+# runs on converges to deepops_components (present on slurm-login while
+# slurm_enable_login_private_dirs is on, removed elsewhere). A login already open keeps
+# the shared directories until it ends, and a new login no longer finds the tmux or
+# screen sessions it started: deploy it while nobody is logged in
+# (docs/slurm-cluster/login-private-dirs.md).
+#
+#   ansible-playbook -K playbooks/generic/login-private-dirs.yml [-l <hosts>]
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: login_private_dirs
+      login_private_dirs_state: "{{ deepops_components.login_private_dirs | component_phase(deepops_phase) }}"
+  tags:
+    - login-private-dirs

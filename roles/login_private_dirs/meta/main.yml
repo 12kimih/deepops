@@ -1,0 +1,14 @@
+---
+dependencies:
+  - role: system_accounts  # login_private_dirs_excluded
+
+galaxy_info:
+  namespace: deepops
+  role_name: login_private_dirs
+  author: DeepOps
+  description: Each person's login gets its own /tmp and /var/tmp on the login nodes
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]

@@ -209,6 +209,17 @@ class LoginLimits(unittest.TestCase):
                 sf.facts(config)["login"], {"cpus": 2.5, "memory_gib": 0.5}, "an unset limit is left out"
             )
 
+    def test_the_directories_each_login_has_its_own_of(self):
+        """roles/login_private_dirs' directories, public, only while its switch is on."""
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            (config / "group_vars" / "slurm-cluster.yml").write_text(
+                "slurm_enable_login_private_dirs: true\n"
+            )
+            every = sf.facts(config)
+            self.assertEqual(every["login"], {"private_dirs": ["/tmp", "/var/tmp"]})
+            self.assertEqual(sf.public(every)["login"], {"private_dirs": ["/tmp", "/var/tmp"]})
+
     def test_no_login_limits_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(sf.facts(site(tmp))["login"], {})

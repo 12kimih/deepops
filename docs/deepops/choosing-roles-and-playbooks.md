@@ -151,6 +151,7 @@ hosts it no longer belongs on (with its switch, or only when it is named in
 | `ingress_policy` | `ingress_policy` | `slurm_enable_ingress_policy` | `slurm-cluster` | - | with its switch |
 | `coredump` | `coredump` | `kube_enable_coredump`, `slurm_enable_coredump` | `slurm-cluster`, `k8s_cluster` | - | with its switch |
 | `disk_quota` | `disk_quota` | `slurm_enable_disk_quota` | `slurm-login`, `slurm-nfs`, `scratch-server` | - | with its switch |
+| `login_private_dirs` | `login_private_dirs` | `slurm_enable_login_private_dirs` | `slurm-login` | - | with its switch |
 | `shared_space` | `shared_space` | `slurm_enable_shared_space` | the first `slurm-nfs` | - | with its switch |
 | `scratch_space` | `scratch_space` | `slurm_enable_scratch_space` | `scratch-server` | - | with its switch |
 | `cluster_bot` | `cluster_bot` | `slurm_enable_cluster_bot` | the first `slurm-master` | - | with its switch |

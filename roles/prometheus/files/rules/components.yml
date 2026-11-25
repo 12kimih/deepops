@@ -102,6 +102,9 @@ groups:
         labels: {component: lmod, playbook: playbooks/slurm-cluster/lmod.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: login_private_dirs, playbook: playbooks/generic/login-private-dirs.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: nfs, playbook: playbooks/generic/nfs-server.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)

@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# roles/login_private_dirs: each login's own directory, namespace.conf(5).
+# polydir  instance prefix  method  accounts that keep the shared one
+{% for path in login_private_dirs_paths %}
+{{ path }}  {{ path }}-inst/  user  {{ login_private_dirs_excluded | join(',') }}
+{% endfor %}

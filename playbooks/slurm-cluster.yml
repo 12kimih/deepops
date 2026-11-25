@@ -375,6 +375,11 @@
   vars:
     deepops_phase: install
 
+- name: Give each login its own temporary directories on the login nodes
+  import_playbook: generic/login-private-dirs.yml
+  vars:
+    deepops_phase: install
+
 - name: Run the cluster's Slack app for the requests users make
   import_playbook: generic/cluster-bot.yml
   vars:
@@ -547,6 +552,11 @@
 
 - name: Remove the disk quotas where they are no longer wanted
   import_playbook: generic/disk-quota.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the logins' own temporary directories where they are no longer wanted
+  import_playbook: generic/login-private-dirs.yml
   vars:
     deepops_phase: remove
 

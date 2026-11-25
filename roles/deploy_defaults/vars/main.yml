@@ -286,6 +286,10 @@ deepops_component_registry:
       - {switch: "{{ slurm_enable_disk_quota }}", group: slurm-login}
       - {switch: "{{ slurm_enable_disk_quota }}", group: slurm-nfs}
       - {switch: "{{ slurm_enable_disk_quota }}", group: scratch-server}
+  # Each login's own /tmp and /var/tmp on the login nodes (pam_namespace).
+  login_private_dirs:
+    rules:
+      - {switch: "{{ slurm_enable_login_private_dirs }}", group: slurm-login}
   # Shared data and collaboration folders where /home is local; their data stays.
   shared_space:
     rules:

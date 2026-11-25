@@ -1,0 +1,103 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: login_private_dirs
+    component_record_action: begin
+    component_record_items: "{{ login_private_dirs_items }}"
+
+# pam_namespace and its namespace.d (libpam-modules), pam-auth-update and its profiles
+# directory (libpam-runtime): Ubuntu's own, never removed with the component.
+- name: Install pam_namespace and pam-auth-update
+  ansible.builtin.apt:
+    name: [libpam-modules, libpam-runtime]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# The instance directories and the namespace settings come first: PAM turns to them at
+# the first login after the profile is on.
+- name: Read how the host keeps its temporary directories
+  ansible.builtin.command:
+    argv: [systemd-tmpfiles, --cat-config]
+  register: login_private_dirs_cat_config
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Keep the instance directories as their directories are kept
+  ansible.builtin.template:
+    src: tmpfiles.conf.j2
+    dest: "{{ login_private_dirs_tmpfiles_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: login_private_dirs_tmpfiles
+
+# --create alone: it makes the directories and sets their mode, and removes nothing.
+- name: Create the instance directories
+  change_command:
+    argv: [systemd-tmpfiles, --create, "{{ login_private_dirs_tmpfiles_file }}"]
+  when: login_private_dirs_tmpfiles is changed
+
+- name: Read the instance directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ login_private_dirs_parents }}"
+  register: login_private_dirs_parent_stat
+
+# pam_namespace refuses an instance parent anyone else could write to or own.
+- name: Check the instance directories are root's with mode 0000
+  ansible.builtin.assert:
+    that:
+      - item.stat.isdir
+      - item.stat.uid == 0
+      - item.stat.mode == '0000'
+    fail_msg: "{{ item.item }} must be a directory of root's with mode 0000."
+    quiet: true
+  loop: "{{ login_private_dirs_parent_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: not ansible_check_mode
+
+- name: Configure which directories each login gets its own of
+  ansible.builtin.template:
+    src: namespace.conf.j2
+    dest: "{{ login_private_dirs_namespace_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write the PAM profile
+  ansible.builtin.template:
+    src: pam-profile.j2
+    dest: "{{ login_private_dirs_profile_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Turn the PAM profile on
+  ansible.builtin.include_role:
+    name: pam_profile
+  vars:
+    pam_profile_name: "{{ login_private_dirs_profile }}"
+    pam_profile_enabled: true
+    pam_profile_module: pam_namespace.so
+    pam_profile_file: /etc/pam.d/common-session
+
+# sudo and cron read the non-interactive stack: they must keep the caller's view.
+- name: Check the non-interactive session stack has no pam_namespace
+  ansible.builtin.command:
+    argv: [grep, -qE, '^[^#]*pam_namespace\.so', /etc/pam.d/common-session-noninteractive]
+  register: login_private_dirs_noninteractive
+  changed_when: false
+  failed_when: login_private_dirs_noninteractive.rc != 1
+  check_mode: false
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: login_private_dirs
+    component_record_action: present
+    component_record_items: "{{ login_private_dirs_items }}"

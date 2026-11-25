@@ -1,0 +1,52 @@
+---
+# A login node's SSH: sshd through PAM, two people, a service account, and sudo. The
+# container cannot set the audit login UID (no CAP_AUDIT_CONTROL), so sshd's
+# pam_loginuid is made optional here alone; a node keeps it required.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install sshd, the client and sudo
+      ansible.builtin.apt:
+        name: [openssh-server, openssh-client, sudo]
+        update_cache: true
+
+    - name: Let sshd sessions start without the audit login UID (the container's limit)
+      ansible.builtin.replace:
+        path: /etc/pam.d/sshd
+        regexp: '^session\s+required\s+pam_loginuid\.so'
+        replace: "session optional pam_loginuid.so"
+
+    - name: Create the people and the service account
+      ansible.builtin.user:
+        name: "{{ item }}"
+        shell: /bin/bash
+      loop: [alice, bob, "{{ login_private_dirs_test_service }}"]
+
+    - name: Let alice use sudo without a password
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/alice
+        content: "alice ALL=(ALL) NOPASSWD: ALL\n"
+        mode: "0440"
+        validate: visudo -cf %s
+
+    - name: Make root's key
+      community.crypto.openssh_keypair:
+        path: /root/.ssh/molecule
+        type: ed25519
+
+    - name: Read root's public key
+      ansible.builtin.slurp:
+        src: /root/.ssh/molecule.pub
+      register: molecule_pub
+
+    - name: Let root's key log in as each of them
+      ansible.posix.authorized_key:
+        user: "{{ item }}"
+        key: "{{ molecule_pub.content | b64decode }}"
+      loop: [alice, bob, "{{ login_private_dirs_test_service }}"]
+
+    - name: Start sshd
+      ansible.builtin.systemd_service:
+        name: ssh
+        state: started

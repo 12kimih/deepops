@@ -294,6 +294,8 @@ The [Open OnDemand](https://openondemand.org/) web portal is a component, off by
 
 The per-user directories containers keep around jobs, and what creates and removes each, are listed in [the job environment](./job-environment.md).
 
+On the login nodes each person's login can have its own `/tmp` and `/var/tmp`, as each job has: [each login's own /tmp](./login-private-dirs.md), off by default (`slurm_enable_login_private_dirs`).
+
 To build images from a Dockerfile, users run rootless Podman in a CPU job and import the result with `enroot import podman://IMAGE`; see [Building container images with rootless Podman](../container/podman.md). It is installed on the compute nodes by default (`slurm_install_podman`) and replaces the retired docker-rootless role.
 
 The DeepOps Singularity wrapper role has been retired. Singularity lives on upstream as [Apptainer](https://apptainer.org/); sites that still want it can install Apptainer/Singularity separately.
