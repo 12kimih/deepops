@@ -28,7 +28,11 @@ Facts:
             it publishes (open_ondemand_proxied_services, as Grafana), dashboard
             (slurm_enable_monitoring), bot (slurm_enable_cluster_bot: the /cluster command),
             job_notices (slurm_enable_job_notices: --mail-type is a Slack DM to the job's
-            owner); never an address
+            owner), the portal's own menu groups in order (portal_groups:
+            open_ondemand_nav_groups, OOD's names), the folders its file browser opens
+            (portal_files: open_ondemand_allowlist_paths) and the dashboards Grafana
+            shows (dashboards: [{uid, title}] of every set in grafana_dashboard_sets, read
+            from each src/dashboards file); never an address
   paths     the shared trees people use: scratch (scratch_space_root), software
             (sm_prefix), shared (shared_space_root) and its data folders (shared_space_data)
   login     each person's limits on a login node (cluster_tools_user_slice_limits, the
@@ -107,7 +111,17 @@ PUBLIC = {
         "submit_holds_disk",
     },
     "login": {"cpus", "memory_gib", "tasks"},
-    "services": {"portal", "overview", "menu", "dashboard", "bot", "job_notices"},
+    "services": {
+        "portal",
+        "overview",
+        "menu",
+        "dashboard",
+        "bot",
+        "job_notices",
+        "portal_groups",
+        "portal_files",
+        "dashboards",
+    },
     "paths": {"scratch", "software", "shared", "shared_data"},
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
     "dates": None,  # any name the site's schedule gives, its value a date
@@ -349,10 +363,21 @@ def host_quotas(config):
     return out
 
 
+def dashboards(settings_):
+    """[{uid, title}] of every dashboard deepops ships (grafana_dashboard_sets), in order."""
+    out = []
+    for files in (settings_.get("grafana_dashboard_sets") or {}).values():
+        for name in files:
+            board = json.loads((ROOT / "src" / "dashboards" / name).read_text())
+            out.append({"uid": board["uid"], "title": board["title"]})
+    return out
+
+
 def services(config, settings_):
-    """{portal, overview, menu, dashboard, bot, job_notices}: whether the portal, the
-    monitoring dashboard, the cluster bot and job notices run, the portal's overview page title (its setting is a template, set when the site
-    has one) and the titles of the services in its top menu."""
+    """Whether the portal, the monitoring dashboard, the cluster bot and job notices run;
+    the portal's overview page title (its setting is a template, set when the site has
+    one), the titles of the services in its top menu, its own menu groups and the folders
+    its file browser opens; the dashboards Grafana shows."""
     portal = bool(settings_.get("slurm_install_open_ondemand"))
     raw = {}
     for name in ("all.yml", "slurm-cluster.yml") if config else ():
@@ -366,6 +391,9 @@ def services(config, settings_):
         "dashboard": bool(settings_.get("slurm_enable_monitoring")),
         "bot": bool(settings_.get("slurm_enable_cluster_bot")),
         "job_notices": bool(settings_.get("slurm_enable_job_notices")),
+        "portal_groups": list(settings_.get("open_ondemand_nav_groups") or []) if portal else [],
+        "portal_files": list(settings_.get("open_ondemand_allowlist_paths") or []) if portal else [],
+        "dashboards": dashboards(settings_) if settings_.get("slurm_enable_monitoring") else [],
     }
 
 
