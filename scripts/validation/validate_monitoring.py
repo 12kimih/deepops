@@ -102,6 +102,9 @@ SOURCES = {
     "scratch_space": r"scratch_space_\w+",  # the scratch cleanup (roles/scratch_space)
     # Folders worth cleaning (cluster_tools.cleanup), from disk_quota's scan and the scratch cleanup.
     "disk_cleanup": r"disk_cleanup_\w+",
+    # Each host's expected component versions, rendered at each prometheus.yml run
+    # (scripts/deepops/component_pins.py).
+    "component_pins": r"deepops:component_pin:info",
     "shared_data": r"shared_data_\w+",  # the shared data's export, the bot's rounds (roles/shared_space)
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)
     "gpu_diag_idle": r"gpu_diag_idle_\w+",  # the weekly GPU diagnostics (roles/gpu_diag_idle)

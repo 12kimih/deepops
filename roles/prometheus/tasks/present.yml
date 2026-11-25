@@ -21,6 +21,39 @@
   ansible.builtin.set_fact:
     prometheus_rule_sources: "{{ lookup('ansible.builtin.fileglob', role_path ~ '/files/rules/*.yml', wantlist=True) + prometheus_extra_rule_files }}"
 
+# The version each host should have of each component, from the role defaults and the
+# site config this run reads (scripts/deepops/component_pins.py): rendered on the
+# controller and installed with the rules below, for ComponentVersionNotPinned.
+- name: Render each host's component pins
+  delegate_to: localhost
+  become: false
+  run_once: true
+  block:
+    - name: Make a directory for the rendered rules
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: .prometheus-rules
+      register: _prometheus_rendered
+      changed_when: false  # removed again below
+      check_mode: false  # a preview renders them too
+
+    - name: Render the component pins
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - "{{ role_path }}/../../scripts/deepops/component_pins.py"
+          - --config
+          - "{{ inventory_dir }}"
+          - rules
+          - --out
+          - "{{ _prometheus_rendered.path }}/component-pins.yml"
+      changed_when: false
+      check_mode: false  # writes only the temporary directory
+
+- name: Add them to the rule sources
+  ansible.builtin.set_fact:
+    prometheus_rule_sources: "{{ prometheus_rule_sources + [_prometheus_rendered.path ~ '/component-pins.yml'] }}"
+
 - name: Install python3 docker module
   ansible.builtin.package:
     name: python3-docker
@@ -36,13 +69,25 @@
 # promtool checks each rule file before it is installed; a rule file dropped from the
 # sources is removed.
 - name: Install alert rules
-  ansible.builtin.include_role:
-    name: managed_dir
-  vars:
-    managed_dir_path: "{{ prometheus_config_dir }}/rules"
-    managed_dir_sources: "{{ prometheus_rule_sources }}"
-    managed_dir_validate: "docker run --rm -u 0 --entrypoint promtool --mount type=bind,src=%s,dst=/check.yml,readonly {{ prometheus_container }} check rules /check.yml"
-    managed_dir_notify: [Reload prometheus]
+  block:
+    - name: Install alert rules
+      ansible.builtin.include_role:
+        name: managed_dir
+      vars:
+        managed_dir_path: "{{ prometheus_config_dir }}/rules"
+        managed_dir_sources: "{{ prometheus_rule_sources }}"
+        managed_dir_validate: "docker run --rm -u 0 --entrypoint promtool --mount type=bind,src=%s,dst=/check.yml,readonly {{ prometheus_container }} check rules /check.yml"
+        managed_dir_notify: [Reload prometheus]
+  always:
+    - name: Remove the rendered rules from the controller
+      ansible.builtin.file:
+        path: "{{ _prometheus_rendered.path }}"
+        state: absent
+      delegate_to: localhost
+      become: false
+      run_once: true
+      check_mode: false
+      changed_when: false
 
 # The targets of every exporter, from the component map; the endpoint directory holds
 # that one file (what exporters wrote there before goes).

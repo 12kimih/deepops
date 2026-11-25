@@ -208,6 +208,33 @@ tests:
               summary: "pyxis is at 2 different versions across the hosts"
               description: "n1: 0.20; n2: 0.21; A run limited to some of its hosts left the others behind: `ansible-playbook -K playbooks/container/pyxis.yml` converges every host it belongs on (one already there changes nothing)."
 
+  - name: a host behind the version the repository and config pin warns after a day
+    interval: 1h
+    input_series:
+      # Both hosts agree (no ComponentVersionsDiffer), but the pin moved to 4.2.2-1.
+      - series: 'os_updates_component_info{host="n1", instance="n1:9100", component="enroot", version="4.2.1-1"}'
+        values: '1x40'
+      - series: 'os_updates_component_info{host="n2", instance="n2:9100", component="enroot", version="4.2.1-1"}'
+        values: '1x40'
+      - series: 'deepops:component_pin:info{host="n1", component="enroot", version="4.2.2-1"}'
+        values: '1x40'
+      - series: 'deepops:component_pin:info{host="n2", component="enroot", version="4.2.1-1"}'
+        values: '1x40'
+      # n2 pins it at what it has; a component with no pin (unchecked) never alerts
+      - series: 'os_updates_component_info{host="n1", instance="n1:9100", component="dcgm", version="datacenter-gpu-manager-4-cuda12"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: ComponentVersionNotPinned
+        exp_alerts: []
+      - eval_time: 30h
+        alertname: ComponentVersionNotPinned
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, component: enroot, version: 4.2.1-1}
+            exp_annotations:
+              summary: "n1 has enroot 4.2.1-1, not the version the repository and config pin"
+              description: "Expected 4.2.2-1. `ansible-playbook -K playbooks/container/enroot.yml -l n1` installs it."
+
   - name: a broken dpkg or apt warns after an hour
     interval: 1h
     input_series:

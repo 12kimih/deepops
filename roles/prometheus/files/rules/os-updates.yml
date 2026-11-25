@@ -107,6 +107,27 @@ groups:
             {{ range printf "deepops:component_playbook:info{component=%q}" $labels.component | query }}
             {{- "" }}`ansible-playbook -K {{ .Labels.playbook }}`{{ end }} converges every host it belongs on
             (one already there changes nothing).
+      # Every host at the same version can still be behind the repository: a pin bumped,
+      # the checkout synced, the component's playbook not run. The expected versions are
+      # each role's own record expression resolved per host from the role defaults and the
+      # site config, rendered at each prometheus.yml run (component-pins.yml, from
+      # scripts/deepops/component_pins.py; sync.py names the hosts and playbooks when the
+      # checkout moves). A component whose version only the host can work out is named
+      # unchecked, with the reason, at the head of that file.
+      - alert: ComponentVersionNotPinned
+        expr: |
+          max by (host, component, version) (os_updates_component_info{version!=""})
+          unless on (host, component, version) deepops:component_pin:info
+          and on (host, component) deepops:component_pin:info
+        for: 26h
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} has {{ $labels.component }} {{ $labels.version }}, not the version the repository and config pin"
+          description: >-
+            {{ range printf "deepops:component_pin:info{host=%q, component=%q}" $labels.host $labels.component | query }}
+            {{- "" }}Expected {{ .Labels.version }}. {{ end -}}
+            {{ range printf "deepops:component_playbook:info{component=%q}" $labels.component | query }}
+            {{- "" }}`ansible-playbook -K {{ .Labels.playbook }} -l {{ $labels.host }}` installs it.{{ end }}
       - alert: OsKernelsDiffer
         expr: count(count by (release) (max by (host, release) (node_uname_info))) > 1
         for: 26h
