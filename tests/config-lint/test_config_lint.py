@@ -99,6 +99,52 @@ class MappingKeys(Configs):
         self.assertEqual(found, ["mapping-keys: config/group_vars/all.yml:2"])
 
 
+class Inventory(unittest.TestCase):
+    TEXT = (
+        "[all]\nm ansible_host=10.0.0.1\nn1\n# n9 commented\n"
+        "[kube_node]\n#n2\n[k8s_cluster:children]\nkube_node\n"
+        "[slurm-node]\nn1\n[slurm-cluster:children]\nslurm-node\nslurm-master\n"
+        "[slurm-master]\nm\n[all:vars]\nansible_user=x\n"
+    )
+
+    def test_hosts_through_child_groups_and_never_a_vars_line(self):
+        self.assertEqual(cl.group_hosts(self.TEXT, "slurm-cluster"), {"m", "n1"})
+        self.assertEqual(cl.group_hosts(self.TEXT, "k8s_cluster"), set())
+        self.assertEqual(cl.group_hosts(self.TEXT, "all"), {"m", "n1"})
+        self.assertEqual(cl.group_hosts(self.TEXT, "absent"), set())
+
+
+class IdleVars(Configs):
+    def test_vars_of_a_group_without_hosts_or_of_an_unknown_host_are_dead(self):
+        (self.site / "inventory").write_text(Inventory.TEXT)
+        for rel in (
+            "group_vars/k8s_cluster.yml",
+            "group_vars/slurm-node.yml",
+            "host_vars/m",
+            "host_vars/old",
+        ):
+            (self.site / rel).parent.mkdir(exist_ok=True)
+            (self.site / rel).write_text("a_setting: 1\n")
+        (self.site / "group_vars/kube_node").mkdir()
+        (self.site / "group_vars/kube_node/x.yml").write_text("a_setting: 1\n")
+        self.write(site="a_setting: 1\n")
+        tree = [t for label, t, _ in cl.configs() if label == "config"][0]
+        self.assertEqual(
+            cl.idle_vars(tree),
+            {
+                "group_vars/k8s_cluster.yml": "group k8s_cluster has no hosts in the inventory",
+                "group_vars/kube_node/x.yml": "group kube_node has no hosts in the inventory",
+                "host_vars/old": "host old is not in the inventory",
+            },
+        )
+
+    def test_another_config_is_no_reader(self):
+        self.assertEqual(cl.config_of("config.example/group_vars/all.yml"), "config.example")
+        self.assertEqual(cl.config_of(f"{cl.EXAMPLE}/inventory"), "config.example")
+        self.assertEqual(cl.config_of("config/group_vars/all.yml"), "config")
+        self.assertIsNone(cl.config_of("roles/r/defaults/main.yml"))
+
+
 class Removals(Configs):
     def test_only_explicit_removal_components_may_be_named(self):
         self.write(

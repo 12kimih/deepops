@@ -19,8 +19,10 @@ redundant  no active line, in config.example or config/, equals what every host 
            --fix comments the line out in config.example and deletes it in config/.
 dead       every variable config.example or config/ sets or shows, and every role
            default, is read somewhere: a role, playbook, plugin or script, another
-           value, or Kubespray. A setting nothing reads misleads whoever sets it (a typo
-           in config/ is one), and a default left unread is usually a task that was lost.
+           value, or Kubespray (for config/ only when its inventory has Kubernetes hosts:
+           a Slurm-only site's Kubespray settings are read by nothing it runs). A setting
+           nothing reads misleads whoever sets it (a typo in config/ is one), and a
+           default left unread is usually a task that was lost.
 doc-paths  every repository path a document names (roles/..., playbooks/..., ...)
            exists, so a page never sends a reader to a file that is gone.
 doc-vars   every setting a document tells a reader to set (`name: value`) or lists in
@@ -342,19 +344,28 @@ def check_dead():
     # (key, report as, private, {name: line}, text): the config files and role defaults
     # whose names must be read, each also a source for the others.
     named = []
+    # Kubespray reads a site's settings only where the site runs it.
+    kubernetes = {
+        label: label == "config.example" or bool(group_hosts(tree.text("inventory") or "", "k8s_cluster"))
+        for label, tree, _ in configs()
+    }
     for label, tree, private in configs():
+        idle = idle_vars(tree) if private else {}
+        problems += [f"dead: {label}/{rel}: {why}" for rel, why in sorted(idle.items())]
         for src in settings.Config(tree).sources:
+            if src.rel in idle:  # the whole file is reported above
+                continue
             found = {}
             for e in src.entries:
                 found.setdefault(e.name, e.line)
             key = f"{label}/{src.rel}"
-            named.append((key, key, private, found, tree.text(src.rel) or ""))
+            named.append((key, key, private, found, tree.text(src.rel) or "", kubernetes[label]))
     for path in tracked("roles/*/defaults/main.yml"):
         text = path.read_text()
         found = {e.name: e.line for e in settings.entries(text) if e.active}
-        named.append((str(path), str(path.relative_to(ROOT)), False, found, text))
+        named.append((str(path), str(path.relative_to(ROOT)), False, found, text, True))
     keys = {key for key, *_ in named}
-    texts = [(key, text) for key, _, _, _, text in named]
+    texts = [(key, text) for key, _, _, _, text, _ in named]
     texts += [(str(path), text) for path, text in sources if source_key(path) not in keys]
     # The site's own templates and files (files/slurm/*.conf, ...) read its settings too.
     for label, tree, _ in configs():
@@ -362,20 +373,51 @@ def check_dead():
             texts += [
                 (f"config/{rel}", tree.text(rel) or "") for rel in tree.files() if f"config/{rel}" not in keys
             ]
-    for key, shown, private, found, own in named:
+    for key, shown, private, found, own, k8s in named:
         # Its own definition does not count, but another value in the same file that
         # templates it does (the part after "name:").
         rest = "\n".join(re.sub(r"^#?[A-Za-z_]\w*:", "", raw) for raw in own.splitlines())
         for name, line in found.items():
-            if name in READ_ELSEWHERE or name in k8s_words:
+            if name in READ_ELSEWHERE or (k8s and name in k8s_words):
                 continue
             pattern = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
-            if pattern.search(rest) or any(pattern.search(text) for k, text in texts if k != key):
+            # Another config is no reader: config.example shows a setting, it does not read
+            # the site's, and the site's copy does not read the example's.
+            readers = (text for k, text in texts if k != key and config_of(k) in (None, config_of(key)))
+            if pattern.search(rest) or any(pattern.search(text) for text in readers):
                 continue
             problems.append(
                 f"dead: {shown}:{line}" + (": nothing reads it" if private else f": nothing reads {name}")
             )
     return problems
+
+
+def idle_vars(tree):
+    """{file: why} for TREE's group_vars of a group without hosts and host_vars of a host
+    outside its inventory: Ansible applies them to no host, so every value in them is read
+    by nothing the site runs (a Slurm-only site's Kubernetes group_vars). Only the site
+    config: config.example's inventory lists its hosts commented out."""
+    inventory = tree.text("inventory") or ""
+    _, hosts, _ = inventory_groups(inventory)
+    everyone = set().union(*hosts.values())
+    idle = {}
+    for rel in tree.files():
+        parts = Path(rel).parts
+        if len(parts) < 2 or parts[0] not in ("group_vars", "host_vars"):
+            continue
+        name = Path(parts[1]).stem if len(parts) == 2 else parts[1]
+        if parts[0] == "group_vars" and name != "all" and not group_hosts(inventory, name):
+            idle[rel] = f"group {name} has no hosts in the inventory"
+        elif parts[0] == "host_vars" and name not in everyone:
+            idle[rel] = f"host {name} is not in the inventory"
+    return idle
+
+
+def config_of(key):
+    """Which config a key of check_dead's files belongs to: config.example, config or None."""
+    if key.startswith("config.example/") or key.startswith(f"{EXAMPLE}/"):
+        return "config.example"
+    return "config" if key.startswith("config/") else None
 
 
 def source_key(path):
@@ -403,17 +445,39 @@ VAR_SUFFIXES = ("", ".yml", ".yaml", ".json")
 
 def example_groups():
     """(groups, {group: its child groups}, every name) of config.example/inventory."""
-    children, groups, current = {}, set(), None
     text = (EXAMPLE / "inventory").read_text()
-    for line in text.splitlines():
-        header = re.match(r"^\[([^\]:]+)(:children)?\]", line)
-        if header:
-            current = header.group(1) if header.group(2) else None
-            groups.add(header.group(1))
-            children.setdefault(header.group(1), set())
-        elif current and line.strip() and not line.lstrip().startswith("#"):
-            children[current].add(line.strip())
+    groups, _, children = inventory_groups(text)
     return groups, children, set(re.findall(r"[A-Za-z0-9_.-]+", text))
+
+
+def inventory_groups(text):
+    """(groups, {group: its own hosts}, {group: its child groups}) of an INI inventory;
+    a [group:vars] section holds no hosts."""
+    groups, hosts, children, section = set(), {}, {}, None
+    for line in text.splitlines():
+        header = re.match(r"^\[([^\]:]+)(?::(\w+))?\]", line)
+        if header:
+            name, kind = header.groups()
+            groups.add(name)
+            hosts.setdefault(name, set())
+            children.setdefault(name, set())
+            section = {None: hosts, "children": children}.get(kind), name
+        elif section and section[0] is not None and line.strip() and not line.lstrip().startswith(("#", ";")):
+            section[0][section[1]].add(line.split()[0])
+    return groups, hosts, children
+
+
+def group_hosts(text, group):
+    """The hosts GROUP of the INI inventory TEXT holds, its child groups' included."""
+    _, hosts, children = inventory_groups(text)
+    found, todo, seen = set(), [group], set()
+    while todo:
+        name = todo.pop()
+        if name not in seen:
+            seen.add(name)
+            found |= hosts.get(name, set())
+            todo.extend(children.get(name, ()))
+    return found
 
 
 def play_targets(playbook):
