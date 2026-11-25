@@ -281,6 +281,26 @@ class RenderTests(unittest.TestCase):
                 self.assertLessEqual(len(rich.read([b])), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
 
+    def test_an_idle_job_leaves_everyone_in_the_per_person_table(self):
+        """The per-person table lists every running GPU job, not the idle section's last
+        owner's jobs (owner 2026-11-26: with one idle job, the thread showed only it)."""
+
+        def gpu_job(jid, user, idle):
+            return {"id": jid, "label": jid, "user": user, "runtime": 7200, "gpus": [("gpu1", int(jid))],
+                    "gpu_type": "a10", "qos": "normal", "partition": "p", "util": 0.0 if idle else 80.0,
+                    "mem_gib": 1.0, "mem_known": 1, "idle": idle, "idle_gpus": 1 if idle else 0}  # fmt: skip
+
+        jobs = [gpu_job("1", "alice", False), gpu_job("2", "bob", True), gpu_job("3", "carol", False)]
+        data = {"jobs": jobs, "idle": [jobs[1]], "total_gpus": 8, "reasons": [], "now": 0,
+                "pending": {}, "due": []}  # fmt: skip
+        cfg = {"idle_util_threshold": 0, "idle_hours": 2, "notify": ["mention"], "dashboard_url": ""}
+        _, thread = report.render(data, cfg, lambda user, mention: user)
+        body = "\n".join(rich.read(blocks) for _, blocks in thread)
+        people = body[body.index("사람별 실행 중인 GPU 잡") :]
+        for user in ("alice", "bob", "carol"):
+            self.assertIn(user, people)
+        self.assertEqual(people.count("잡 1개"), 3, "one row per person, each with their own job")
+
 
 class RunTests(unittest.TestCase):
     """report_once: a failure part-way still records what this run did."""
