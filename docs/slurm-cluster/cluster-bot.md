@@ -113,6 +113,7 @@ write, never through a shell.
 | Service | Offered by | Command | Requests |
 |---|---|---|---|
 | `bans` | `roles/fail2ban` (while there is a bot) | `cluster-bans serve` | list, unban IP |
+| `shared-data` | `roles/shared_space` (while there is a bot) | `shared-data <config> serve` | the shared data requests' downloads and cleanup |
 
 The shared pieces (dispatcher, sudo rule, authorized key) are items of every role that
 offers a service, so `roles/component_record` removes them with the last of those roles.
@@ -149,7 +150,7 @@ export SBATCH_MAIL_TYPE=END,FAIL      # in ~/.bashrc: every job they submit asks
 ```
 
 Other types are Slurm's (`BEGIN`, `TIME_LIMIT_80`, `ALL`, ...; sbatch(1)); the notice goes to
-the job's own user unless `--mail-user` names another. A person's notices within ten minutes of the first become one
+the job's own user only: `--mail-user` may name anyone, so it is never a recipient. A person's notices within ten minutes of the first become one
 message updated in place, so an array of jobs is one DM. The Home tab's switch writes
 `cluster_bot_prefs_file`, which `job-notice` reads, so it needs the bot on the
 controller (the first `slurm-master`, its default host). Without `slack_bot_token`
@@ -159,8 +160,9 @@ on, since Slurm would send them as local mail instead.
 
 ## Turning it on
 
-The cluster has ONE Slack app, whose bot token (`slack_bot_token`) the usage reports, the
-job notices and this bot all use. Each deploy writes its manifest,
+The cluster has ONE Slack app, whose bot token (`slack_bot_token`) the usage reports (with the disk,
+I/O and scratch cleanup notices), the job notices, Alertmanager (`alertmanager_slack_bot`) and
+this bot all use. Each deploy writes its manifest,
 `/etc/cluster-bot/slack-app-manifest.json`, from the subcommand table: the command, the
 app's and bot user's name (`cluster_bot_app_name`, cluster-bot; importing the manifest
 into an existing app renames it and keeps its tokens and webhook), interactivity, Socket Mode and every bot scope the cluster's Slack features
@@ -191,9 +193,11 @@ Alertmanager posts through the app's webhook).
    pin it as `slack_admin_group_id` to skip the lookup (a set ID always wins). Slack
    notifies a group only by its ID; none found, the notices mention no one.
 6. Set `slurm_enable_cluster_bot: true` and run `playbooks/generic/cluster-bot.yml` (it
-   also authorizes its key where fail2ban offers the bans service). A deploy that still
+   also authorizes its key on every host that offers a service: fail2ban's bans, the shared
+   space's shared-data). A deploy that still
    lacks a setting says which, by name; without both tokens the bot is installed but
-   stopped. Invite the app to the help and admin channels (`slack_channels`).
+   stopped. Invite the app to every channel `slack_channels` names (announce, help, status,
+   admin): it posts and pins in them and keeps their guides.
 
 Who the bot knows comes from the people roster: `cluster_bot_members` (each person's
 `slack` attribute) and `cluster_bot_admins` (people with the `admin` role).

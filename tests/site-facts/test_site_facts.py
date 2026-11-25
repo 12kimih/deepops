@@ -130,10 +130,10 @@ class ServicesAndPaths(unittest.TestCase):
     def test_the_portal_its_menu_and_the_dashboard(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = site(tmp)
-            self.assertEqual(sf.facts(config)["services"], {"portal": False, "overview": "", "menu": [], "dashboard": True, "bot": False},
-                             "the defaults: no portal, monitoring on")  # fmt: skip
+            self.assertEqual(sf.facts(config)["services"], {"portal": False, "overview": "", "menu": [], "dashboard": True, "bot": False,
+                              "job_notices": True}, "the defaults: no portal, monitoring and job notices on")  # fmt: skip
             (config / "group_vars" / "slurm-cluster.yml").write_text(
-                "slurm_install_open_ondemand: true\nslurm_enable_cluster_bot: true\n"
+                "slurm_install_open_ondemand: true\nslurm_enable_cluster_bot: true\nslurm_enable_job_notices: false\n"
                 "open_ondemand_servername: portal.example.org\n"
                 "open_ondemand_overview: \"{{ lookup('file', 'x') }}\"\n"
                 "open_ondemand_overview_title: Overview\n"
@@ -144,7 +144,14 @@ class ServicesAndPaths(unittest.TestCase):
             every = sf.facts(config)
         self.assertEqual(
             every["services"],
-            {"portal": True, "overview": "Overview", "menu": ["Grafana"], "dashboard": True, "bot": True},
+            {
+                "portal": True,
+                "overview": "Overview",
+                "menu": ["Grafana"],
+                "dashboard": True,
+                "bot": True,
+                "job_notices": False,
+            },
         )
         self.assertNotIn("portal.example.org", json.dumps(sf.public(every)))
 

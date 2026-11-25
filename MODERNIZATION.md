@@ -2,7 +2,7 @@
 
 This document explains **every change made on the `main` branch (formerly `modernize`) since the
 forked NVIDIA DeepOps baseline** (commit `8858399d`, "release 26.05"): *what* was
-changed, *how*, and *why*. It is meant for review before merging.
+changed, *how*, and *why*. It records the review trail of the changes now on `main`.
 
 - **Goal:** keep this fork as a clean, public, continuously-maintained DeepOps --
   latest pinned versions, official-docs-compliant (with citations in code),
@@ -190,7 +190,8 @@ auto-detection so 26.04/EL10 and future releases are included automatically.
 Ported from the operator's private playbooks, rewritten in DeepOps style
 (`hostlist` default, FQCN, `proxy_env`):
 - `playbooks/utilities/disable-acs.yml` -- persistent oneshot unit disabling PCIe
-  ACS for NVIDIA NCCL GPU P2P (reapplied every boot).
+  ACS for NVIDIA NCCL GPU P2P (reapplied every boot); retired since: `roles/pcie_acs`
+  (`playbooks/generic/pcie-acs.yml`) owns `disable-acs.service`.
 - `playbooks/utilities/verify-acs.yml` -- reads back the ACS Control register on
   every PCI device and checks the disable-acs unit is enabled/active; fails if ACS
   is still on anywhere. Also a read-only IOMMU/VT-d audit (BIOS VT-d via the DMAR

@@ -55,9 +55,9 @@ slurm_ha_state_save_location: "/sw/slurm"
 #alertmanager_heartbeat_url: ""
 # The cluster's Slack workspace (roles/slack_defaults): the one bot token (xoxb-, vault
 # it) every feature that posts uses, the channels by purpose (Alertmanager posts to
-# admin), and whom what an administrator must act on mentions there (critical alerts,
-# the usage report's and the bot's notices): a user group "<!subteam^S0123ABCD>" (its
-# ID: the group's profile > Copy group ID), "<!channel>", or "" for no one.
+# admin), and the administrators' user group (slack_admin_group, its @handle, and
+# slack_admin_group_id, its S... ID; empty: each run looks it up by the handle), which
+# critical alerts and the usage report's and the bot's notices mention.
 #slack_bot_token: ""
 #slack_channels:
 #  status: "#gpu-usage"

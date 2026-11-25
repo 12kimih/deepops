@@ -26,8 +26,9 @@ Facts:
             or missing: portal (slurm_install_open_ondemand), its overview page's menu title
             (open_ondemand_overview_title, "" without one), the menu titles of the services
             it publishes (open_ondemand_proxied_services, as Grafana), dashboard
-            (slurm_enable_monitoring), bot (slurm_enable_cluster_bot: the /cluster command);
-            never an address
+            (slurm_enable_monitoring), bot (slurm_enable_cluster_bot: the /cluster command),
+            job_notices (slurm_enable_job_notices: --mail-type is a Slack DM to the job's
+            owner); never an address
   paths     the shared trees people use: scratch (scratch_space_root), software
             (sm_prefix), shared (shared_space_root) and its data folders (shared_space_data)
   login     each person's limits on a login node (cluster_tools_user_slice_limits, the
@@ -106,7 +107,7 @@ PUBLIC = {
         "submit_holds_disk",
     },
     "login": {"cpus", "memory_gib", "tasks"},
-    "services": {"portal", "overview", "menu", "dashboard", "bot"},
+    "services": {"portal", "overview", "menu", "dashboard", "bot", "job_notices"},
     "paths": {"scratch", "software", "shared", "shared_data"},
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
     "dates": None,  # any name the site's schedule gives, its value a date
@@ -349,8 +350,8 @@ def host_quotas(config):
 
 
 def services(config, settings_):
-    """{portal, overview, menu, dashboard}: whether the portal and the monitoring dashboard
-    run, the portal's overview page title (its setting is a template, set when the site
+    """{portal, overview, menu, dashboard, bot, job_notices}: whether the portal, the
+    monitoring dashboard, the cluster bot and job notices run, the portal's overview page title (its setting is a template, set when the site
     has one) and the titles of the services in its top menu."""
     portal = bool(settings_.get("slurm_install_open_ondemand"))
     raw = {}
@@ -364,6 +365,7 @@ def services(config, settings_):
         "menu": [svc["title"] for svc in services_ if svc.get("title")],
         "dashboard": bool(settings_.get("slurm_enable_monitoring")),
         "bot": bool(settings_.get("slurm_enable_cluster_bot")),
+        "job_notices": bool(settings_.get("slurm_enable_job_notices")),
     }
 
 
