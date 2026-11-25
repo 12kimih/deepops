@@ -14,6 +14,9 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files")
+)  # cluster_tools, which the bot imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
 import bounds  # noqa: E402
 from cluster_bot import github, sshkeys  # noqa: E402

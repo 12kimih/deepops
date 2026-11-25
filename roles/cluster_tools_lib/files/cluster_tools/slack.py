@@ -8,6 +8,8 @@
     member(slack, user, user_map, email_domain, cache) -> a person's Slack member ID
     slack.call(method, **params)            -> any other method, parsed
     sections(text), table(header, rows)     -> message blocks within Slack's limits
+                                               (cluster_tools.rich: the Markdown every
+                                               text is written in, sent as rich text)
     mentioning(who, text, blocks)           -> (text, blocks) that notify WHO first
     bar(percent)                            -> a text gauge for a code span or table
 
@@ -35,6 +37,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from . import rich
 from .files import write_atomic
 from .render import width
 
@@ -134,12 +137,7 @@ class Slack:
     def _print(method, params):
         print(f"--- {method} {params.get('channel', '')} thread={params.get('thread_ts', '')}")
         for b in json.loads(params.get("blocks", "[]")):
-            print(
-                b.get("text", {}).get("text")
-                or " | ".join(f["text"] for f in b.get("fields", []))
-                or " ".join(e["text"] for e in b.get("elements", []))
-                or "-" * 40
-            )
+            print(rich.read([b]) or "-" * 40)
         if "blocks" not in params:
             print(params.get("text", ""))
         print()
@@ -147,9 +145,9 @@ class Slack:
     def post(self, channel, text, blocks=None, thread_ts=None):
         if MEMBER.fullmatch(channel):
             raise Error(f"Slack chat.postMessage: {channel} is a person; a message to a person is a dm()")
-        params = {"channel": channel, "text": text, "unfurl_links": "false", "unfurl_media": "false"}
-        if blocks:
-            params["blocks"] = json.dumps(blocks)
+        msg = rich.message(text, blocks or None)
+        params = {"channel": channel, "text": msg["text"], "blocks": json.dumps(msg["blocks"]),
+                  "unfurl_links": "false", "unfurl_media": "false"}  # fmt: skip
         if thread_ts:
             params["thread_ts"] = thread_ts
         return self.call("chat.postMessage", **params)["ts"]
@@ -168,7 +166,7 @@ class Slack:
         if logged:
             text = f"{text}\n{DM_LOG_NOTE}"
             if blocks:
-                blocks = [*blocks, {"type": "context", "elements": [{"type": "mrkdwn", "text": DM_LOG_NOTE}]}]
+                blocks = [*blocks, rich.context(DM_LOG_NOTE)]
         channel = self.dm_channel(member)
         ts = self.post(channel, text, blocks)
         print(f"dm {kind} {login} {channel} {ts}")
@@ -181,10 +179,10 @@ class Slack:
         return channel, ts
 
     def update(self, channel, ts, text, blocks=None):
-        params = {"channel": channel, "ts": ts, "text": text}
-        if blocks:
-            params["blocks"] = json.dumps(blocks)
-        return self.call("chat.update", **params)
+        msg = rich.message(text, blocks or None)
+        return self.call(
+            "chat.update", channel=channel, ts=ts, text=msg["text"], blocks=json.dumps(msg["blocks"])
+        )
 
 
 def dm_log_title(day, count):
@@ -194,10 +192,11 @@ def dm_log_title(day, count):
 
 def dm_log_line(kind, login, text, link=""):
     """The administrators' line for one DM: what kind, to whom, its first line, a link."""
-    first = text.strip().splitlines()[0] if text.strip() else ""
+    shown = rich.plain(text).strip()
+    first = shown.splitlines()[0] if shown else ""
     if len(first) > DM_LOG_FIRST:
         first = first[: DM_LOG_FIRST - 3] + "..."
-    return f"`{kind}` to *{escape(login)}*: {first}" + (f"  <{link}|open>" if link else "")
+    return f"`{escape(kind)}` to **{escape(login)}**: {escape(first)}" + (f"  <{link}|open>" if link else "")
 
 
 def _retry_after(error):
@@ -210,9 +209,11 @@ def _retry_after(error):
 
 
 def escape(text):
-    """TEXT shown as itself in a Slack message: &, < and > are Slack's control characters
-    (a job name with <!channel> would mention everyone). api.slack.com/reference/surfaces/formatting"""
-    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    """TEXT shown as itself in a message (cluster_tools.rich): &, < and > as Slack's
+    entities (a job name with <!channel> would mention everyone), and the Markdown's own
+    characters escaped, so a value is never read as a style or a link."""
+    text = str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return re.sub(r"([\\*_`\[\]:])", r"\\\1", text)
 
 
 def member(slack, user, user_map, email_domain, cache):
@@ -262,25 +263,12 @@ def mentioning(who, text, blocks=None):
     mention, its text is only the fallback. An empty WHO leaves both as they are."""
     if not who:
         return text, blocks
-    return f"{who} {text}", (
-        [{"type": "section", "text": {"type": "mrkdwn", "text": who}}, *blocks] if blocks else blocks
-    )
+    return f"{who} {text}", ([*rich.blocks(who), *blocks] if blocks else blocks)
 
 
 def sections(text):
-    """Slack sections holding all of TEXT. Slack rejects a section over 3000 characters,
-    failing the whole post, so a longer text is split at lines into several, a code block
-    closed at the end of one and reopened in the next. Nothing is cut: a line left out
-    could be the mention that tells an owner about their idle job."""
-    chunks, cur, fenced = [], [], False
-    width = MAX_SECTION - 8  # room for a code fence closed and reopened around a piece
-    pieces = [ln[i : i + width] for ln in text.split("\n") for i in range(0, max(len(ln), 1), width)]
-    for line in pieces:
-        if cur and len("\n".join(cur + [line])) + 4 > MAX_SECTION:
-            chunks.append("\n".join(cur + (["```"] if fenced else [])))
-            cur = ["```"] if fenced else []
-        cur.append(line)
-        if line.startswith("```"):
-            fenced = not fenced
-    chunks.append("\n".join(cur))
-    return [{"type": "section", "text": {"type": "mrkdwn", "text": c}} for c in chunks if c.strip("`\n")]
+    """Rich text blocks holding all of TEXT (cluster_tools.rich): a longer text is split at
+    lines into several within Slack's limits, a code block closed at the end of one and
+    reopened in the next. Nothing is cut: a line left out could be the mention that tells
+    an owner about their idle job."""
+    return rich.blocks(text)

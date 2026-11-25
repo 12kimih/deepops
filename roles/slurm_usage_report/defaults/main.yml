@@ -57,6 +57,8 @@ slurm_usage_report_idle_util_threshold: 0
 # it lasts (owner, 2026-11-23): the idle-job cancel bounds how long that goes on.
 slurm_usage_report_notify: [mention]
 slurm_usage_report_notify_repeat_hours: 0
+# The texts below are written in cluster_tools.rich's Markdown (**bold**, `code`,
+# [text](url), - lists): they are sent as Slack rich text, shown as written.
 # The DM (with dm in notify): {jobs} (one line each), {count}, {hours} (idle_hours).
 slurm_usage_report_dm_text: |-
   잡 {count}개의 GPU가 {hours}시간 넘게 쉬고 있습니다:

@@ -2,6 +2,8 @@
 message for a held request (cluster_bot.requests), approved or denied with
 request.approve and request.deny whatever the feature."""
 
+from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+
 
 def button(text, action, value, style=None, confirm=None):
     b = {
@@ -29,13 +31,13 @@ def mentioning(who, text, blocks):
     counterpart of cluster_tools.slack.mentioning (the bot does not load that library)."""
     if not who:
         return text, blocks
-    return f"{who} {text}", [{"type": "section", "text": {"type": "mrkdwn", "text": who}}, *blocks]
+    return f"{who} {text}", [rich.section(who), *blocks]
 
 
 def held(user_mention, text, key):
     """The administrators' message for a request held for them (any feature)."""
     return [
-        {"type": "section", "text": {"type": "mrkdwn", "text": f"{user_mention}: {text}"}},
+        rich.section(f"{user_mention}: {text}"),
         {"type": "actions", "elements": [
             button("승인", "request.approve", key, style="primary"),
             button("거절", "request.deny", key, style="danger"),

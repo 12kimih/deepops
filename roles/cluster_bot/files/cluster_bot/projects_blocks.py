@@ -1,6 +1,9 @@
 """Block Kit for the collaboration folders (cluster_bot.projects): the Home tab's section,
 the forms, and the notice a person gets once a change is deployed."""
 
+from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+from cluster_tools.slack import escape  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+
 from .blocks import button, field
 from .projects import ROLE_NAMES, role_name
 
@@ -26,7 +29,7 @@ def _people(proj):
     for role in ROLES:
         logins = proj.get(role) or []
         if logins:
-            parts.append(f"{ROLE_NAMES[role]} {', '.join(logins)}")
+            parts.append(f"{ROLE_NAMES[role]} {escape(', '.join(logins))}")
     return " / ".join(parts)
 
 
@@ -34,27 +37,23 @@ def home(login, projects, root):
     """LOGIN's projects with what they may do there, and how to start or join one."""
     mine = {n: p for n, p in sorted(projects.items()) if role_of(p, login)}
     blocks = [{"type": "divider"},
-              {"type": "section", "text": {"type": "mrkdwn", "text": "*공동작업 폴더*"}}]  # fmt: skip
+              rich.section("**공동작업 폴더**")]  # fmt: skip
     for name, proj in mine.items():
         role = role_of(proj, login)
         ops = ["manage", "purpose", "close", "leave"] if role == "owners" else ["leave"]
-        text = f"*{name}* ({ROLE_NAMES[role]})  `{root}/{name}`\n{_people(proj)}"
+        text = f"**{escape(name)}** ({ROLE_NAMES[role]})  `{escape(root)}/{escape(name)}`\n{_people(proj)}"
         if proj.get("purpose"):
-            text += f"\n_{proj['purpose']}_"
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text},
-                       "accessory": {"type": "overflow", "action_id": "project.menu",
-                                     "options": [_option(MENU[op], f"{op}:{name}") for op in ops]}})  # fmt: skip
+            text += f"\n_{escape(proj['purpose'])}_"
+        blocks.append(rich.section(text, accessory={"type": "overflow", "action_id": "project.menu",
+                                     "options": [_option(MENU[op], f"{op}:{name}") for op in ops]}))  # fmt: skip
     if not mine:
-        blocks.append(
-            {"type": "context", "elements": [{"type": "mrkdwn", "text": "참여 중인 프로젝트가 없습니다."}]}
-        )
+        blocks.append(rich.context("참여 중인 프로젝트가 없습니다."))
     blocks.append({"type": "actions", "elements": [
         button("새 프로젝트", "project.new", "new", style="primary"),
         button("참여 요청", "project.join", "join"),
     ]})  # fmt: skip
-    blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text":
-        "관리자와 멤버는 읽고 쓰고, 열람자는 읽기만 합니다. 바뀐 그룹은 새로 로그인하면 적용됩니다. "
-        "파일은 만든 사람의 디스크 할당량에 들어갑니다."}]})  # fmt: skip
+    blocks.append(rich.context("관리자와 멤버는 읽고 쓰고, 열람자는 읽기만 합니다. 바뀐 그룹은 새로 로그인하면 적용됩니다. "
+        "파일은 만든 사람의 디스크 할당량에 들어갑니다."))  # fmt: skip
     return blocks
 
 
@@ -87,7 +86,7 @@ def new_form(places):
         field("owners", "함께 관리할 사람 (관리자)", people, optional=True),
         field("members", "멤버 (읽고 쓰기)", people, optional=True),
         field("viewers", "열람자 (읽기만)", people, optional=True),
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": "신청한 사람이 관리자가 됩니다. 관리자가 승인하면 폴더가 만들어집니다."}]},
+        rich.context("신청한 사람이 관리자가 됩니다. 관리자가 승인하면 폴더가 만들어집니다."),
     ])  # fmt: skip
 
 
@@ -101,7 +100,7 @@ def join_form(projects, login):
         field("project", "프로젝트", {"type": "static_select", "options": options}),
         field("role", "역할", {"type": "radio_buttons", "initial_option": _option(ROLE_NAMES["members"], "members"),
                                "options": [_option(ROLE_NAMES[r], r) for r in ("members", "viewers")]}),
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": "프로젝트 관리자 중 한 명이 승인하면 반영됩니다."}]},
+        rich.context("프로젝트 관리자 중 한 명이 승인하면 반영됩니다."),
     ])  # fmt: skip
 
 

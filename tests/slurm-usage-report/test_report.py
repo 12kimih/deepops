@@ -10,9 +10,9 @@ from unittest import mock
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
-from fake_slack import FakeDM  # noqa: E402
+from cluster_tools import rich  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
-
+from fake_slack import FakeDM  # noqa: E402
 
 NOW = 1_800_000_000
 
@@ -278,7 +278,7 @@ class RenderTests(unittest.TestCase):
         for _, blocks in [("summary", summary)] + thread:
             self.assertLessEqual(len(blocks), 50)
             for b in blocks:
-                self.assertLessEqual(len(b.get("text", {}).get("text", "")), 3000)
+                self.assertLessEqual(len(rich.read([b])), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
 
 
@@ -480,10 +480,10 @@ class WeeklyTests(unittest.TestCase):
         self.assertEqual([r["user"] for r in rows], ["bob", "alice", "carol"])
         text, blocks = report.render_week(rows, lambda u, m: f"@{u}" if m else u, 5, top=1)
         self.assertIn("250 GPU시간 중 130 GPU시간 쉬었습니다 (52%)", text)
-        body = " ".join(b["text"]["text"] for b in blocks if b["type"] == "section")
+        body = rich.read([b for b in blocks if b["type"] not in ("header", "context")])
         self.assertIn("@bob: 120 GPU시간 중 90 GPU시간 쉼 (75%)", body)
         self.assertIn("alice: 100 GPU시간 중 40", body)
-        note = blocks[-1]["elements"][0]["text"]
+        note = rich.read(blocks[-1:])
         self.assertIn("5% 이하", note, "the threshold the hours were counted at, not a fixed 0%")
         self.assertNotIn("@alice", body)
 
@@ -500,7 +500,7 @@ class WeeklyTests(unittest.TestCase):
         self.assertEqual(report.repeaters(weeks, self.CFG), [])
         text, blocks = report.render_repeaters(["bob"], {"bob": weeks["bob"][:2]}, [], self.CFG)
         self.assertIn("bob", text)
-        context = blocks[-1]["elements"][0]["text"]
+        context = rich.read(blocks[-1:])
         self.assertIn("What to do", context)
         self.assertIn("50 idle GPU-hours and 50%", context)
 

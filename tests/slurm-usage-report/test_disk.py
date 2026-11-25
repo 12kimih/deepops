@@ -11,9 +11,9 @@ from unittest import mock
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
-from fake_slack import FakeDM  # noqa: E402
-from cluster_tools import disk_report  # noqa: E402
+from cluster_tools import disk_report, rich  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
+from fake_slack import FakeDM  # noqa: E402
 
 NOW = 1_800_000_000
 G = 2**30
@@ -96,11 +96,7 @@ def who(user, mention):
 
 
 def text_of(blocks):
-    return "\n".join(
-        b["text"]["text"] if b["type"] != "context" else b["elements"][0]["text"]
-        for b in blocks
-        if b["type"] != "header"
-    )
+    return rich.read([b for b in blocks if b["type"] != "header"])
 
 
 class CollectTests(unittest.TestCase):
@@ -183,7 +179,7 @@ class RenderTests(unittest.TestCase):
         (_, card), _ = disk_report.render(
             data, who, 2, fill=fill, fill_mention={disk_report.fill_key(("login", "/"))}
         )
-        self.assertIn(":large_orange_circle: *login:/* 75% 사용 중: @bob 21G, @alice 18G", text_of(card))
+        self.assertIn(":large_orange_circle: login:/ 75% 사용 중: @bob 21G, @alice 18G", text_of(card))
         (_, card), _ = disk_report.render(data, who, 2, fill=fill, fill_mention=set())
         self.assertIn("75% 사용 중: bob 21G, alice 18G", text_of(card), "named every day, mentioned when due")
 
@@ -199,9 +195,9 @@ class RenderTests(unittest.TestCase):
         ]
         (_, card), _ = disk_report.render(disk_report.collect(prom, NOW), who, 2)
         body = text_of(card)
-        self.assertIn("*경고 수준을 넘은 프로젝트*", body)
+        self.assertIn("경고 수준을 넘은 프로젝트", body)
         self.assertIn(
-            ":warning: *shared-data* nfs:/home에서: 19G, 경고 수준(18G)을 넘었습니다 (한도 20G)", body
+            ":warning: shared-data nfs:/home에서: 19G, 경고 수준(18G)을 넘었습니다 (한도 20G)", body
         )
         self.assertNotIn("/home/shared/datasets*", body, "7G of a 10G limit is past nothing")
 
@@ -216,7 +212,7 @@ class RenderTests(unittest.TestCase):
         data = disk_report.collect(prom, NOW)
         _, thread = disk_report.render(data, who, 2, stale_days=60)
         details = text_of(thread[0][1])
-        self.assertIn("nfs:/home*: 정리하면 좋을 폴더 (60일 넘게 쓰지 않은 것", details)
+        self.assertIn("nfs:/home: 정리하면 좋을 폴더 (60일 넘게 쓰지 않은 것", details)
         self.assertIn("/home/alice/old  alice  300G  120일", details)
         self.assertNotIn("@alice", details.split("정리하면 좋을 폴더")[1])
 
@@ -290,7 +286,7 @@ class RunTests(unittest.TestCase):
             def post(self, channel, text, blocks=None, thread_ts=None):
                 if channel == "UBOB":
                     raise RuntimeError("Slack chat.postMessage failed: channel_not_found")
-                posted.append((channel, text, json.dumps(blocks, ensure_ascii=False)))
+                posted.append((channel, text, rich.read(blocks)))
                 return "ts"
 
         with tempfile.TemporaryDirectory() as fresh:

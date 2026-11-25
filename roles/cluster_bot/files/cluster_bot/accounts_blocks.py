@@ -1,5 +1,7 @@
 """The Slack forms of account requests (cluster_bot.accounts)."""
 
+from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+
 from .blocks import field
 
 
@@ -10,9 +12,8 @@ def join_form(teams):
         "title": {"type": "plain_text", "text": "계정 신청"},
         "submit": {"type": "plain_text", "text": "신청"},
         "blocks": [
-            {"type": "context", "elements": [{"type": "mrkdwn", "text":
-                "공개키는 내 컴퓨터에서 `ssh-keygen -t ed25519`로 만든 `~/.ssh/id_ed25519.pub`의 내용입니다. "
-                "개인키(.pub가 없는 파일)는 절대 보내지 마세요."}]},
+            rich.context("공개키는 내 컴퓨터에서 `ssh-keygen -t ed25519`로 만든 `~/.ssh/id_ed25519.pub`의 내용입니다. "
+                "개인키(.pub가 없는 파일)는 절대 보내지 마세요."),
             field("login", "아이디 (영문 소문자로 시작)", {"type": "plain_text_input"}),
             field("name", "이름", {"type": "plain_text_input"}),
             field("team", "팀", {"type": "static_select",
@@ -25,9 +26,8 @@ def join_form(teams):
 def leave_form(login, may_choose, today):
     """The leave form: the last day, and whose account (an administrator may name anyone)."""
     blocks = [
-        {"type": "section", "text": {"type": "mrkdwn", "text":
-            "마지막 날이 지나면 새 잡은 낼 수 없고, 유예 기간 동안 로그인해서 파일을 옮길 수 있습니다. "
-            "그 뒤 로그인이 막히고, 파일은 보관 기간 동안 남습니다."}},
+        rich.section("마지막 날이 지나면 새 잡은 낼 수 없고, 유예 기간 동안 로그인해서 파일을 옮길 수 있습니다. "
+            "그 뒤 로그인이 막히고, 파일은 보관 기간 동안 남습니다."),
         field("ends", "마지막 날", {"type": "datepicker", "initial_date": today}),
     ]  # fmt: skip
     if may_choose:
@@ -53,6 +53,6 @@ def leave_reminder(person, days_left):
     )
     note = "날짜가 바뀌었다면 관리자에게 알려 주세요."
     return "클러스터 사용 종료 안내", [
-        {"type": "section", "text": {"type": "mrkdwn", "text": text}},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": note}]},
+        rich.section(text),
+        rich.context(note),
     ]

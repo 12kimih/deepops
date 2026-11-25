@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from cluster_tools import slack  # noqa: E402
+from cluster_tools import rich, slack  # noqa: E402
 
 
 class Fake(slack.Slack):
@@ -74,11 +74,11 @@ class SlackTests(unittest.TestCase):
             ]
             day = time.strftime("%Y-%m-%d")
             self.assertEqual(posts[0][:2], ("chat.postMessage", "D9"))
-            self.assertIn(slack.DM_LOG_NOTE, posts[0][2])
+            self.assertIn(rich.plain(slack.DM_LOG_NOTE), posts[0][2])
             self.assertEqual(posts[1], ("chat.postMessage", "#alerts", slack.dm_log_title(day, 0), None))
             # Then by the ID Slack gave: chat.update takes no channel name.
             self.assertEqual(posts[2], ("chat.postMessage", "C42",
-                                        "`disk` to *kim*: Your disk use is high.  <https://x/p1|open>", "1.2"))  # fmt: skip
+                                        "disk to kim: Your disk use is high.  open (https://x/p1)", "1.2"))  # fmt: skip
             self.assertEqual(posts[3][:3], ("chat.update", "C42", slack.dm_log_title(day, 1)))
             # The second DM of the day goes under the same message: no new one.
             self.assertEqual([p[1] for p in posts[4:]], ["D9", "C42", "C42"])
@@ -206,17 +206,24 @@ class BlockTests(unittest.TestCase):
         # Every line reaches Slack: a dropped one could be the mention that tells an owner.
         rows = [f"row {i:04d} " + "x" * 40 for i in range(200)]
         text = "head\n```\n" + "\n".join(rows) + "\n```"
-        parts = [b["text"]["text"] for b in slack.sections(text)]
+        parts = [rich.read([b]) for b in slack.sections(text)]
         self.assertGreater(len(parts), 1)
         for p in parts:
             self.assertLessEqual(len(p), 3000)
-            self.assertEqual(p.count("```") % 2, 0, "each part closes the code block it opens")
         lines = [ln for p in parts for ln in p.splitlines() if ln.startswith("row ")]
         self.assertEqual(lines, rows)
-        self.assertEqual([b["text"]["text"] for b in slack.sections("short")], ["short"])
+        self.assertTrue(
+            all(
+                e["type"] == "rich_text_preformatted" for b in slack.sections(text)[1:] for e in b["elements"]
+            ),
+            "a table split in two is a code block in each part",
+        )
+        self.assertEqual([rich.read([b]) for b in slack.sections("short")], ["short"])
         long = slack.sections("y" * 7000)
-        self.assertTrue(all(len(b["text"]["text"]) <= 3000 for b in long))
-        self.assertEqual(sum(len(b["text"]["text"]) for b in long), 7000, "a long line is split, not cut")
+        self.assertTrue(all(len(rich.read([b])) <= 3000 for b in long))
+        self.assertEqual(
+            sum(len(rich.read([b]).replace("\n", "")) for b in long), 7000, "a long line is split, not cut"
+        )
 
     def test_bar(self):
         self.assertEqual(slack.bar(100), "█" * 10 + " 100%")

@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 from cluster_bot import bans, remote, requests  # noqa: E402
+from cluster_tools import rich  # noqa: E402
 
 BAN = {"ip": "192.0.2.7", "jail": "sshd", "since": "2026-11-20 03:12:44"}
 
@@ -122,7 +123,7 @@ class Watch(unittest.TestCase):
         self.assertEqual(self.channel.updated[-1], "현재 차단된 주소 61개")
         text, blocks = bans.bans_blocks.ban_list([{**b, "host": "node1"} for b in wave], {})
         self.assertIn("외 20개", str(blocks), "a long list is cut and counted")
-        self.assertTrue(all(len(b["text"]["text"]) < 3000 for b in blocks if b["type"] == "section"))
+        self.assertTrue(all(len(rich.read([b])) < 3000 for b in blocks))
 
     def test_a_host_that_cannot_be_read_keeps_its_bans_and_is_named(self):
         self.round()
@@ -246,7 +247,7 @@ class Reasons(unittest.TestCase):
         self.assertIn("cluster-bot.yml", shown)
         text, blocks = bans.bans_blocks.ban_list([], {})
         self.assertEqual(text, "현재 차단된 주소가 없습니다")
-        self.assertEqual([b["type"] for b in blocks], ["section", "context"], "said once, in the header")
+        self.assertEqual([b["type"] for b in blocks], ["rich_text", "context"], "said once, in the header")
 
 
 if __name__ == "__main__":

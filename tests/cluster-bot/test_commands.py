@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "tests/lib"))
 from repo_scan import tracked  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
 from cluster_bot import commands, home_blocks  # noqa: E402
 
 APP = ROOT / "roles/cluster_bot/files/cluster_bot/app.py"
