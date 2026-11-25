@@ -60,11 +60,15 @@ def disk_holds(data):
     the worst of their filesystems."""
     out = {}
     for row in disk_report.over_warn(data):
-        place, amount, state, hard = disk_report.describe(row)
-        if hard and row[2] not in out:
+        # In English, as every message sbatch shows (job_submit.lua); the figures are the
+        # notices' own (disk_report.amounts).
+        place, what, used, level, kind, _ = disk_report.amounts(row)
+        figure = disk_report.size if what == "space" else (lambda n: f"{n:,.0f} files")
+        if kind == "hard" and row[2] not in out:
             out[row[2]] = (
-                f"Your disk use on {place} is {amount}, {state}. New jobs are held until you"
-                f" free space there (`quota -s` on {row[0]} shows it); running jobs go on."
+                f"Your disk use on {place} is {figure(used)}, at the hard limit {figure(level)}: writes"
+                f" there fail now. New jobs are held until you free space there (`quota -s` on"
+                f" {row[0]} shows it); running jobs go on."
             )
     return out
 

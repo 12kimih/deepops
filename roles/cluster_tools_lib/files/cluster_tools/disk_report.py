@@ -39,7 +39,7 @@ STALE = 3600
 # A daily timer runs a little earlier or later each day: a notice due every N days may
 # go this much early (cluster_tools.notices), so a weekly one never slips to the eighth day.
 LEEWAY = 3600
-HOW = "`quota -s` on the host shows your own usage there."
+HOW = "내 사용량은 그 호스트에서 `quota -s`로 보실 수 있습니다."
 
 # The disks behind the counted filesystems: node_exporter's mount point is the quota
 # metrics' filesystem.
@@ -186,11 +186,13 @@ def projects_past(data):
     lines = []
     for (host, fs, project), entry, (_, used, level, kind) in rows:
         if kind == "hard":
-            state = "at its limit, writes refused"
+            state = f"한도({size(level)})에 닿아 쓰기가 막혀 있습니다"
         else:
-            state = "past its warn level" + (f", limit {size(entry['hard'])}" if entry["hard"] else "")
+            state = f"경고 수준({size(level)})을 넘었습니다" + (
+                f" (한도 {size(entry['hard'])})" if entry["hard"] else ""
+            )
         mark = ":no_entry:" if kind == "hard" else ":warning:"
-        lines.append(f"{mark} *{project}* on {where(host, fs)}: {size(used)} of {size(level)}, {state}")
+        lines.append(f"{mark} *{project}* {where(host, fs)}에서: {size(used)}, {state}")
     return lines
 
 
@@ -204,9 +206,9 @@ def where(host, filesystem):
 
 
 def change(now, before):
-    """A day's change of a usage: +3.2G, -512M, 0, or new (not counted a day ago)."""
+    """A day's change of a usage: +3.2G, -512M, 0, or 새로 (not counted a day ago)."""
     if before is None:
-        return "new"
+        return "새로"
     d = now - before
     return "0" if abs(d) < 1024**2 else ("+" if d > 0 else "") + size(d)
 
@@ -214,11 +216,11 @@ def change(now, before):
 def disk_line(key, disk):
     """One line on a disk: how full, what is free, how the free space changed in a day."""
     if not disk["size"] or disk["avail"] is None:
-        return f"*{where(*key)}*  no disk figures (node_exporter)"
+        return f"*{where(*key)}*  디스크 수치가 없습니다 (node_exporter)"
     used = disk["size"] - disk["avail"]
-    line = f"*{where(*key)}*  `{bar(100 * used / disk['size'])}`  {size(disk['avail'])} free of {size(disk['size'])}"
+    line = f"*{where(*key)}*  `{bar(100 * used / disk['size'])}`  {size(disk['size'])} 중 {size(disk['avail'])} 남음"
     if disk["avail_before"] is not None:
-        line += f", {change(used, disk['size'] - disk['avail_before'])} used in a day"
+        line += f", 하루 사이 사용량 {change(used, disk['size'] - disk['avail_before'])}"
     return line
 
 
@@ -226,17 +228,33 @@ def _level(entry, kind):
     return size(entry[kind]) if entry[kind] else "-"
 
 
-def describe(row):
-    """(where, how much, how it stands, at the hard limit) for a row of over_warn."""
+def amounts(row):
+    """(where, what, used, level, kind, hard limit) of a row of over_warn, in no language:
+    WHAT is space (bytes) or files, KIND warn or hard. The notices word them (describe),
+    and so does the submit hold (cluster_tools.submit_holds)."""
     host, filesystem, _, entry, levels = row
     what, used, level, kind = levels[0]
-    figure = size if what == "space" else (lambda n: f"{n:,.0f} files")
+    return (
+        where(host, filesystem),
+        what,
+        used,
+        level,
+        kind,
+        entry["hard"] if what == "space" else entry["inode_hard"],
+    )
+
+
+def describe(row):
+    """(where, how much, how it stands, at the hard limit) for a row of over_warn: the
+    state a sentence ("한도(5T)에 닿았습니다"), the level in parentheses so the particle
+    follows the word, not the figure."""
+    place, what, used, level, kind, hard = amounts(row)
+    figure = size if what == "space" else (lambda n: f"파일 {n:,.0f}개")
     if kind == "hard":
-        state = f"at the hard limit {figure(level)}: writes there fail now"
+        state = f"한도({figure(level)})에 닿았습니다"
     else:
-        hard = entry["hard"] if what == "space" else entry["inode_hard"]
-        state = f"past the warn level {figure(level)}" + (f", hard limit {figure(hard)}" if hard else "")
-    return where(host, filesystem), figure(used), state, kind == "hard"
+        state = f"경고 수준({figure(level)})을 넘었습니다" + (f" (한도 {figure(hard)})" if hard else "")
+    return place, figure(used), state, kind == "hard"
 
 
 def hold_note(hold, now):
@@ -245,22 +263,24 @@ def hold_note(hold, now):
     if hold is None:
         return ""
     if now >= hold:
-        return "new Slurm jobs are refused until you free space"
-    return f"from {datetime.fromtimestamp(hold):%Y-%m-%d}, new Slurm jobs are refused while at it"
+        return "공간을 비우실 때까지 새 Slurm 잡은 제출되지 않습니다"
+    return (
+        f"{datetime.fromtimestamp(hold):%Y-%m-%d}부터는 한도에 닿아 있는 동안 새 Slurm 잡이 제출되지 않습니다"
+    )
 
 
 def past_line(row, who, mention=True, note=""):
     place, amount, state, hard = describe(row)
     if hard and note:
-        state += f"; {note}"
-    return f"{':no_entry:' if hard else ':warning:'} {who(row[2], mention)} on {place}: {amount}, {state}"
+        state += f". {note}"
+    return f"{':no_entry:' if hard else ':warning:'} {who(row[2], mention)} {place}에서: {amount}, {state}"
 
 
 def others_line(rest, shown=3):
     """Everyone not in the roster, on one line: the largest SHOWN by name, then the rest."""
     names = ", ".join(f"{u} {size(e['used'])}" for u, e in rest[:shown])
-    more = f", {len(rest) - shown} more" if len(rest) > shown else ""
-    return f"Not in the roster (root, services, people who left): {names}{more}; {size(sum(e['used'] for _, e in rest))} together"
+    more = f", 외 {len(rest) - shown}개" if len(rest) > shown else ""
+    return f"명부에 없는 계정 (root, 서비스, 떠난 분): {names}{more}, 모두 {size(sum(e['used'] for _, e in rest))}"
 
 
 def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_mention=(), stale_days=0):
@@ -277,14 +297,14 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
     for key, disk in data["disks"].items():
         if disk["size"] and disk["avail"] is not None:
             full.append(f"{where(*key)} {100 * (disk['size'] - disk['avail']) / disk['size']:.0f}%")
-    text = f"Disk usage {stamp}: " + (", ".join(full) or "no disk figures")
+    text = f"디스크 사용량 {stamp}: " + (", ".join(full) or "디스크 수치 없음")
     if rows:
-        text += f"; {len(rows)} past their level"
-    card = [{"type": "header", "text": {"type": "plain_text", "text": f"Disk usage {stamp}"}}]
+        text += f", 경고 수준을 넘은 사용량 {len(rows)}건"
+    card = [{"type": "header", "text": {"type": "plain_text", "text": f"디스크 사용량 {stamp}"}}]
     card += sections("\n".join(disk_line(k, d) for k, d in data["disks"].items()))
     if rows:
         card += sections(
-            "*Past a level*\n"
+            "*경고 수준을 넘은 사용량*\n"
             + "\n".join(
                 past_line(r, who, mention is None or row_key(r) in mention, hold_note(hold, data["now"]))
                 for r in rows
@@ -292,24 +312,24 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
         )
     shared = projects_past(data)
     if shared:
-        card += sections("*Projects past a level*\n" + "\n".join(shared))
+        card += sections("*경고 수준을 넘은 프로젝트*\n" + "\n".join(shared))
     if fill:
         card += sections(
-            "*Filling up*: the largest users, please free what you can\n"
+            "*가득 차 가는 공간*: 가장 많이 쓰시는 분들께 부탁드립니다. 비울 수 있는 것을 비워 주세요\n"
             + "\n".join(
-                f":large_orange_circle: *{where(*key)}* {100 * frac:.0f}% full: "
+                f":large_orange_circle: *{where(*key)}* {100 * frac:.0f}% 사용 중: "
                 + ", ".join(f"{who(u, fill_key(key) in fill_mention)} {size(used)}" for u, used in users)
                 for key, frac, users in fill
             )
         )
     stale = sorted(
-        f"{h} (last {datetime.fromtimestamp(t).strftime('%m-%d %H:%M')})"
+        f"{h} (마지막 {datetime.fromtimestamp(t).strftime('%m-%d %H:%M')})"
         for h, t in data["reported"].items()
         if data["now"] - t > STALE
     )
-    notes = [f"The warn level only notifies; the hard limit refuses writes at once. {HOW}"]
+    notes = [f"경고 수준은 알려 드리기만 하고, 한도에 닿으면 바로 쓰기가 막힙니다. {HOW}"]
     if stale:
-        notes.append(f"Not reported lately, so older figures: {', '.join(stale)}.")
+        notes.append(f"최근 보고가 없어 예전 수치입니다: {', '.join(stale)}.")
     card.append({"type": "context", "elements": [{"type": "mrkdwn", "text": " ".join(notes)}]})
 
     detail = []
@@ -330,11 +350,11 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
         tail = ""
         if len(mine) > len(shown):
             rest = mine[len(shown) :]
-            tail = f"\n{len(rest)} more, {size(sum(e['used'] for _, e in rest))} together"
+            tail = f"\n외 {len(rest)}{'명' if people else '개 계정'}, 모두 {size(sum(e['used'] for _, e in rest))}"
         if others:
             tail += "\n" + others_line(others)
-        head = f":file_cabinet: *{where(*key)}*, the largest of {len(mine)} {'people' if people else 'users'}"
-        detail += sections(f"{head}\n{table(('USER', 'USED', 'DAY', 'WARN', 'HARD'), body)}{tail}")
+        head = f":file_cabinet: *{where(*key)}*: {len(mine)}{'명' if people else '개 계정'} 중 많이 쓰는 순"
+        detail += sections(f"{head}\n{table(('사용자', '사용량', '하루', '경고', '한도'), body)}{tail}")
     if data["projects"]:
         body = [
             (
@@ -347,13 +367,15 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
             )
             for (h, f, p), e in sorted(data["projects"].items())
         ]
-        head = ":open_file_folder: *Projects* (a directory tree with one limit)"
-        detail += sections(f"{head}\n{table(('PROJECT', 'ON', 'USED', 'DAY', 'WARN', 'HARD'), body)}")
+        head = ":open_file_folder: *프로젝트* (한도 하나를 함께 쓰는 디렉터리)"
+        detail += sections(f"{head}\n{table(('프로젝트', '위치', '사용량', '하루', '경고', '한도'), body)}")
     for key, rows in sorted((data.get("cleanup") or {}).items()):
-        body = [(c["path"], c["user"], size(c["bytes"]), f"{c['unused_days']}d") for c in rows]
-        head = f":broom: *{where(*key)}*, folders worth cleaning (unused over {stale_days} days, the largest and longest unused first)"
-        detail += sections(f"{head}\n{table(('FOLDER', 'OWNER', 'SIZE', 'UNUSED'), body)}")
-    thread = [("Disk usage details", detail[i : i + MAX_BLOCKS]) for i in range(0, len(detail), MAX_BLOCKS)]
+        body = [(c["path"], c["user"], size(c["bytes"]), f"{c['unused_days']}일") for c in rows]
+        head = (
+            f":broom: *{where(*key)}*: 정리하면 좋을 폴더 ({stale_days}일 넘게 쓰지 않은 것, 크고 오래된 순)"
+        )
+        detail += sections(f"{head}\n{table(('폴더', '주인', '크기', '안 쓴 기간'), body)}")
+    thread = [("디스크 사용량 자세히", detail[i : i + MAX_BLOCKS]) for i in range(0, len(detail), MAX_BLOCKS)]
     return (text, card), thread
 
 
@@ -362,16 +384,18 @@ def dm_text(row, note=""):
     at a hard limit) and what to do."""
     place, amount, state, hard = describe(row)
     if hard:
-        act = "Writes there fail" + (f" and {note}" if note else " until you free space") + "."
+        act = "지금은 그곳에 쓸 수 없습니다. " + (
+            f"{note}." if note else "공간을 비우시면 다시 쓰실 수 있습니다."
+        )
     else:
-        act = "Nothing is refused yet: free space before the hard limit."
-    return f"Your disk use on {place} is {amount}, {state}. {act} {HOW}"
+        act = "아직 막힌 것은 없습니다. 한도에 닿기 전에 공간을 비워 주세요."
+    return f"{place}의 디스크 사용량이 {amount}입니다. {state}. {act} {HOW}"
 
 
 # The scratch space's cleanup (cluster_tools.scratch_space): each person's files listed for
 # removal, told once per removal date, and the mass access-time refreshes an
 # administrator sees.
-PURGE_HOW = "`scratch-space` lists them, with any you used since."
+PURGE_HOW = "`scratch-space`로 그 파일과, 그사이 쓰신 파일을 보실 수 있습니다."
 
 
 def collect_purge(prom):
@@ -406,15 +430,15 @@ def purge_key(k, entry):
 def purge_dm_text(k, entry):
     when = datetime.fromtimestamp(entry["next"]).strftime("%Y-%m-%d")
     return (
-        f"{entry['files']} of your files on the scratch space ({size(entry['bytes'])}) have not been used"
-        f" for {entry['stale_days']} days: the first go on {when} unless you use them before (read or write)."
+        f"스크래치 공간의 파일 {entry['files']}개({size(entry['bytes'])})를 {entry['stale_days']}일 동안"
+        f" 쓰지 않으셨습니다. {when}부터 차례로 정리되니, 남겨 두실 파일은 그전에 한 번 읽거나 써 주세요."
         + (
-            f" {entry['deferred']} of them were deferred because you have running jobs; they go on their"
-            " new date even if jobs still run, unless used."
+            f" 그중 {entry['deferred']}개는 실행 중인 잡이 있어 미뤄졌습니다. 잡이 계속 돌더라도 새 날짜에"
+            " 정리되니, 필요하시면 그전에 써 주세요."
             if entry.get("deferred")
             else ""
         )
-        + f" {PURGE_HOW} /scratch is for data in use; keep what must last in your home."
+        + f" {PURGE_HOW} 스크래치 공간은 지금 쓰는 데이터를 위한 곳이니, 오래 남길 것은 홈에 두세요."
     )
 
 

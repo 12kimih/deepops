@@ -117,7 +117,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_usage_report_io_share: 0.4
 #slurm_usage_report_io_minutes: 15
 #slurm_usage_report_io_repeat_hours: 6
-#slurm_usage_report_io_advice: "Put data a job reads or writes heavily on /scratch."  # example
+#slurm_usage_report_io_advice: "잡이 많이 읽고 쓰는 데이터는 /scratch에 두어 주세요."  # example
 
 # AI coding agents (roles/ai_agent_rules): the site's agent rules file (Markdown
 # starting with <!-- cluster-agent-rules -->), installed for Claude Code

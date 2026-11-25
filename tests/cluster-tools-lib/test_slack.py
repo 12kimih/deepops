@@ -221,7 +221,12 @@ class BlockTests(unittest.TestCase):
     def test_bar(self):
         self.assertEqual(slack.bar(100), "█" * 10 + " 100%")
         self.assertEqual(slack.bar(0), "░" * 10 + "   0%")
-        self.assertTrue(slack.bar(None).startswith("n/a"))
+        self.assertTrue(slack.bar(None).startswith("-"))
+
+    def test_a_korean_cell_takes_two_columns_per_character(self):
+        """Padded by len(), a Korean header pushed every column after it out of line."""
+        lines = slack.table(("사용자", "GPU"), [("alice", "8")]).splitlines()[1:3]
+        self.assertEqual(lines, ["사용자  GPU", "alice   8"])
 
     def test_table_pads_columns_in_a_code_block(self):
         self.assertEqual(slack.table(("A", "BB"), [("xyz", 1)]), "```\nA    BB\nxyz  1\n```")

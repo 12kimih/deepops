@@ -65,12 +65,13 @@ class Collect(unittest.TestCase):
         item = io_report.collect(Prom(), MOUNTS, 0.4, 15, 3)[0]
         dm = io_report.dm_text(item, 0, "Use /scratch.")
         self.assertIn(
-            "node `n1` has been writing to `/home` at 400M/s, 50% of what the disk behind it serves", dm
+            "`n1` 노드가 `/home`에 쓰고 있습니다. 400M/s로, 그 뒤의 디스크가 클러스터 전체에 내주는 양의 50%",
+            dm,
         )
-        self.assertIn("Your job `10` did the most writing on that node (300M/s", dm)
-        self.assertIn("not its own share of the disk", dm)
+        self.assertIn("그 노드에서 가장 많이 쓴 잡이 `10`입니다 (300M/s", dm)
+        self.assertIn("디스크에서 차지한 몫이 아니라 그 노드 안의 순위", dm)
         self.assertTrue(dm.endswith("Use /scratch."))
-        self.assertIn("was number 2 of the jobs by writing", io_report.dm_text(item, 1, ""))
+        self.assertIn("2번째로 많이 쓴 잡이 `11`", io_report.dm_text(item, 1, ""))
         self.assertEqual(
             io_report.admin_text([item]),
             "I/O: `n1` writing to `/home` at 400M/s (50% of the disk) for 15 min; "
@@ -120,7 +121,7 @@ class Run(unittest.TestCase):
             self.assertEqual(
                 sorted(p[0] for p in posted), ["#admins", "UALICE", "UBOB"], "root's job: admins only"
             )
-            self.assertIn("did the most writing", dict(posted)["UALICE"])
+            self.assertIn("가장 많이 쓴 잡", dict(posted)["UALICE"])
             self.assertEqual(len(saved["told"]), 3)
             again, _, _ = self.run_io(Prom(), d, now=NOW + 3600)
             self.assertEqual(again, [], "within io_repeat_hours")

@@ -36,6 +36,7 @@ import urllib.parse
 import urllib.request
 
 from .files import write_atomic
+from .render import width
 
 API = "https://slack.com/api/"
 TIMEOUT = 30
@@ -238,7 +239,7 @@ def bar(pct, width=BAR_WIDTH):
     """PCT (0 to 100, None unknown) as a gauge of WIDTH blocks and the percent; the same
     width either way, so a table's columns line up."""
     if pct is None:
-        return "n/a".ljust(width + 5)
+        return "-".ljust(width + 5)
     filled = round(max(0.0, min(pct, 100.0)) / 100 * width)
     return "█" * filled + "░" * (width - filled) + f" {pct:3.0f}%"
 
@@ -246,11 +247,11 @@ def bar(pct, width=BAR_WIDTH):
 def table(header, rows):
     """A fixed-width table in a code block; Slack renders it monospaced. Cells may hold
     what users named (folders, jobs): each is escaped after padding, so the columns line
-    up as Slack shows them."""
-    widths = [max(len(str(c)) for c in col) for col in zip(header, *rows)]
+    up as Slack shows them; a wide character (Korean) takes two columns (render.width)."""
+    widths = [max(width(str(c)) for c in col) for col in zip(header, *rows)]
 
     def fmt(r):
-        return "  ".join(escape(str(c).ljust(w)) for c, w in zip(r, widths)).rstrip()
+        return "  ".join(escape(str(c) + " " * (w - width(str(c)))) for c, w in zip(r, widths)).rstrip()
 
     return "```\n" + "\n".join([fmt(header)] + [fmt(r) for r in rows]) + "\n```"
 
