@@ -5,12 +5,16 @@
 # as the dependency ahead of every role that mentions them (alertmanager,
 # slurm_usage_report, cluster_bot), and slack_admin_mention follows. A configured
 # slack_admin_group_id always wins; not found, or Slack not answering, mentions no one.
+# Decided before the block: a block's condition is every task's in it, and the lookup
+# sets both of the names it would test, which skipped the ID's report (task rule 32).
+- name: Decide whether to look the group up
+  ansible.builtin.set_fact:
+    _slack_admin_group_lookup: >-
+      {{ slack_admin_group_id | length == 0 and slack_admin_group | length > 0
+         and slack_bot_token | length > 0 and _slack_admin_group_looked is not defined }}
+
 - name: Find the administrators' Slack user group's ID
-  when:
-    - slack_admin_group_id | length == 0
-    - slack_admin_group | length > 0
-    - slack_bot_token | length > 0
-    - _slack_admin_group_looked is not defined
+  when: _slack_admin_group_lookup
   run_once: true
   block:
     - name: Ask Slack for its user groups

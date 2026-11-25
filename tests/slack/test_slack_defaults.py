@@ -15,7 +15,7 @@ from ansible_yaml import condition, load, render, role_defaults  # noqa: E402
 
 slack = in_tree.load("plugins/filter/slack.py")
 TASKS = load("roles/slack_defaults/tasks/main.yml")
-LOOKUP = TASKS[0]
+LOOKUP = next(t for t in TASKS if "block" in t)
 GROUPS = {"ok": True, "usergroups": [{"id": "S1", "handle": "gpu"}, {"id": "S2", "handle": "sysadmin"}]}
 
 
@@ -31,10 +31,39 @@ class Filter(unittest.TestCase):
         self.assertEqual(slack.slack_usergroup_id(GROUPS, ""), "")
 
 
+BASE = {"slack_admin_group_id": "", "slack_admin_group": "@sysadmin", "slack_bot_token": "xoxb-x"}
+
+
+def facts(values):
+    """VALUES with the facts the role's tasks before the lookup set."""
+    out = dict(values)
+    for task in TASKS[: TASKS.index(LOOKUP)]:
+        for name, value in (task.get("set_fact") or {}).items():
+            out[name] = render(value, out)
+    return out
+
+
 class Lookup(unittest.TestCase):
     def runs(self, **values):
-        base = {"slack_admin_group_id": "", "slack_admin_group": "@sysadmin", "slack_bot_token": "xoxb-x"}
-        return condition(LOOKUP["when"], {**base, **values})
+        return condition(LOOKUP["when"], facts({**BASE, **values}))
+
+    def reported(self, found):
+        """The names of the block's tasks that run once the lookup found FOUND: each
+        under the block's condition as well as its own, with the facts the block set."""
+        values = facts(BASE)
+        use = next(t for t in LOOKUP["block"] if "set_fact" in t)
+        values.update({k: v for k, v in use["set_fact"].items() if k != "slack_admin_group_id"})
+        values.update(slack_admin_group_id=found, _slack_usergroups={"json": GROUPS})
+        return [
+            t["name"] for t in LOOKUP["block"][LOOKUP["block"].index(use) + 1 :]
+            if condition(LOOKUP["when"], values) and condition(t.get("when", []), values)
+        ]  # fmt: skip
+
+    def test_the_found_id_is_said_and_a_miss_warned(self):
+        """2026-11-25 (ARA 315): the block's condition named the ID and the flag its own
+        set_fact sets, so both reports were always skipped and the ID never shown."""
+        self.assertEqual(self.reported("S2"), ["Say the group's ID, to pin as slack_admin_group_id"])
+        self.assertEqual(self.reported(""), ["Warn that the group was not found"])
 
     def test_only_without_a_configured_id(self):
         self.assertTrue(self.runs())
