@@ -92,6 +92,10 @@ _spec = importlib.util.spec_from_file_location(
 _user_env = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_user_env)
 
+# The submit policy's switches (slurm_job_submit_policy, roles/slurm's job_submit.lua),
+# each a policy fact of its name: what the job rules on the user pages say holds.
+SUBMIT_RULES = ("strict_gpu_type", "force_gpu_partition", "gpu_jobs_use_defaults", "gpu_nodes_shared")
+
 # The only top-level keys the public file may carry, and under commands and policy the
 # only fields: what a user may read on a public site.
 PUBLIC = {
@@ -107,6 +111,9 @@ PUBLIC = {
         "leave_grace_days",
         "interactive_team_qos",
         "submit_holds_disk",
+        "gpus_per_node",
+        "gpu_type_defaulted",
+        *SUBMIT_RULES,
     },
     "login": {"cpus", "memory_gib", "tasks", "private_dirs"},
     "services": {
@@ -447,13 +454,25 @@ def bot(settings_):
     }
 
 
+def submit_policy(p):
+    """The submit policy as the user pages state it, never its patterns or names: whether
+    GPU sessions must name a team QoS, the allowed GPUs per node ([] any), whether a job
+    without a GPU type gets the default one, and each switch of SUBMIT_RULES."""
+    return {
+        "interactive_team_qos": bool(p.get("interactive_gpu_qos")),
+        "gpus_per_node": [int(n) for n in p.get("gpus_per_node") or []],
+        "gpu_type_defaulted": bool(p.get("default_gpu_type")),
+        **{rule: bool(p.get(rule)) for rule in SUBMIT_RULES},
+    }
+
+
 def facts(config):
     s = settings(config)
     every = {
         "commands": commands(s.get("cluster_tools_builtin") or []),
         "policy": {
             **{field: s.get(key) for field, key in POLICY.items()},
-            "interactive_team_qos": bool((s.get("slurm_job_submit_policy") or {}).get("interactive_gpu_qos")),
+            **submit_policy(s.get("slurm_job_submit_policy") or {}),
         },
         "slurm": slurm_values(config),
         "dates": schedule(config),
