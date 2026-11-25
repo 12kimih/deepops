@@ -148,8 +148,12 @@ class Vocabulary(unittest.TestCase):
         # setting in every command.
         import importlib
 
-        commands = [importlib.import_module(f"cluster_tools.{m}").COMMAND
-                    for m in ("sq", "qos", "gpu_usage", "scratch_space")]  # fmt: skip
+        import yaml
+
+        # Every command the role ships (cluster_tools_builtin), so a new one is held to it too.
+        defaults = Path(__file__).resolve().parents[2] / "roles/cluster_tools/defaults/main.yml"
+        builtin = yaml.safe_load(defaults.read_text())["cluster_tools_builtin"]
+        commands = [importlib.import_module(f"cluster_tools.{m.replace('-', '_')}").COMMAND for m in builtin]
         meaning = {}
         for c in commands:
             for o in c.options:

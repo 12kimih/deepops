@@ -149,9 +149,8 @@ cluster_disk_fill_fraction: 0.8
 # longest unused first) each filesystem's scan names for the daily disk report.
 cluster_cleanup_top: 20
 
-# Components whose removal is explicit only (removal: explicit in the registry,
-# roles/deploy_defaults/vars/main.yml: the driver, authentication, Slurm, MUNGE, the NFS
-# server). Turning their switch off, or a host leaving their group, leaves them as they
+# Components whose removal is explicit only (the registry entries marked removal:
+# explicit, roles/deploy_defaults/vars/main.yml). Turning their switch off, or a host leaving their group, leaves them as they
 # are; listing one here removes it from the hosts where nothing wants it any more.
 deepops_component_removals: []
 # What a component play does (plugins/filter/components.py component_phase): converge

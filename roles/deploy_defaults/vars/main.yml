@@ -2,7 +2,6 @@
 # The components a deploy converges, each with the switches and groups that make it
 # present (docs/deepops/component-state.md, plugins/filter/components.py). Structure,
 # not settings: sites turn the switches in roles/deploy_defaults/defaults/main.yml.
-# Components move here batch by batch; one not listed is still installed by its switch.
 deepops_component_registry:
   # Time sync: present wherever a deploy runs while chrony_install is on; the site's own
   # with chrony_install false; removed only when named (a host must keep time).

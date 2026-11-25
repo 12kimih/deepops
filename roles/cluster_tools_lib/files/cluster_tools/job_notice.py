@@ -16,7 +16,7 @@ is one DM, not hundreds. Anyone may turn them off without touching their jobs: a
 login listed under `muted` in the preferences file gets none.
 
 CONFIG: token_file, members {login: Slack ID or email}, email_domain, state_file,
-coalesce_seconds (600), prefs_file (optional; {"muted": [login, ...]}), dry_run.
+coalesce_seconds, prefs_file (optional; {"muted": [login, ...]}), dry_run.
 Without a token it exits 0 and sends nothing: a notice is never worth a failed job.
 """
 
@@ -33,7 +33,6 @@ from .files import write_atomic
 from .slack import Error as SlackError
 from .slack import Slack, escape, member
 
-COALESCE = 600
 SHOWN = 15  # lines listed in a coalesced message; the rest are counted
 USAGE = "usage: job-notice CONFIG.json -s SUBJECT RECIPIENT"
 
@@ -136,13 +135,13 @@ def main(argv=None, env=None, now=None):
             for key in [
                 k
                 for k, v in state.items()
-                if not k.startswith("_") and now - v.get("first", 0) >= cfg.get("coalesce_seconds", COALESCE)
+                if not k.startswith("_") and now - v.get("first", 0) >= cfg["coalesce_seconds"]
             ]:
                 del state[key]
             cache = state.setdefault("_members", {})
             slack_id = member(slack, login, cfg.get("members", {}), cfg.get("email_domain", ""), cache)
             if slack_id:
-                deliver(slack, state, slack_id, login, line(env), now, cfg.get("coalesce_seconds", COALESCE))
+                deliver(slack, state, slack_id, login, line(env), now, cfg["coalesce_seconds"])
     except SlackError as e:
         print(f"job-notice: {e}", file=sys.stderr)  # slurmctld logs it; the job is unaffected
     return 0

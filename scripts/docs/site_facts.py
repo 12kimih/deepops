@@ -13,15 +13,9 @@ written is named and the exit status is 1.
 Facts:
   commands  the people's cluster commands (cluster_tools_builtin) and their options,
             read from each command's one definition (cluster_tools.cli Command)
-  policy    the cluster-wide periods and fraction every cleanup and warning uses
-            (cluster_user_stale_days, cluster_user_grace_days, cluster_user_warn_fraction),
-            and the idle-GPU rules (slurm_usage_report_idle_hours, _cancel_after_hours,
-            _cancel_warn_hours; cancel_after_hours 0 means no cancel) and how an idle
-            job's owner is told (idle_notify: slurm_usage_report_notify, mention or dm);
-            how long a login lasts past a person's end (leave_grace_days:
-            people_leave_grace_days; new jobs are held from the day after the end);
-            whether srun and salloc GPU sessions must name a team QoS (interactive_team_qos:
-            slurm_job_submit_policy.interactive_gpu_qos set; the pattern stays private)
+  policy    the cluster-wide rules the pages state, each field from the setting POLICY
+            names (periods, fractions, the idle-GPU rules, how people are told, login
+            grace, session QoS, submit holds); the pattern of a QoS stays private
   services  what the cluster runs that the pages describe, so none says a service is coming
             or missing: portal (slurm_install_open_ondemand), its overview page's menu title
             (open_ondemand_overview_title, "" without one), the menu titles of the services

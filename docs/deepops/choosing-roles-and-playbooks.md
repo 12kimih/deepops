@@ -42,20 +42,20 @@ Different layers; the monitoring stack uses the exporter.
 
 ## PCIe ACS (GPU peer-to-peer)
 
-- `playbooks/generic/power-policy.yml` (`power_policy` role, switch `slurm_enable_power_policy`) -- holds every host's power management at full performance: the CPU governor, its EPP hint and turbo, PCIe ASPM and SATA link power at runtime, and the same plus NVMe power states on the kernel command line; on GPU hosts every GPU's power limit (the `nvidia_power_limit` cap, else the card default), default application clocks and no clock lock, with persistence mode reported. It applies at boot before slurmd and again every 15 minutes, so a job or package that switches one is put back; the alerts in `roles/prometheus/files/rules/power-policy.yml` name a setting the kernel refuses (the firmware owns it) or one that keeps being switched. Nothing else changes these: no Slurm prolog or epilog part sets a CPU or GPU for a job.
-- `playbooks/generic/pcie-acs.yml` (`pcie_acs` role, switch `slurm_disable_pcie_acs`) -- turns PCIe Access Control Services off on every device that has it, at every boot before the GPUs are opened, so GPUs below one PCIe switch talk peer to peer (NCCL's guidance for bare metal). NHC drains a node where ACS is back on; `playbooks/utilities/verify-acs.yml` reports it with the IOMMU state.
+- `playbooks/generic/power-policy.yml` (`power_policy` role) -- holds every host's power management at full performance: the CPU governor, its EPP hint and turbo, PCIe ASPM and SATA link power at runtime, and the same plus NVMe power states on the kernel command line; on GPU hosts every GPU's power limit (the `nvidia_power_limit` cap, else the card default), default application clocks and no clock lock, with persistence mode reported. It applies at boot before slurmd and again every `power_policy_interval`, so a job or package that switches one is put back; the alerts in `roles/prometheus/files/rules/power-policy.yml` name a setting the kernel refuses (the firmware owns it) or one that keeps being switched. Nothing else changes these: no Slurm prolog or epilog part sets a CPU or GPU for a job.
+- `playbooks/generic/pcie-acs.yml` (`pcie_acs` role) -- turns PCIe Access Control Services off on every device that has it, at every boot before the GPUs are opened, so GPUs below one PCIe switch talk peer to peer (NCCL's guidance for bare metal). NHC drains a node where ACS is back on; `playbooks/utilities/verify-acs.yml` reports it with the IOMMU state.
 
 ## Crash dumps
 
-- `playbooks/generic/coredump.yml` (`coredump` role, switches `slurm_enable_coredump`, `kube_enable_coredump`, on by default) -- hands crashing processes to **systemd-coredump** on every host, in place of apport's core handler on Ubuntu (apport itself stays). Every crash is logged to the journal; a core is stored only within the process's core size limit (`ulimit -c`, which a Slurm job takes from where it was submitted), readable by its owner with `coredumpctl`, and kept three days. `coredump_settings` sets coredump.conf over systemd's bounds.
+- `playbooks/generic/coredump.yml` (`coredump` role) -- hands crashing processes to **systemd-coredump** on every host, in place of apport's core handler on Ubuntu (apport itself stays). Every crash is logged to the journal; a core is stored only within the process's core size limit (`ulimit -c`, which a Slurm job takes from where it was submitted), readable by its owner with `coredumpctl`, and kept three days. `coredump_settings` sets coredump.conf over systemd's bounds.
 
 ## Disk quotas (login nodes, /home)
 
-- `playbooks/generic/disk-quota.yml` (`disk_quota` role, switch `slurm_enable_disk_quota`, on `slurm-login` and `slurm-nfs`) -- per-user quotas on local ext4 filesystems: a login node's disk, which it may share with the controller, its database and the logs, and the home server's `/home`. Everyone in the roster is limited, administrators too; root and the system accounts never are. It counts before it limits, exports each user's usage, and takes its mount options from `host_baseline_mount_options`. See [disk-quota.md](disk-quota.md).
-- `playbooks/slurm-cluster/shared-space.yml` (`shared_space` role, switch `slurm_enable_shared_space`, on the first `slurm-nfs`) -- the shared part of `/home`: datasets, models and container images the account `shared` (whose home it is) writes for everyone, and the collaboration folders of `shared_projects`, one group each, published with the other cluster groups. Nothing there is removed by a deploy. See [shared-space.md](../slurm-cluster/shared-space.md).
-- `playbooks/slurm-cluster/submit-holds.yml` (`submit_holds` role, switch `slurm_enable_submit_holds`, on `slurm-master`) -- someone at a disk hard limit cannot submit Slurm jobs until they free space, told why at submit time; running jobs go on. No one is held before `submit_holds_from`, the grace for those already at a limit. Run `slurm.yml` after it, so `job_submit.lua` reads the holds. See [disk-quota.md](disk-quota.md#no-new-slurm-jobs-at-a-hard-limit).
-- `playbooks/generic/scratch-space.yml` (`scratch_space` role, switch `slurm_enable_scratch_space`, on `scratch-server`) -- every person's own directory on the fast scratch space, as under /home; their space there is their user quota (`disk_quota`)
-- `playbooks/generic/cluster-bot.yml` (`cluster_bot` role, switch `slurm_enable_cluster_bot`, on the first `slurm-master`) -- the cluster's Slack app in Socket Mode (no port opened) for requests users make themselves, such as `/scratch`; needs `slack_bot_token` and `slack_app_token`. See [cluster-bot.md](../slurm-cluster/cluster-bot.md).
+- `playbooks/generic/disk-quota.yml` (`disk_quota` role) -- per-user quotas on local ext4 filesystems: a login node's disk, which it may share with the controller, its database and the logs, and the home server's `/home`. Everyone in the roster is limited, administrators too; root and the system accounts never are. It counts before it limits, exports each user's usage, and takes its mount options from `host_baseline_mount_options`. See [disk-quota.md](disk-quota.md).
+- `playbooks/slurm-cluster/shared-space.yml` (`shared_space` role) -- the shared part of `/home`: datasets, models and container images the account `shared` (whose home it is) writes for everyone, and the collaboration folders of `shared_projects`, one group each, published with the other cluster groups. Nothing there is removed by a deploy. See [shared-space.md](../slurm-cluster/shared-space.md).
+- `playbooks/slurm-cluster/submit-holds.yml` (`submit_holds` role) -- someone at a disk hard limit cannot submit Slurm jobs until they free space, told why at submit time; running jobs go on. No one is held before `submit_holds_from`, the grace for those already at a limit. Run `slurm.yml` after it, so `job_submit.lua` reads the holds. See [disk-quota.md](disk-quota.md#no-new-slurm-jobs-at-a-hard-limit).
+- `playbooks/generic/scratch-space.yml` (`scratch_space` role) -- every person's own directory on the fast scratch space, as under /home; their space there is their user quota (`disk_quota`)
+- `playbooks/generic/cluster-bot.yml` (`cluster_bot` role) -- the cluster's Slack app in Socket Mode (no port opened) for requests users make themselves (the subcommands `cluster_bot.commands` lists); needs `slack_bot_token` and `slack_app_token`. See [cluster-bot.md](../slurm-cluster/cluster-bot.md).
 
 ## Container registries (three different deploy targets)
 
@@ -66,6 +66,9 @@ Different layers; the monitoring stack uses the exporter.
 ## RDMA / InfiniBand drivers
 
 - `mofed` -- the modern **DOCA-OFED** driver (apt/dnf repo, multi-OS). **Use this.**
+  DOCA pins driver and firmware per release and does not publish every OS and
+  architecture for each version: confirm `mofed_doca_version` for your adapter and OS
+  on NVIDIA's DOCA downloads page, and validate on RDMA hardware, before deploying.
 - `nvidia-network-operator` -- SR-IOV, RDMA and Multus for Kubernetes pods, from NVIDIA
   Network Operator's Helm chart (the retired `roce_backend` wired them by hand).
 
@@ -79,3 +82,76 @@ Different layers; the monitoring stack uses the exporter.
   the locale by `playbooks/generic/locale.yml`; `playbooks/generic/default-target.yml`
   sets the boot target (`default_target`, multi-user.target). All three run in both
   cluster deploys.
+
+## Where each component runs
+
+A deploy places each component by its switches and host groups, and removes it from the
+hosts it no longer belongs on (with its switch, or only when it is named in
+`deepops_component_removals`: explicit). The table is the registry,
+`deepops_component_registry` in `roles/deploy_defaults/vars/main.yml`.
+
+<!-- BEGIN GENERATED: components -->
+| Component | Role | Switches | Hosts | Needs | Removal |
+|---|---|---|---|---|---|
+| `chrony` | `deepops_chrony` | `chrony_install` | `slurm-cluster`, `k8s_cluster` | - | explicit |
+| `ldap_server` | `ldap_server` | `ldap_suffix` | the first `ldap-server` | - | explicit |
+| `nis_server` | `nis_server` | `nis_domain` | the first `nis-master` | - | explicit |
+| `nis_client` | `nis_client` | `directory_service` | `all` | - | explicit |
+| `sssd_client` | `sssd_client` | `directory_service` | `all` | - | explicit |
+| `rsyslog_server` | `rsyslog_server` | `kube_enable_rsyslog_server`, `slurm_enable_rsyslog_server` | the first `slurm-master`, the first `kube_control_plane` | - | with its switch |
+| `rsyslog_client` | `rsyslog_client` | `kube_enable_rsyslog_client`, `slurm_enable_rsyslog_client` | `slurm-node`, `k8s_cluster` | - | with its switch |
+| `fail2ban` | `fail2ban` | `kube_enable_fail2ban`, `slurm_enable_fail2ban` | `slurm-cluster`, `k8s_cluster` | - | explicit |
+| `docker` | `docker` | - | - | - | explicit |
+| `standalone_container_registry` | `standalone-container-registry` | `kube_enable_container_registry`, `slurm_enable_container_registry` | `slurm-master`, `kube_control_plane` | `docker` | with its switch |
+| `nginx_docker_cache` | `nginx-docker-registry-cache` | `slurm_enable_nginx_docker_cache` | `slurm-cache` | `docker` | with its switch |
+| `nginx_docker_cache_client` | `nginx-docker-registry-cache-client` | `slurm_enable_nginx_docker_cache` | `slurm-node` | `docker` | with its switch |
+| `gpu_operator` | `nvidia-gpu-operator` | `deepops_gpu_operator_enabled` | the first `kube_control_plane` | - | with its switch |
+| `k8s_gpu_plugin` | `nvidia-k8s-gpu-device-plugin` | `deepops_gpu_operator_enabled` | the first `kube_control_plane` | - | with its switch |
+| `k8s_gpu_feature_discovery` | `nvidia-k8s-gpu-feature-discovery` | `deepops_gpu_operator_enabled` | the first `kube_control_plane` | - | with its switch |
+| `k8s_nfs_client` | `nfs-client-provisioner` | `k8s_nfs_client_provisioner` | the first `kube_control_plane` | - | with its switch |
+| `prometheus` | `prometheus` | `slurm_enable_monitoring` | `slurm-metric` | `docker` | with its switch |
+| `alertmanager` | `alertmanager` | `slurm_enable_monitoring` | `slurm-metric` | `docker` | with its switch |
+| `grafana` | `grafana` | `slurm_enable_monitoring` | `slurm-metric` | `docker`, `prometheus` | with its switch |
+| `node_exporter` | `prometheus-node-exporter` | `slurm_enable_monitoring` | `slurm-cluster` | `docker` | with its switch |
+| `ipmi_exporter` | `prometheus-ipmi-exporter` | `slurm_enable_monitoring` | `slurm-cluster` | `docker` | with its switch |
+| `slurm_exporter` | `prometheus-slurm-exporter` | - | - | - | with its switch |
+| `dcgm_exporter` | `nvidia-dcgm-exporter` | `slurm_enable_monitoring` | `slurm-node` | `docker`, `nvidia_container_toolkit` | with its switch |
+| `io_usage` | `io_usage` | `slurm_enable_monitoring` | `slurm-cluster` | `node_exporter` | with its switch |
+| `slurm_metrics` | `slurm_metrics` | `slurm_enable_monitoring` | `slurm-metric` | `node_exporter` | with its switch |
+| `slurm_backup` | `slurm_backup` | `slurm_enable_backup` | the first `slurm-master` | - | with its switch |
+| `gpu_diag_idle` | `gpu_diag_idle` | `install_dcgm`, `slurm_enable_gpu_diag_idle` | the first `slurm-master` | - | with its switch |
+| `io_fairness` | `io_fairness` | `slurm_enable_io_fairness` | `slurm-nfs` | - | with its switch |
+| `job_notice` | `job_notice` | `slurm_enable_job_notices` | `slurm-master` | - | with its switch |
+| `submit_holds` | `submit_holds` | `slurm_enable_submit_holds` | `slurm-master` | - | with its switch |
+| `slurm_usage_report` | `slurm_usage_report` | `slurm_enable_monitoring` | `slurm-metric` | `prometheus` | with its switch |
+| `open_ondemand` | `open_ondemand` | `slurm_install_open_ondemand` | the first `slurm-master` | - | with its switch |
+| `lmod` | `lmod` | `slurm_install_lmod` | `slurm-cluster` | - | with its switch |
+| `cluster_tools` | `cluster_tools` | `slurm_install_cluster_tools` | `slurm-cluster` | - | with its switch |
+| `nfs` | `nfs` | `k8s_deploy_nfs_server`, `slurm_enable_nfs_server` | `slurm-nfs`, the first `kube_control_plane` | - | explicit |
+| `nfs_client` | `nfs_client` | `slurm_enable_nfs_client_nodes` | `slurm-nfs-client` | - | explicit |
+| `nvidia_driver` | `nvidia_driver` | `deepops_gpu_operator_enabled`, `gpu_operator_preinstalled_nvidia_software`, `slurm_cluster_install_nvidia_driver` | `slurm-cluster`, `k8s_cluster` | - | explicit |
+| `nvidia_container_toolkit` | `nvidia_container_toolkit` | `deepops_gpu_operator_enabled`, `gpu_operator_preinstalled_nvidia_software` | `k8s_cluster` | - | with its switch |
+| `nvidia_power_limit` | `nvidia_power_limit` | `slurm_cluster_configure_gpu_power_limit` | `slurm-node` | - | with its switch |
+| `pcie_acs` | `pcie_acs` | `slurm_disable_pcie_acs` | `slurm-node` | - | with its switch |
+| `power_policy` | `power_policy` | `slurm_enable_power_policy` | `slurm-cluster` | - | with its switch |
+| `hpcsdk` | `nvidia_hpc_sdk` | `slurm_install_hpcsdk` | the first `slurm-login` | - | with its switch |
+| `cuda` | `nvidia_cuda` | `slurm_install_cuda` | `slurm-cluster` | - | with its switch |
+| `cuda_toolkit` | `nvidia_cuda_toolkit` | `slurm_install_cuda_toolkit` | the first `slurm-master` | - | with its switch |
+| `easybuild` | `easy-build` | `slurm_install_easybuild` | the first `slurm-master` | - | with its switch |
+| `enroot` | `enroot` | `slurm_install_enroot` | `slurm-cluster` | `nvidia_container_toolkit` | with its switch |
+| `pyxis` | `pyxis` | `slurm_install_enroot`, `slurm_install_pyxis` | `slurm-cluster` | `enroot` | with its switch |
+| `podman` | `podman` | `slurm_install_podman` | `slurm-node` | - | with its switch |
+| `container_storage_gc` | `container_storage_gc` | `slurm_enable_container_storage_gc` | `slurm-cluster` | - | with its switch |
+| `openmpi` | `openmpi` | `slurm_cluster_install_openmpi` | `slurm-cluster` | - | with its switch |
+| `job_scratch` | `job_scratch` | `slurm_enable_job_scratch` | `slurm-node` | - | with its switch |
+| `nhc` | `nhc` | `slurm_install_nhc` | `slurm-node` | - | with its switch |
+| `dcgm` | `nvidia_dcgm` | `install_dcgm` | `slurm-node` | - | with its switch |
+| `dns_resolver` | `dns_resolver` | `slurm_enable_dns_resolver` | `slurm-cluster` | - | with its switch |
+| `egress_policy` | `egress_policy` | `slurm_enable_egress_policy` | `slurm-cluster` | - | with its switch |
+| `ingress_policy` | `ingress_policy` | `slurm_enable_ingress_policy` | `slurm-cluster` | - | with its switch |
+| `coredump` | `coredump` | `kube_enable_coredump`, `slurm_enable_coredump` | `slurm-cluster`, `k8s_cluster` | - | with its switch |
+| `disk_quota` | `disk_quota` | `slurm_enable_disk_quota` | `slurm-login`, `slurm-nfs`, `scratch-server` | - | with its switch |
+| `shared_space` | `shared_space` | `slurm_enable_shared_space` | the first `slurm-nfs` | - | with its switch |
+| `scratch_space` | `scratch_space` | `slurm_enable_scratch_space` | `scratch-server` | - | with its switch |
+| `cluster_bot` | `cluster_bot` | `slurm_enable_cluster_bot` | the first `slurm-master` | - | with its switch |
+<!-- END GENERATED: components -->

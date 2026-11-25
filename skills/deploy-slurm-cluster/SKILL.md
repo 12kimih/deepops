@@ -7,8 +7,9 @@ description: Deploy a Slurm GPU cluster with DeepOps and prove it works. Use whe
 
 ## Preconditions
 
-- Ubuntu 22.04/24.04 or RHEL/Rocky 8/9 hosts you may fully manage (driver
-  installs may reboot them; no active users or workloads).
+- Hosts on an Ubuntu release the Slurm packages are built for (the keys of
+  `slurm_deb_build_images`, roles/slurm/defaults/main.yml) that you may fully manage
+  (driver installs may reboot them; no active users or workloads).
 - SSH access from the provisioning machine to every host as a sudo-capable
   user.
 - Run everything from the repository root.

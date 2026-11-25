@@ -371,7 +371,7 @@
 # CONTAINER RUNTIME                                                            #
 ################################################################################
 # Docker configuration
-# Playbook: docker, nvidia-docker, k8s_cluster
+# Playbooks: container/docker.yml, container/nvidia-container-toolkit.yml, k8s-cluster.yml
 #
 # docker_install gates the in-tree roles/docker, whose engine release is
 # docker_engine_version. docker_version, docker_dns_servers_strict,

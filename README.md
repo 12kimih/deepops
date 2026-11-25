@@ -2,10 +2,9 @@
 
 Infrastructure automation tools for Kubernetes and Slurm clusters with NVIDIA GPUs.
 
-> **This repository is a modernized, continuously-maintained fork of
-> [NVIDIA DeepOps](https://github.com/NVIDIA/deepops)** -- see
-> [About this fork](#about-this-fork) below and the full, sectioned change log in
-> [MODERNIZATION.md](MODERNIZATION.md).
+> **This repository is a continuously maintained fork of
+> [NVIDIA DeepOps](https://github.com/NVIDIA/deepops)**; see
+> [About this fork](#about-this-fork).
 
 ## Table of Contents
 
@@ -31,23 +30,22 @@ This fork keeps upstream DeepOps' architecture and entry points, but modernizes 
 parts that had drifted -- aimed at keeping a GPU + Slurm cluster current and
 reproducible. At a glance:
 
-- **Current OS matrix** (Ubuntu 22.04 / 24.04 / 26.04, RHEL 8 / 9 / 10) and
-  current component versions (Slurm, enroot, pyxis, PMIx / OpenMPI, DOCA-OFED, the
-  monitoring stack; every pin in [docs/deepops/versions.md](docs/deepops/versions.md)).
+- **Current releases** of the operating systems in
+  [Deployment Requirements](#deployment-requirements) and of every component
+  (every pin in [docs/deepops/versions.md](docs/deepops/versions.md)).
 - **In-tree NVIDIA roles** (driver / CUDA / container-toolkit / DCGM) replacing the
   EOL Galaxy roles.
 - **CUDA as per-version Lmod modules**, plus performance tuning and broad
   idempotency + reboot-persistence work.
 
-See **[MODERNIZATION.md](MODERNIZATION.md)** for the complete, sectioned list of what
-changed and why.
+What changed and why is in the git history (`git log upstream/master..main`).
 
 ### How to use it
 
 The entry points are unchanged from upstream DeepOps:
 
 ```bash
-scripts/setup.sh                     # uv, the locked .venv, Galaxy collections; copies config.example to config
+scripts/setup.sh                     # uv, the locked .venv, Galaxy collections; starts config/ from config.example
 vi config/inventory                  # real hostnames / IPs
 vi config/group_vars/*.yml           # node/partition/gres, NFS, etc.
 uv run ansible-playbook -l slurm-cluster playbooks/slurm-cluster.yml
@@ -55,15 +53,13 @@ uv run ansible-playbook -l slurm-cluster playbooks/slurm-cluster.yml
 
 How the environment works (and how the Kubernetes playbooks differ):
 [docs/deepops/ansible.md](docs/deepops/ansible.md#requirements). Helpful docs: [managing private cluster config](docs/deepops/managing-cluster-config.md)
-(the `config/` + ansible-vault workflow) and
-[MODERNIZATION.md](MODERNIZATION.md) (every change since the fork, and why).
+(the `config/` + ansible-vault workflow).
 
 ### Staying current with upstream
 
 This fork tracks NVIDIA DeepOps via an `upstream` git remote; absorb their updates
 with `git fetch upstream && git merge upstream/master` (`config/` is gitignored, so
-it is never touched). Upstream role names were left unchanged, which keeps those merges
-reviewable; files this fork rewrote still conflict and are resolved by hand.
+it is never touched). Files this fork rewrote conflict and are resolved by hand.
 
 ## Overview
 
@@ -97,7 +93,7 @@ The cluster nodes will follow the requirements described by Slurm or Kubernetes.
 
 - Ubuntu 22.04 LTS and 24.04 LTS for generic Kubernetes and Slurm deployments
 - NVIDIA DGX OS 6 and 7 for DGX systems
-- Ubuntu 26.04 and Red Hat Enterprise Linux / Rocky Linux 8, 9 and 10 for DGX platform software installation through the `nvidia-dgx` role
+- Ubuntu 26.04 and Red Hat Enterprise Linux / Rocky Linux 8 and 9 for DGX platform software installation through the `nvidia-dgx` role
 
 The legacy DGX OS 4/5 and DGX EL7 paths have been removed (see above); other older releases are not validated.
 

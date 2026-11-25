@@ -1,7 +1,6 @@
 # Component state: off means removed
 
-Status: design (2026-11-20, owner-approved direction). Roles move over in batches;
-`tests/component-state/` enforces the rules for every role that has moved.
+`tests/component-state/` enforces these rules for every component in the registry.
 
 ## The rule
 
@@ -146,9 +145,7 @@ clients before the server.
 - Files a component drops into another's directory: an exporter's file_sd endpoint
   file on the Prometheus host (left behind, ExporterDown fires forever); the
   dashboards it provisions through `grafana` `tasks_from: dashboards`; every textfile
-  writer's `.prom` file in the node exporter's directory and its persistent copy
-  (slurm_metrics, slurm_backup, gpu_diag_idle, os_updates, slurm_usage_report,
-  egress_policy, io_fairness, io_usage, power_policy). These
+  writer's `.prom` file in the node exporter's directory and its persistent copy. These
   go through `recorded_files`, so the owner of the directory keeps the rest.
 - Data and configuration never share a directory: Grafana's provisioned dashboards
   move from `/var/lib/grafana` (its database: data) to `/etc/grafana/dashboards`
@@ -172,27 +169,9 @@ clients before the server.
 - Every deploy switch is in the registry; no import is skipped on `when: <switch>`,
   and the playbooks' order agrees with the `needs` graph. A switch a deploy still
   gates an import on is listed in the test's `GATES` with why: a policy, a one-shot
-  setting, or a component still to move with its owner. The list only shrinks: a name
+  setting. The list only shrinks: a name
   no gate uses fails the test.
 - No `absent.yml` removes a path listed as data in its role's defaults
   (`<role>_data_paths`), or any directory recursively unless the record names it.
-- A molecule scenario per batch runs present, rerun (`changed=0`), absent, rerun
+- A molecule scenario per component group runs present, rerun (`changed=0`), absent, rerun
   (`changed=0`), present again (data still there).
-
-## Batches
-
-1. Framework: `component_record`, the registry and its map, the test, the
-   `_service_state`/`_service_enabled` renames; pilot on rsyslog_server, rsyslog_client,
-   nvidia_power_limit, cluster_sudoers (deepops-4).
-2. Monitoring (prometheus, grafana with the dashboards move, alertmanager, the
-   exporters, slurm_metrics: deepops-3); containers (registry, nginx cache, Docker as a
-   derived dependency: deepops-4).
-3. GPU and HPC software: nvidia_dcgm, nhc, openmpi, lmod, nvidia_hpc_sdk,
-   nvidia_cuda_toolkit, easy-build, podman, enroot and pyxis, the NVIDIA driver
-   (removal: explicit) and the container toolkit (needed by enroot and the DCGM
-   exporter) (deepops).
-4. Services: open_ondemand, nfs (the exports), nfs_client (the mounts), cluster_tools
-   (deepops-2);
-   egress_policy and the policies os_updates, node_user_policy, ai_agent_rules
-   (deepops-4).
-5. Kubernetes charts: already on `helm_release` with `state`; map their switches.
