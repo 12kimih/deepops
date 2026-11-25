@@ -9,6 +9,18 @@
     fail_msg: "container_service needs unit (a .service name) and image: {{ _container_service }}"
     quiet: true
 
+# The limits have their keys, so each service states them one way and a test reads them.
+- name: Require the limits in their keys
+  ansible.builtin.assert:
+    that:
+      - _container_service.cpus | string is match('^([0-9]+([.][0-9]+)?)?$')
+      - _container_service.memory | string is match('^([0-9]+[bkmg]?)?$')
+      - _container_service.options | select('search', '--(cpus|memory)') | list == []
+    fail_msg: >-
+      {{ _container_service.unit }}: cpus ("0.5") and memory ("512m") go in their keys,
+      not in options: {{ _container_service.options }}
+    quiet: true
+
 - name: Refuse a mount Docker would read otherwise
   ansible.builtin.assert:
     that:

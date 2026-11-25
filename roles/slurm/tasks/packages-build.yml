@@ -343,6 +343,13 @@
           container: "{{ slurm_deb_build_container }}"
           env: "{{ proxy_env | combine({'DEBIAN_FRONTEND': 'noninteractive'}) }}"
       block:
+        # The container runs outside the operator's slice: capped at what this run may
+        # use there, and the build runs that many jobs.
+        - name: Count the CPUs the build may use
+          ansible.builtin.include_role:
+            name: cluster_tools_lib
+            tasks_from: usable_cpus
+
         # The trees at the same path; the repository (for pyxis, the published Slurm) and
         # the CUDA repository (package_repos, for cuda-nvml-dev) read-only.
         - name: Start the build container
@@ -354,6 +361,7 @@
             network_mode: host
             recreate: true
             state: started
+            cpus: "{{ cluster_tools_lib_usable_cpus }}"
             env: "{{ proxy_env }}"
             mounts:
               - {type: bind, source: "{{ _slurm_build_account.home }}", target: "{{ _slurm_build_account.home }}"}
@@ -392,7 +400,7 @@
             user: "{{ _slurm_build_account.uid }}:{{ _slurm_build_account.gid | default(_slurm_build_account.uid) }}"
             env:
               HOME: "{{ _slurm_build_account.home }}"
-              DEB_BUILD_OPTIONS: "parallel={{ ansible_facts.processor_nproc }}"
+              DEB_BUILD_OPTIONS: "parallel={{ cluster_tools_lib_usable_cpus }}"
             argv: [dpkg-buildpackage, -b, -uc, -us]
             chdir: "{{ _tree }}"
           changed_when: true
@@ -418,6 +426,7 @@
             user: "{{ _slurm_build_account.uid }}:{{ _slurm_build_account.gid | default(_slurm_build_account.uid) }}"
             env:
               HOME: "{{ _slurm_build_account.home }}"
+              DEB_BUILD_OPTIONS: "parallel={{ cluster_tools_lib_usable_cpus }}"
             argv: [dpkg-buildpackage, -b, -uc, -us]
             chdir: "{{ _pyxis_tree }}"
           changed_when: true

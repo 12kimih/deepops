@@ -136,6 +136,11 @@
    the inner task sets it the rest of the block is skipped. The administrators' group
    lookup set the ID its block required to be empty, and its report of the ID never ran
    (slack_defaults, ARA 2026-11-25). Decide in a task before the block.
+33. A build's parallelism (make -j, DEB_BUILD_OPTIONS parallel=, a build container's
+   CPUs) is cluster_tools_lib_usable_cpus (tasks/usable_cpus.yml: the CPUs the run may
+   use), never ansible_facts.processor_nproc or processor_vcpus, which count the CPUs
+   and no quota, and never a bare `make -j`, which starts a job for every target: on a
+   login node, the operator's capped slice and the logins beside it crawled.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -1145,6 +1150,17 @@ class TaskRules(unittest.TestCase):
             if "dpkg-query" in path.read_text() and "${Package}" in line
         ]
         self.assertEqual(offenders, [], "use ${binary:Package}, which keeps :i386")
+
+    def test_builds_run_as_many_jobs_as_the_run_may_use(self):
+        counted = re.compile(r"processor_(?:nproc|vcpus|count|cores)\b|\bmake\b[^\n]*?(?<![\w-])-j(?![\w{])")
+        offenders = [
+            f"{rel(path)}:{number}: {line.strip()}"
+            for path in ansible_files() + tracked("roles/*/templates/**")
+            if "molecule" not in path.parts and not rel(path).startswith("roles/nvidia-dgx")
+            for number, line in lines_of(path)
+            if counted.search(line)
+        ]
+        self.assertEqual(offenders, [], "use cluster_tools_lib_usable_cpus, see rule 33")
 
     def test_only_deepops_hosts_writes_etc_hosts(self):
         offenders = []

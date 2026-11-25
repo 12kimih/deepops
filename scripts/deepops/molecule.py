@@ -8,8 +8,10 @@ Usage:
 Every scenario lives in roles/<role>/molecule/<scenario>/ and starts from
 .config/molecule/config.yml (the platform, driver and Ansible paths). Running through
 here names each role's container after the role (DEEPOPS_MOLECULE_INSTANCE), so two
-roles tested at once on one Docker host never share, or destroy, a container. CI and
-local runs take the same path: the list is the repository's, never a hand copy.
+roles tested at once on one Docker host never share, or destroy, a container, and
+gives the container as many CPUs as this run may use (DEEPOPS_MOLECULE_CPUS, from
+cluster_tools' cpus.py; set it to choose). CI and local runs take the same path: the
+list is the repository's, never a hand copy.
 """
 
 import json
@@ -22,6 +24,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
 import unrecorded  # noqa: E402
 from repo_files import ROOT, tracked  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files/cluster_tools"))
+import cpus  # noqa: E402
 
 
 def roles():
@@ -46,8 +51,11 @@ def test(names):
     # molecule and ansible-* from the same environment as this interpreter.
     path = f"{Path(sys.executable).parent}{os.pathsep}{os.environ.get('PATH', '')}"
     failed = []
+    usable = str(cpus.usable(("DEEPOPS_MOLECULE_CPUS",)))
     for role in names or known:
-        env = unrecorded.env(PATH=path, DEEPOPS_MOLECULE_INSTANCE=instance(role))  # a test, not a run to keep
+        env = unrecorded.env(  # a test, not a run to keep
+            PATH=path, DEEPOPS_MOLECULE_INSTANCE=instance(role), DEEPOPS_MOLECULE_CPUS=usable
+        )
         print(f"==> {role}", flush=True)
         if subprocess.run(["molecule", "test", "--all"], cwd=ROOT / "roles" / role, env=env).returncode:
             failed.append(role)

@@ -15,6 +15,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from ansible_yaml import render, role_defaults  # noqa: E402
+from repo_scan import tracked  # noqa: E402
 
 TEMPLATE = (ROOT / "roles/container_service/templates/container.service.j2").read_text()
 
@@ -65,6 +66,43 @@ class Unit(unittest.TestCase):
         self.assertIn("After=docker.service network-online.target\nRequires=docker.service\n", plain)
         dcgm = (ROOT / "roles/nvidia-dcgm-exporter/tasks/present.yml").read_text()
         self.assertIn("after: [nvidia-cdi-refresh.service]", dcgm)
+
+    def test_limits_render_when_set(self):
+        limited = self.unit(cpus="0.5", memory="512m")
+        self.assertIn("  --cpus=0.5 \\\n", limited)
+        # swap included: --memory alone lets the container swap as much again
+        self.assertIn("  --memory=512m --memory-swap=512m \\\n", limited)
+        self.assertNotIn("--cpus", self.unit())
+        self.assertNotIn("--memory", self.unit())
+
+    def test_every_service_has_its_limits(self):
+        """Each container service caps its CPUs and memory from its role's own defaults
+        (<prefix>_max_cpu, <prefix>_max_memory), which a site can raise or clear: none
+        runs unbounded beside the jobs and the logins, or hides a limit in options."""
+        found = {}
+        for path in tracked("roles/*/tasks/*.yml"):
+            for service in services(yaml.safe_load(path.read_text()) or []):
+                role = path.parts[-3]
+                found[role] = service
+                options = str(service.get("options", ""))  # a list, or a Jinja expression
+                self.assertNotRegex(options, "--(cpus|memory)", f"{role}: limits in options")
+                defaults = role_defaults(role)
+                for key, suffix in (("cpus", "_max_cpu"), ("memory", "_max_memory")):
+                    names = [n for n in defaults if n.endswith(suffix)]
+                    self.assertEqual(len(names), 1, f"{role}: one {suffix} default")
+                    self.assertEqual(service.get(key), "{{ %s }}" % names[0], f"{role}: {key}")
+        self.assertGreaterEqual(len(found), 9, sorted(found))
+
+
+def services(tasks):
+    """The container_service requests in a task list (blocks included)."""
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        yield from services(task.get("block") or [])
+        include = task.get("ansible.builtin.include_role") or {}
+        if include.get("name") == "container_service" and "tasks_from" not in include:
+            yield task["vars"]["container_service"]
 
 
 if __name__ == "__main__":

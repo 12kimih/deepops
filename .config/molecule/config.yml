@@ -40,6 +40,13 @@ platforms:
     tmpfs:
       - /run
       - /run/lock
+    # Docker runs it outside the slice of whoever started the test (a login node caps an
+    # operator's CPUs there): it may use as many CPUs as that run (molecule.py sets
+    # DEEPOPS_MOLECULE_CPUS from cluster_tools' cpus.py) and DEEPOPS_MOLECULE_MEMORY,
+    # swap included.
+    cpus: ${DEEPOPS_MOLECULE_CPUS:-2}  # a number: the schema refuses a string
+    memory: "${DEEPOPS_MOLECULE_MEMORY:-4g}"
+    memory_swap: "${DEEPOPS_MOLECULE_MEMORY:-4g}"
 provisioner:
   name: ansible
   ansible_args:

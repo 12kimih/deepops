@@ -66,7 +66,9 @@
           unit: "{{ ipmi_exporter_svc_name }}"
           description: Prometheus IPMI Exporter
           image: "{{ ipmi_exporter_container }}"
-          options: [--network host, --user 0, "--cpus={{ ipmi_exporter_max_cpu }}", --device /dev/ipmi0]
+          options: [--network host, --user 0, --device /dev/ipmi0]
+          cpus: "{{ ipmi_exporter_max_cpu }}"
+          memory: "{{ ipmi_exporter_max_memory }}"
           mounts:
             - {src: "{{ ipmi_exporter_config_dir }}", dst: /config, readonly: true}
           args: [--config.file=/config/config.yml, "--web.listen-address=:{{ ipmi_exporter_port }}"]

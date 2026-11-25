@@ -61,6 +61,11 @@
   vars:
     host_baseline_absent_packages: "{{ openmpi_distro_packages[ansible_facts.os_family] }}"
 
+- name: Count the CPUs the build may use
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: usable_cpus
+
 # Resolved here, in this role's scope: source_build evaluates its arguments in its own.
 - name: Describe the openmpi build
   ansible.builtin.set_fact:
@@ -69,7 +74,7 @@
       version: "{{ openmpi_version }}"
       url: "{{ openmpi_src_url }}"
       checksum: "{{ openmpi_checksums[openmpi_version] | default('') }}"
-      steps: ["{{ openmpi_configure | split }}", [make, "-j{{ ansible_facts.processor_nproc }}"]]
+      steps: ["{{ openmpi_configure | split }}", [make, "-j{{ cluster_tools_lib_usable_cpus }}"]]
       record: "{{ openmpi_build_record }}"
       key: "{{ openmpi_build_key }}"
       installed: ["{{ openmpi_install_prefix }}/bin/ompi_info"]
@@ -85,7 +90,7 @@
 
 - name: Uninstall an install from before the manifest, from its own tree
   change_command:
-    argv: [make, -j, uninstall]
+    argv: [make, uninstall]
     chdir: "{{ (openmpi_old_trees.results | selectattr('stat.exists') | first).item }}"
   failed_when: false  # a tree whose configure failed has nothing to uninstall
   when:

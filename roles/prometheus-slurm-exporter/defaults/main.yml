@@ -13,5 +13,9 @@ slurm_exporter_container: "deepops/prometheus-slurm-exporter:2.0.0"
 slurm_exporter_build_image: true
 slurm_exporter_build_dir: /opt/deepops/build/slurm-exporter
 slurm_exporter_svc_name: "docker.slurm-exporter.service"
+# The container's CPUs and memory (Docker's --cpus and --memory, roles/container_service);
+# "" for no limit.
+slurm_exporter_max_cpu: "0.5"
+slurm_exporter_max_memory: "512m"
 slurm_exporter_service_state: started
 slurm_exporter_service_enabled: true

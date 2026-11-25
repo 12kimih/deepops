@@ -73,6 +73,8 @@
       description: Alertmanager
       image: "{{ alertmanager_container }}"
       options: [--network host]
+      cpus: "{{ alertmanager_max_cpu }}"
+      memory: "{{ alertmanager_max_memory }}"
       mounts:
         - {src: "{{ alertmanager_config_dir }}", dst: /etc/alertmanager, readonly: true}
         - {src: "{{ alertmanager_docker_volume_name }}", dst: /alertmanager, type: volume}

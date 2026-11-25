@@ -88,6 +88,8 @@
       description: Prometheus Slurm Exporter
       image: "{{ slurm_exporter_container }}"
       options: [--network host]
+      cpus: "{{ slurm_exporter_max_cpu }}"
+      memory: "{{ slurm_exporter_max_memory }}"
       mounts:
         - {src: "{{ slurm_install_prefix }}/bin/sdiag", dst: /usr/local/bin/sdiag, readonly: true}
         - {src: "{{ slurm_install_prefix }}/bin/sinfo", dst: /usr/local/bin/sinfo, readonly: true}

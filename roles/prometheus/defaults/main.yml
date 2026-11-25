@@ -5,6 +5,10 @@ prometheus_state: present
 prometheus_config_src: templates/prometheus.yml.j2
 prometheus_container: "prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06"
 prometheus_svc_name: "docker.prometheus.service"
+# The container's CPUs and memory (Docker's --cpus and --memory, roles/container_service);
+# "" for no limit.
+prometheus_max_cpu: "2"
+prometheus_max_memory: "8g"
 prometheus_docker_volume_name: "deepops_prometheus_metrics"
 prometheus_service_state: started
 prometheus_service_enabled: true

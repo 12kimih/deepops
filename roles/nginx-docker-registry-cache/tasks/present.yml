@@ -70,6 +70,8 @@
       description: Container registry caching proxy
       image: "{{ nginx_docker_cache_image }}"
       options: [--network host]
+      cpus: "{{ nginx_docker_cache_max_cpu }}"
+      memory: "{{ nginx_docker_cache_max_memory }}"
       mounts:
         - {src: "{{ nginx_docker_cache_mirror_path }}", dst: /docker_mirror_cache}
         - {src: "{{ nginx_docker_cache_ca_path }}", dst: /ca}
