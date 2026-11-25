@@ -108,7 +108,9 @@ class Topology(unittest.TestCase):
 
     def test_this_host_matches_its_cpu_count(self):
         topology = fact("topology")["cpu_topology"]
-        self.assertEqual(topology["logical_cpus"], os.cpu_count())
+        # The online CPUs as the kernel counts them: os.cpu_count() follows PYTHON_CPU_COUNT,
+        # which scripts/check.sh sets for the tools it runs.
+        self.assertEqual(topology["logical_cpus"], os.sysconf("SC_NPROCESSORS_ONLN"))
 
 
 class Memory(unittest.TestCase):

@@ -8,7 +8,12 @@
 #   scripts/check.sh --missing-tools   the packages of the tools it needs that are missing
 #
 # The checks are independent, so they run in parallel (CHECK_JOBS at a time, default
-# the CPU count): the run takes about as long as its slowest check, not their sum.
+# this run's share of the CPUs it may use: cluster_tools.cpus.usable(), which a login
+# node's per-person CPU quota caps, divided among the checks this person runs at the same
+# time): the run takes about as long as its slowest check, not their sum. Each check is
+# one CPU's worth: the tools inside it are told so (PYTHON_CPU_COUNT, GOMAXPROCS,
+# OMP_NUM_THREADS), and each runs in its own process group, which goes with the run
+# however it ends.
 # Each prints one line when it ends, with its time; a failed one then prints its
 # output in full. CHECK_JOBS=1 runs them one by one. They run niced, at idle I/O
 # priority: the host may be a login node or the controller, whose users and services
@@ -155,9 +160,36 @@ if ! "${fast}"; then
 fi
 
 # Run them: each in the background with its own log, at most CHECK_JOBS at once.
-jobs_max="${CHECK_JOBS:-$(nproc 2>/dev/null || echo 4)}"
+# nproc counts the CPUs a process may run on, never a quota: 48 steps in an 8-CPU login
+# slice throttled the whole slice, its owner's shell included. Each run holds a slot (a
+# locked file per run in a per-person directory) and takes its share of the CPUs.
+slots="${XDG_RUNTIME_DIR:-/tmp}/deepops-check-slots-$(id -u)"
+mkdir -p "${slots}" && chmod 700 "${slots}"
+exec 7>"${slots}/$$"
+flock 7
+running=0
+for slot in "${slots}"/*; do
+    if [ "${slot}" = "${slots}/$$" ] || ! flock -n "${slot}" true 2>/dev/null; then
+        running=$((running + 1))
+    else
+        rm -f "${slot}"  # a run that ended without removing its slot
+    fi
+done
+usable="$("${python}" roles/cluster_tools_lib/files/cluster_tools/cpus.py)"
+share=$((usable / running))
+jobs_max="${CHECK_JOBS:-$((share > 0 ? share : 1))}"
+export PYTHON_CPU_COUNT=1 GOMAXPROCS=1 OMP_NUM_THREADS=1
 logs="$(mktemp -d)"
-trap 'kill $(jobs -p) 2>/dev/null || true; rm -rf "${logs}"' EXIT
+stop_steps() {
+    local pid
+    for pid in "${logs}"/*.pid; do
+        [ -e "${pid}" ] && kill -- "-$(cat "${pid}")" 2>/dev/null
+    done
+    return 0
+}
+trap 'stop_steps; rm -rf "${logs}" "${slots}/$$"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 # The test playbooks are not runs to keep: no callback plugin directory, no ARA record;
 # and they need no site secret: a throwaway vault password file for the one ansible.cfg
 # names, so the checks run where no site config is (scripts/deepops/unrecorded.py, the
@@ -172,12 +204,18 @@ export ANSIBLE_VAULT_PASSWORD_FILE="${logs}/vault-pass"
 # found": the runai role tests, 2026-11-24).
 export ANSIBLE_CACHE_PLUGIN=memory
 run_one() {
-    local i="$1" start=${SECONDS} status=ok
-    nice -n 10 bash -c "${commands[$i]}" >"${logs}/${i}" 2>&1 </dev/null || status=FAILED
+    local i="$1" start=${SECONDS} status=ok pid
+    # Its own session and process group (setsid): stop_steps ends the step and all it
+    # started, a test's ansible-playbook or container among them.
+    setsid nice -n 10 bash -c "${commands[$i]}" >"${logs}/${i}" 2>&1 </dev/null &
+    pid=$!
+    echo "${pid}" >"${logs}/${i}.pid"
+    wait "${pid}" || status=FAILED
+    rm -f "${logs}/${i}.pid"
     echo "${status}" >"${logs}/${i}.status"
     printf '%-6s %4ss  %s\n' "${status}" "$((SECONDS - start))" "${names[$i]}"
 }
-echo "Running ${#names[@]} checks, ${jobs_max} at a time"
+echo "Running ${#names[@]} checks, ${jobs_max} at a time (${usable} usable CPUs, ${running} run(s) of this person)"
 started=${SECONDS}
 for i in "${!names[@]}"; do
     while [ "$(jobs -rp | wc -l)" -ge "${jobs_max}" ]; do wait -n || true; done
