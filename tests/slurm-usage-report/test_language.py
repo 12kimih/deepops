@@ -1,5 +1,5 @@
 """Everything the reports say to people (the status channel's posts, the DMs) is Korean,
-and shows no Markdown marker (tests/lib/slack_text: "*3개*의" in mrkdwn shows its stars):
+and shows no Markdown marker (cluster_tools.rich.problems: "*3개*의" in mrkdwn shows its stars):
 no English word outside the names it shows (GPU, Slurm, Grafana, a node's state), a
 command or path in backticks, a link, a mention or an emoji. The administrators' channel
 and what sbatch prints stay English, as every terminal message does."""
@@ -18,8 +18,6 @@ sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 from cluster_tools import disk_report, io_report, rich  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
 
-sys.path.insert(0, str(ROOT / "tests/lib"))
-from slack_text import problems  # noqa: E402
 
 # The disk tests' Prometheus stand-in, the same site.
 _spec = importlib.util.spec_from_file_location("disk_fixture", Path(__file__).with_name("test_disk.py"))
@@ -77,11 +75,11 @@ class Language(unittest.TestCase):
         self.assertEqual(english(text), [], f"{what}: {text[:300]}")
 
     def assertShown(self, what, message):
-        """MESSAGE (blocks, or a text sent as one) shows no Markdown marker (tests/lib/slack_text)."""
+        """MESSAGE (blocks, or a text sent as one) shows no Markdown marker (cluster_tools.rich.problems)."""
         if isinstance(message, str):
             message = rich.message(message)
             message = (message["text"], message["blocks"])
-        self.assertEqual(problems(message, what), [])
+        self.assertEqual(rich.problems(message, what), [])
 
     def test_the_check_finds_english(self):
         self.assertEqual(

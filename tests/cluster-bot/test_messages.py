@@ -1,5 +1,5 @@
 """Every message the bot sends, rendered as Slack gets it, shows no Markdown marker: bold
-right before a Korean particle ("**3개**의") is a style, never stars (tests/lib/slack_text).
+right before a Korean particle ("**3개**의") is a style, never stars (cluster_tools.rich.problems).
 Before, each module wrote mrkdwn by hand, and Slack showed "*N개*의" as typed."""
 
 import sys
@@ -9,7 +9,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
-sys.path.insert(0, str(ROOT / "tests/lib"))
 from cluster_bot import (  # noqa: E402
     accounts_blocks,
     bans_blocks,
@@ -21,7 +20,6 @@ from cluster_bot import (  # noqa: E402
 )
 from cluster_bot.requests import Failed  # noqa: E402
 from cluster_tools import rich  # noqa: E402
-from slack_text import problems  # noqa: E402
 
 CONNECT = {"login_host": "login.example.org", "ssh_port": 2222, "portal_url": "https://portal.example.org/",
            "docs_url": "https://docs.example.org/"}  # fmt: skip
@@ -79,17 +77,17 @@ def messages():
 
 class Messages(unittest.TestCase):
     def test_no_message_shows_a_marker(self):
-        found = [p for name, message in messages() for p in problems(message, name)]
+        found = [p for name, message in messages() for p in rich.problems(message, name)]
         self.assertEqual(found, [])
 
     def test_the_check_finds_what_slack_shows_raw(self):
         self.assertTrue(
-            problems([{"type": "context", "elements": [{"type": "mrkdwn", "text": "*3개*의 잡"}]}])
+            rich.problems([{"type": "context", "elements": [{"type": "mrkdwn", "text": "*3개*의 잡"}]}])
         )
-        self.assertTrue(problems([{"type": "rich_text", "elements": [{"type": "rich_text_section", "elements": [
+        self.assertTrue(rich.problems([{"type": "rich_text", "elements": [{"type": "rich_text_section", "elements": [
             {"type": "text", "text": "**3개**의 잡"}]}]}]))  # fmt: skip
         self.assertEqual(
-            problems(
+            rich.problems(
                 [{"type": "context", "elements": [{"type": "mrkdwn", "text": "*3개* 잡, node_exporter"}]}]
             ),
             [],

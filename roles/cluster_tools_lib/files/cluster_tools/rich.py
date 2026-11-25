@@ -11,6 +11,8 @@ set explicitly; nothing is left for Slack to parse.
                        section's fields or a section beside a button): a style is kept
                        only where Slack would show it, never as raw markers
     message(text, blocks=None) -> {"text", "blocks"} for chat.postMessage and the like
+    problems(message) -> what a message would show raw (a marker Slack or this module
+                       did not read), empty when it shows as written
 
 The Markdown, the same the user docs' notices use (cluster-docs scripts/notices.py):
 
@@ -393,3 +395,77 @@ def read(blocks_):
         elif b.get("type") == "context":
             out += [e.get("text", "") for e in b["elements"]]
     return "\n".join(out)
+
+
+# --- What a message must never show (the tests, and the docs' notices at commit) ---
+
+# A marker in shown text: a style, a link or a reference typed out, an entity or an escape.
+# Markdown this grammar does not have, left as typed: *one star*, __two__, a heading.
+_RAW = re.compile(
+    r"\*\*|`|\]\(|<(?:https?:|mailto:|@|!|#)|&(?:lt|gt|amp);|\\[\\*_`\[\]<>:]"
+    r"|(?<!\*)\*(?=[^\s*])[^*\n]+?(?<=[^\s*])\*(?!\*)|(?<!\w)__\S|^#{1,6} ",
+    re.M,
+)
+# mrkdwn: what Slack reads itself and is no style (links, references), then a styled span.
+_REFERENCE = re.compile(r"<[^>\n]+>|:[a-z0-9_+-]+:")
+_SPAN = re.compile(r"(?P<m>[*_`])(?=\S)(?P<body>[^\n]*?\S)(?P=m)")
+
+
+def _mrkdwn_problems(text, where):
+    out = []
+    body = _REFERENCE.sub(" ", text)
+    if "**" in body:
+        out.append(f"{where}: ** in mrkdwn: {text!r}")
+    for m in _SPAN.finditer(body):
+        if m["m"] == "_" and not (m.start() == 0 or _EDGE.match(body[m.start() - 1])):
+            continue  # an identifier's underscore (node_exporter), no italic
+        before = body[m.start() - 1] if m.start() else ""
+        after = body[m.end()] if m.end() < len(body) else ""
+        if (before and not _EDGE.match(before)) or (after and not _EDGE.match(after)):
+            out.append(f"{where}: {m.group(0)!r} touches a letter, Slack shows the marks: {text!r}")
+    return out
+
+
+def problems(message, where="message"):
+    """What MESSAGE would show that it should not: ["where: what"], empty when clean. A
+    rich text element holding a marker (**, a backtick, a link or a mention typed out,
+    Markdown this grammar has not) means a text went around this module or used Markdown
+    it does not read; mrkdwn (context, fields, a section beside a button) must not hold
+    a style marker that touches a letter: Slack shows the stars there, not the style.
+    MESSAGE: a list of blocks, a view ({"type", "blocks"}), (text, blocks) or a block."""
+    if isinstance(message, tuple):
+        text, blocks = message[0], message[1]
+        out = (
+            [f"{where} text: ** in the fallback: {text!r}"] if isinstance(text, str) and "**" in text else []
+        )
+        return out + problems(blocks, where)
+    if (
+        isinstance(message, dict)
+        and "blocks" in message
+        and "type" in message
+        and message["type"] in ("home", "modal")
+    ):
+        return problems(message["blocks"], where)
+    out = []
+
+    def walk(node, path, pre):
+        if isinstance(node, list):
+            for i, n in enumerate(node):
+                walk(n, f"{path}[{i}]", pre)
+            return
+        if not isinstance(node, dict):
+            return
+        kind = node.get("type")
+        if kind == "mrkdwn":
+            out.extend(_mrkdwn_problems(node.get("text", ""), path))
+            return
+        if kind == "text" and isinstance(node.get("text"), str):
+            if not pre and not node.get("style", {}).get("code") and _RAW.search(node["text"]):
+                out.append(f"{path}: a marker in rich text: {node['text']!r}")
+            return
+        for k, v in node.items():
+            if k in ("elements", "blocks", "fields", "text", "accessory"):
+                walk(v, f"{path}.{k}", pre or kind == "rich_text_preformatted")
+
+    walk(message, where, False)
+    return out

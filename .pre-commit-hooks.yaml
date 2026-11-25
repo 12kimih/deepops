@@ -39,3 +39,11 @@
   pass_filenames: false
   always_run: true
   stages: [pre-push]
+- id: notice-render
+  name: notices render as the cluster bot posts them
+  # The repository's config gives the command that prints its notices.json, e.g.
+  # args: [--, python3, scripts/notices.py, export, "-"]; or a notices.json path.
+  entry: scripts/deepops/notice_render.py
+  language: script
+  pass_filenames: false
+  stages: [pre-commit, manual]
