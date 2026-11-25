@@ -1,0 +1,17 @@
+---
+# Whether roles/slurm's own config files, rendered from the site's settings, say what the
+# site's own templates (slurm_conf_template and the like) say; lists every difference and
+# fails on any (roles/slurm/tasks/conf-compare.yml, docs/slurm-cluster/slurm-conf.md).
+# Renders on the controller from the facts the last deploy cached; changes nothing.
+#   ansible-playbook playbooks/slurm-cluster/slurm-conf-compare.yml
+- name: Compare the site's Slurm config files with the role's
+  hosts: "{{ (groups['slurm-master'] | default([]))[:1] }}"
+  gather_facts: false
+  tasks:
+    - name: Compare the Slurm config files
+      ansible.builtin.include_role:
+        name: slurm
+        tasks_from: conf-compare
+        public: true
+      vars:
+        facts_ready: true  # roles/facts, a dependency, installs nothing

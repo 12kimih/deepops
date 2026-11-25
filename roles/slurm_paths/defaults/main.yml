@@ -20,6 +20,10 @@ slurm_log_files:
   slurm-prolog-epilog: "{{ slurm_log_dir }}/prolog-epilog"
 # slurmctld's port: slurm.conf, slurmd's --conf-server and the metrics scrape.
 slurm_slurmctld_port: 6817
+# slurmd's port on every node (slurm.conf SlurmdPort).
+slurm_slurmd_port: 6818
+# slurmdbd's port (slurmdbd.conf DbdPort, slurm.conf AccountingStoragePort).
+slurm_slurmdbd_port: 6819
 # Where roles/nhc installs the node health check, for the role and for whatever runs it.
 nhc_install_dir: /usr
 nhc_program: "{{ nhc_install_dir }}/sbin/nhc"

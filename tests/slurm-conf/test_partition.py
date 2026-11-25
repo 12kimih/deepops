@@ -13,11 +13,11 @@ import sys
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
-from ansible_yaml import render, role_defaults  # noqa: E402
+from ansible_yaml import render, role_variables  # noqa: E402
 
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 ROLE = ROOT / "roles/slurm"
-DEFAULTS = role_defaults("slurm")
+DEFAULTS = role_variables("slurm")
 TEMPLATE = (ROLE / "templates" / DEFAULTS["slurm_conf_template"]).read_text()
 FACTS = {
     "ansible_facts": {
