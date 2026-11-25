@@ -82,17 +82,21 @@ def share_of(item):
     return round(100 * item["rate"] / item["capacity"])
 
 
+# The DM's words for each direction: (what the node did, what the job did most of).
+DIRECTIONS_KO = {"read": ("에서 읽고", "읽은"), "write": ("에 쓰고", "쓴")}
+
+
 def dm_text(item, rank, advice):
     """The DM to the user of ITEM's jobs[RANK]."""
     job, _, job_rate = item["jobs"][rank]
-    _, _, _, verb, prep = DIRECTIONS[item["direction"]]
-    lead = "did the most" if rank == 0 else f"was number {rank + 1} of the jobs by"
+    did, what = DIRECTIONS_KO[item["direction"]]
+    lead = "가장 많이" if rank == 0 else f"{rank + 1}번째로 많이"
     return (
-        f"For the last {item['minutes']} minutes, node `{item['host']}` has been {verb} {prep} "
-        f"`{item['mount']}` at {rate(item['rate'])}, {share_of(item)}% of what the disk behind it serves "
-        f"the whole cluster, so everyone's work on `{item['mount']}` is slower. Your job `{job}` {lead} "
-        f"{verb} on that node ({rate(job_rate)} through its read and write calls, cache and pipes "
-        f"included, so a ranking on the node, not its own share of the disk).\n{advice}"
+        f"지난 {item['minutes']}분 동안 `{item['host']}` 노드가 `{item['mount']}`{did} 있습니다. "
+        f"{rate(item['rate'])}로, 그 뒤의 디스크가 클러스터 전체에 내주는 양의 {share_of(item)}%라 "
+        f"모두의 `{item['mount']}` 작업이 느려집니다. 그 노드에서 {lead} {what} 잡이 `{job}`입니다 "
+        f"({rate(job_rate)}: 잡의 읽기, 쓰기 호출로 잰 값이라 캐시와 파이프도 들어 있어, 디스크에서 차지한 몫이 "
+        f"아니라 그 노드 안의 순위입니다).\n{advice}"
     )
 
 

@@ -59,9 +59,9 @@ slurm_usage_report_notify: [mention]
 slurm_usage_report_notify_repeat_hours: 0
 # The DM (with dm in notify): {jobs} (one line each), {count}, {hours} (idle_hours).
 slurm_usage_report_dm_text: |-
-  {count} of your jobs have had idle GPUs for {hours}h or more:
+  잡 {count}개의 GPU가 {hours}시간 넘게 쉬고 있습니다:
   {jobs}
-  If you no longer need them, please free the GPUs with `scancel <job>`.
+  더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요. 기다리는 분들이 쓰실 수 있습니다.
 # Cancel any job (batch or interactive alike) whose GPUs sat idle this long (0 = never),
 # announced in the report thread, and only once its owner was told, and warned
 # cancel_warn_hours ahead, in earlier runs: needs notify and more than idle_hours.
@@ -71,9 +71,9 @@ slurm_usage_report_cancel_after_hours: 0
 # to go (0: no separate warning): {jobs}, {count}, {hours} (cancel_warn_hours).
 slurm_usage_report_cancel_warn_hours: 1
 slurm_usage_report_cancel_warn_text: |-
-  These jobs of yours have held idle GPUs for long and will be cancelled in {hours}h:
+  아래 잡은 GPU를 오래 쓰지 않아 {hours}시간 뒤에 취소됩니다:
   {jobs}
-  Use the GPUs, or free them now with `scancel <job>`.
+  GPU를 쓰시거나, 지금 `scancel <JOBID>`로 반납해 주세요.
 
 # The I/O notices (systemd OnCalendar, every 5 minutes): a node whose NFS traffic to a
 # measured export (io_fairness_models, roles/io_defaults) stayed above io_share of what
@@ -86,8 +86,8 @@ slurm_usage_report_io_minutes: 15
 slurm_usage_report_io_top_jobs: 3
 slurm_usage_report_io_repeat_hours: 6
 slurm_usage_report_io_advice: >-
-  Data a job reads or writes heavily belongs on the cluster's scratch space where there
-  is one, or on the node's local disk, with the results copied back once at the end.
+  잡이 많이 읽고 쓰는 데이터는 클러스터의 스크래치 공간(있다면)이나 노드의 로컬 디스크에
+  두고, 결과만 마지막에 한 번 옮겨 주세요.
 
 # Slurm user -> Slack member ID or email (default: the roster's, slack_members). Users
 # not listed are looked up as <user>@<email_domain> when email_domain is set; otherwise

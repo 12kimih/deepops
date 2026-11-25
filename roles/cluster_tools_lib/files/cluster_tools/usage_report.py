@@ -60,7 +60,7 @@ from .vocab import job_holds, node_unavailable
 
 NOTIFY = {"mention", "dm"}
 # The fields a DM text may use: the person's jobs, one line each, how many, the hours.
-DM_FIELDS = {"jobs": "- `1234_5` (8 GPU, running 1:00:00)", "count": 1, "hours": "2"}
+DM_FIELDS = {"jobs": "- `1234_5` (GPU 8장, 1:00:00 실행 중)", "count": 1, "hours": "2"}
 # An hourly run starts a few seconds later some hours: a notice due every N hours may
 # go this much early, so it never slips to the next run.
 RUN_LEEWAY = 300
@@ -180,21 +180,22 @@ def collect_week(prom, threshold, days=WEEK_DAYS):
     )
 
 
-def render_week(rows, who, days=WEEK_DAYS, top=WEEK_TOP):
+def render_week(rows, who, threshold, days=WEEK_DAYS, top=WEEK_TOP):
     """(text, blocks): totals, then everyone who held GPUs, idlest first; the TOP idlest
-    with idle hours are mentioned."""
+    with idle hours are mentioned. THRESHOLD is collect_week's, in percent."""
     held = sum(r["held"] for r in rows)
     idle = sum(r["idle"] for r in rows)
     share = idle / held if held else 0
-    head = f"GPU usage, last {days} days: {held:,.0f} GPU-hours held, {idle:,.0f} idle ({share:.0%})"
+    head = f"지난 {days}일 GPU 사용: {held:,.0f} GPU시간 중 {idle:,.0f} GPU시간 쉬었습니다 ({share:.0%})"
     lines = []
     for n, r in enumerate(rows):
         name = who(r["user"], n < top and r["idle"] >= 1)
         part = r["idle"] / r["held"] if r["held"] else 0
-        lines.append(f"{name}: {r['idle']:,.0f} of {r['held']:,.0f} GPU-hours idle ({part:.0%})")
-    body = "\n".join(lines) or "No GPU jobs ran."
+        lines.append(f"{name}: {r['held']:,.0f} GPU시간 중 {r['idle']:,.0f} GPU시간 쉼 ({part:.0%})")
+    body = "\n".join(lines) or "GPU 잡이 없었습니다."
     note = (
-        "Idle: a GPU a job held at 0% utilisation for the minute. Free GPUs you are not using with scancel."
+        f"쉼: 잡이 잡아 둔 GPU의 사용률이 그 1분 동안 {threshold:g}% 이하였다는 뜻입니다. "
+        "쓰지 않는 GPU는 `scancel <JOBID>`로 반납해 주세요."
     )
     return head, [{"type": "header", "text": {"type": "plain_text", "text": head[:150]}}] + sections(body) + [
         {"type": "context", "elements": [{"type": "mrkdwn", "text": note}]}
@@ -261,7 +262,7 @@ def by_owner(jobs):
 def job_lines(jobs):
     """One line per job for a person's notice."""
     return "\n".join(
-        f"- `{escape(j['label'])}` ({len(j['gpus'])} GPU, running {duration(j['runtime'])})" for j in jobs
+        f"- `{escape(j['label'])}` (GPU {len(j['gpus'])}장, {duration(j['runtime'])} 실행 중)" for j in jobs
     )
 
 
@@ -269,9 +270,9 @@ def job_lines(jobs):
 
 
 def gib(job):
-    """GPU memory in use: 'n/a' without data, a trailing '+' when some GPUs lack it."""
+    """GPU memory in use: '-' without data, a trailing '+' when some GPUs lack it."""
     if job["mem_gib"] is None:
-        return "n/a"
+        return "-"
     return f"{job['mem_gib']:.0f}G" + ("+" if job["mem_known"] < len(job["gpus"]) else "")
 
 
@@ -281,55 +282,57 @@ def render(report, cfg, who):
     alloc = sum(len(j["gpus"]) for j in jobs)
     utils = [j["util"] for j in jobs if j["util"] is not None for _ in j["gpus"]]
     # Unknown is not zero: with no utilisation data (no jobs, or Prometheus down) say so.
-    avg = f"{sum(utils) / len(utils):.0f}%" if utils else "n/a"
+    avg = f"{sum(utils) / len(utils):.0f}%" if utils else "알 수 없음"
     pending = report["pending"]
     pend_jobs = sum(p["jobs"] for p in pending.values())
     pend_gpus = sum(p["gpus"] for p in pending.values())
     stamp = datetime.fromtimestamp(report["now"]).strftime("%Y-%m-%d %H:%M")
 
     text = (
-        f"GPU usage {stamp}: {alloc}/{total} GPUs allocated ({100 * alloc / total:.0f}%), "
-        f"avg util {avg}, {len(idle)} idle jobs"
+        f"GPU 사용 현황 {stamp}: GPU {alloc}/{total}장 할당 ({100 * alloc / total:.0f}%), "
+        f"평균 사용률 {avg}, GPU를 쓰지 않는 잡 {len(idle)}개"
     )
     status = ":large_green_circle:" if not idle and not report["reasons"] else ":large_yellow_circle:"
     fields = [
-        f"*Allocated*\n{alloc} / {total} GPU ({100 * alloc / total:.0f}%)",
-        f"*Average utilisation*\n{avg}",
-        f"*Idle jobs*\n{len(idle)}" + (" :zzz:" if idle else ""),
-        f"*Pending*\n{pend_jobs} jobs, {pend_gpus} GPU",
-        f"*Drain / down*\n{len(report['reasons'])} nodes" + (" :warning:" if report["reasons"] else ""),
+        f"*할당된 GPU*\n{alloc} / {total}장 ({100 * alloc / total:.0f}%)",
+        f"*평균 사용률*\n{avg}",
+        f"*GPU를 쓰지 않는 잡*\n{len(idle)}개" + (" :zzz:" if idle else ""),
+        f"*기다리는 잡*\n{pend_jobs}개, GPU {pend_gpus}장",
+        f"*쓸 수 없는 노드 (drain, down)*\n{len(report['reasons'])}대"
+        + (" :warning:" if report["reasons"] else ""),
     ]
-    footer = "Details in the thread"
+    footer = "자세한 내용은 스레드에 있습니다"
     if report.get("dashboard_url"):
         footer += f"  |  <{report['dashboard_url']}|Grafana>"
     summary = [
-        {"type": "header", "text": {"type": "plain_text", "text": f"\U0001f4ca GPU usage  {stamp}"}},
+        {"type": "header", "text": {"type": "plain_text", "text": f"\U0001f4ca GPU 사용 현황  {stamp}"}},
         {"type": "section", "fields": [{"type": "mrkdwn", "text": f} for f in fields]},
         {"type": "context", "elements": [{"type": "mrkdwn", "text": f"{status}  {footer}"}]},
     ]
 
     blocks = []
     if idle:
-        rule = f"every GPU at or under {cfg['idle_util_threshold']:g}% for {cfg['idle_hours']:g}h+"
-        lines = [f":zzz: *Idle GPU jobs*  _{rule}_"]
+        rule = f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게"
+        lines = [f":zzz: *GPU를 쓰지 않는 잡*  _{rule}_"]
         owners = by_owner(idle)
         for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
             jobs = owners[user]
             told = "mention" in cfg["notify"] and user in report.get("due", ())
-            lines.append(f"• {who(user, told)}  {len(jobs)} job{'s' if len(jobs) > 1 else ''}")
+            lines.append(f"• {who(user, told)}  잡 {len(jobs)}개")
             for j in jobs:
                 hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
                 lines.append(
-                    f"    `{j['label']}`  {len(j['gpus'])}x {j['gpu_type'] or 'GPU'} on {hosts}  "
-                    f"running {duration(j['runtime'])}"
+                    f"    `{j['label']}`  {j['gpu_type'] or 'GPU'} {len(j['gpus'])}장, {hosts}  "
+                    f"{duration(j['runtime'])} 실행 중"
                 )
-        lines.append("_Cancel with `scancel <job>` if you no longer need it._")
+        lines.append("_더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요._")
         blocks.extend(sections("\n".join(lines)))
     if report["reasons"]:
         rows = [(n, st, since.replace("T", " ")[:16], u, why) for n, st, since, u, why in report["reasons"]]
         blocks.extend(
             sections(
-                ":warning: *Drain / down nodes*\n" + table(("NODE", "STATE", "SINCE", "BY", "REASON"), rows)
+                ":warning: *쓸 수 없는 노드 (drain, down)*\n"
+                + table(("노드", "상태", "언제부터", "누가", "사유"), rows)
             )
         )
     if pending:
@@ -345,8 +348,8 @@ def render(report, cfg, who):
         ]
         blocks.extend(
             sections(
-                ":hourglass_flowing_sand: *Pending*\n"
-                + table(("USER", "JOBS", "GPU", "LONGEST", "REASON"), rows)
+                ":hourglass_flowing_sand: *기다리는 잡*\n"
+                + table(("사용자", "잡", "GPU", "가장 오래", "사유"), rows)
             )
         )
 
@@ -356,19 +359,21 @@ def render(report, cfg, who):
             by_user[j["user"]].append(j)
     if by_user:
         blocks.append({"type": "divider"})
-        blocks.extend(sections(":busts_in_silhouette: *Running GPU jobs by user*"))
+        blocks.extend(sections(":busts_in_silhouette: *사람별 실행 중인 GPU 잡*"))
     for user, ujobs in sorted(by_user.items(), key=lambda kv: -sum(len(j["gpus"]) for j in kv[1])):
         n = sum(len(j["gpus"]) for j in ujobs)
         rows = []
         for j in sorted(ujobs, key=lambda j: -j["runtime"]):
             hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
             note = (
-                "idle" if j["idle"] else (f"{j['idle_gpus']}/{len(j['gpus'])} idle" if j["idle_gpus"] else "")
+                "쉬는 중"
+                if j["idle"]
+                else (f"{j['idle_gpus']}/{len(j['gpus'])} 쉬는 중" if j["idle_gpus"] else "")
             )
             rows.append(
                 (
                     j["label"],
-                    f"{len(j['gpus'])}x {j['gpu_type'] or 'gpu'}",
+                    f"{j['gpu_type'] or 'GPU'} {len(j['gpus'])}장",
                     hosts,
                     duration(j["runtime"]),
                     j["qos"],
@@ -377,14 +382,12 @@ def render(report, cfg, who):
                     note,
                 )
             )
-        head = (
-            f"*{user}*  {n} GPU ({100 * n / total:.1f}%)  |  {len(ujobs)} job{'s' if len(ujobs) > 1 else ''}"
-        )
+        head = f"*{user}*  GPU {n}장 ({100 * n / total:.1f}%)  |  잡 {len(ujobs)}개"
         blocks.extend(
-            sections(f"{head}\n{table(('JOB', 'GPU', 'NODE', 'TIME', 'QOS', 'UTIL', 'MEM', ''), rows)}")
+            sections(f"{head}\n{table(('잡', 'GPU', '노드', '시간', 'QOS', '사용률', '메모리', ''), rows)}")
         )
 
-    thread = [("GPU usage details", blocks[i : i + MAX_BLOCKS]) for i in range(0, len(blocks), MAX_BLOCKS)]
+    thread = [("GPU 사용 현황 자세히", blocks[i : i + MAX_BLOCKS]) for i in range(0, len(blocks), MAX_BLOCKS)]
     return (text, summary), thread
 
 
@@ -669,7 +672,7 @@ def weekly(cfg, args):
     weeks, cache = state.get("weeks", {}), state.get("users", {})
     who = namer(cfg, slack, cache)
     preview = args.dry_run or bool(args.to)
-    text, blocks = render_week(rows, who)
+    text, blocks = render_week(rows, who, cfg["idle_util_threshold"])
     to_channel(slack, args.to, cfg["channel"], text, blocks)
     remember_week(weeks, rows, now)
     heavy = repeaters(weeks, cfg)
@@ -859,6 +862,17 @@ def purge_notices(cfg, slack, cache, state, now, preview):
     return failures
 
 
+def cancelled_note(cancelled, cfg, who):
+    """The report thread's (text, blocks) on the jobs CANCELLED for idle GPUs."""
+    lines = [
+        f":no_entry: {who(user, bool(cfg['notify']))}  "
+        + ", ".join(f"`{j['label']}`" for j in jobs)
+        + f": GPU를 {cfg['cancel_after_hours']:g}시간 동안 쓰지 않아 취소했습니다"
+        for user, jobs in by_owner(cancelled).items()
+    ]
+    return "GPU를 쓰지 않는 잡을 취소했습니다", sections("\n".join(lines))
+
+
 def post_report(report, cfg, who, slack, to):
     """The summary card and its thread; returns (channel, ts) of the card."""
     card, thread = render(report, cfg, who)
@@ -943,13 +957,7 @@ def act(report, cfg, who, slack, cache, now):
             except Failed as e:
                 failures.append(f"scancel {j['id']}: {e}")
         if cancelled:
-            lines = [
-                f":no_entry: {who(user, bool(cfg['notify']))}  "
-                + ", ".join(f"`{j['label']}`" for j in jobs)
-                + f" cancelled after {cfg['cancel_after_hours']:g}h with idle GPUs"
-                for user, jobs in by_owner(cancelled).items()
-            ]
-            slack.post(channel, "Idle jobs cancelled", sections("\n".join(lines)), thread_ts=ts)
+            slack.post(channel, *cancelled_note(cancelled, cfg, who), thread_ts=ts)
     if failures:
         raise RuntimeError("; ".join(failures))
 

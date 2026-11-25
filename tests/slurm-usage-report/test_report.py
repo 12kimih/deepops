@@ -202,7 +202,7 @@ class IdleTests(unittest.TestCase):
             self.job("unknown", 60, [("n", 9)]),
         ]
         report.analyze(jobs, gpu, window=7200, threshold=0)
-        self.assertEqual([report.gib(j) for j in jobs], ["12G", "12G+", "n/a"])
+        self.assertEqual([report.gib(j) for j in jobs], ["12G", "12G+", "-"])
 
     def test_idle_since_is_kept_and_forgotten_when_no_longer_idle(self):
         state, j = {}, self.job("1", 7200, [("n", 0)])
@@ -230,7 +230,7 @@ class IdleTests(unittest.TestCase):
         c = dict(self.job("c", 7200, [("n", 3)]), user="v")
         self.assertEqual({u: [j["id"] for j in js] for u, js in report.by_owner([a, b, c]).items()},
                          {"u": ["b", "a"], "v": ["c"]})  # fmt: skip
-        self.assertEqual(report.job_lines([a]), "- `a` (1 GPU, running 2:00:00)")
+        self.assertEqual(report.job_lines([a]), "- `a` (GPU 1장, 2:00:00 실행 중)")
 
 
 class RenderTests(unittest.TestCase):
@@ -478,11 +478,13 @@ class WeeklyTests(unittest.TestCase):
     def test_collect_and_render_idlest_first(self):
         rows = report.collect_week(self.Prom(), 0)
         self.assertEqual([r["user"] for r in rows], ["bob", "alice", "carol"])
-        text, blocks = report.render_week(rows, lambda u, m: f"@{u}" if m else u, top=1)
-        self.assertIn("250 GPU-hours held, 130 idle (52%)", text)
+        text, blocks = report.render_week(rows, lambda u, m: f"@{u}" if m else u, 5, top=1)
+        self.assertIn("250 GPU시간 중 130 GPU시간 쉬었습니다 (52%)", text)
         body = " ".join(b["text"]["text"] for b in blocks if b["type"] == "section")
-        self.assertIn("@bob: 90 of 120 GPU-hours idle (75%)", body)
-        self.assertIn("alice: 40 of 100", body)
+        self.assertIn("@bob: 120 GPU시간 중 90 GPU시간 쉼 (75%)", body)
+        self.assertIn("alice: 100 GPU시간 중 40", body)
+        note = blocks[-1]["elements"][0]["text"]
+        self.assertIn("5% 이하", note, "the threshold the hours were counted at, not a fixed 0%")
         self.assertNotIn("@alice", body)
 
     def test_a_streak_of_heavy_weeks_is_reported_and_a_rerun_replaces_its_week(self):
