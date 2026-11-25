@@ -10,4 +10,7 @@ ipmi_exporter_kernel_modules: [ipmi_devintf, ipmi_si]
 ipmi_exporter_svc_name: "docker.ipmi-exporter.service"
 ipmi_exporter_service_state: started
 ipmi_exporter_service_enabled: true
+# The container's CPUs and memory (Docker's --cpus and --memory, roles/container_service);
+# "" for no limit.
 ipmi_exporter_max_cpu: "0.2"
+ipmi_exporter_max_memory: "256m"

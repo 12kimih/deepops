@@ -83,6 +83,8 @@
       description: Prometheus
       image: "{{ prometheus_container }}"
       options: [--network host]
+      cpus: "{{ prometheus_max_cpu }}"
+      memory: "{{ prometheus_max_memory }}"
       mounts:
         - {src: "{{ prometheus_config_dir }}", dst: /etc/prometheus, readonly: true}
         - {src: "{{ prometheus_docker_volume_name }}", dst: /prometheus, type: volume}

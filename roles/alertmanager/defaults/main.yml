@@ -26,6 +26,10 @@ alertmanager_dashboard_url: "{{ grafana_root_url }}"
 alertmanager_repeat_interval: 4h
 alertmanager_critical_repeat_interval: 1h
 alertmanager_svc_name: "docker.alertmanager.service"
+# The container's CPUs and memory (Docker's --cpus and --memory, roles/container_service);
+# "" for no limit.
+alertmanager_max_cpu: "0.5"
+alertmanager_max_memory: "512m"
 alertmanager_docker_volume_name: "deepops_alertmanager_metrics"
 alertmanager_service_state: started
 alertmanager_service_enabled: true

@@ -17,7 +17,7 @@
 
 - name: Uninstall an install from before the manifest, from its own tree
   ansible.builtin.command:
-    argv: [make, -j, uninstall]
+    argv: [make, uninstall]
     chdir: "{{ item.path }}"
     removes: "{{ item.path }}/Makefile"
   loop: "{{ openmpi_trees.files | default([]) }}"

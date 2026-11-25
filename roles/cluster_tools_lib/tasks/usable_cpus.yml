@@ -1,0 +1,21 @@
+---
+# cluster_tools_lib_usable_cpus: the CPUs this run may use on the host, from cpus.py
+# there (its cpuset, capped by every cgroup CPU quota above it). A build sizes its jobs
+# and its container by it: ansible_facts.processor_nproc counts the CPUs, never a quota,
+# so on a login node, where the operator's slice may use a few of them, make -j48 ran
+# throttled with every shell in the slice, and a build container (outside the slice)
+# took all 48 from the logins.
+#   ansible.builtin.include_role:
+#     name: cluster_tools_lib
+#     tasks_from: usable_cpus
+- name: Count the CPUs this run may use
+  ansible.builtin.script:
+    cmd: cluster_tools/cpus.py
+    executable: python3
+  register: _cluster_tools_lib_cpus
+  changed_when: false
+  check_mode: false  # reads only; a preview sizes the same build
+
+- name: Record the CPUs this run may use
+  ansible.builtin.set_fact:
+    cluster_tools_lib_usable_cpus: "{{ _cluster_tools_lib_cpus.stdout | trim | int }}"

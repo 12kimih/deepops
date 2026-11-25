@@ -19,4 +19,7 @@ node_exporter_svc_name: "docker.node-exporter.service"
 node_exporter_service_state: started
 node_exporter_service_enabled: true
 
+# The container's CPUs and memory (Docker's --cpus and --memory, roles/container_service);
+# "" for no limit.
 node_exporter_max_cpu: "0.5"
+node_exporter_max_memory: "256m"

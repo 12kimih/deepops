@@ -7,8 +7,12 @@
 #   unit         the unit's name (docker.<service>.service); the container's name too
 #   description
 #   image        what runs
-#   options      docker run flags other than the mounts and the environment (--network
-#                host, --cpus=1)
+#   options      docker run flags other than the limits, the mounts and the environment
+#                (--network host, --device ...)
+#   cpus         the CPUs it may use (--cpus, "0.5", "2"); "" for no limit
+#   memory       the memory it may use, swap included (--memory and --memory-swap,
+#                "512m", "8g"); "" for no limit. Past it the kernel kills the container
+#                and systemd restarts it; Go programs (Prometheus) collect harder near it
 #   env          the container's environment, {NAME: value}: each value reaches it as
 #                given, spaces, %, $, \ and " included (one quoted --env per entry)
 #   mounts       host paths and volumes the container sees, each
@@ -32,6 +36,8 @@ container_service_keys:
   description: ""
   image: ""
   options: []
+  cpus: ""
+  memory: ""
   env: {}
   mounts: []
   args: []

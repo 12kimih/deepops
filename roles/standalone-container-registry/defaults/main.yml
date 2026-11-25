@@ -4,6 +4,10 @@ standalone_container_registry_image: "registry:3.1.2@sha256:82f6ff4a7f982960c8aa
 standalone_container_registry_port: "5000"
 # Run as a systemd unit (roles/container_service), its container named after it.
 standalone_container_registry_svc_name: docker.registry.service
+# The container's CPUs and memory (Docker's --cpus and --memory, roles/container_service);
+# "" for no limit.
+standalone_container_registry_max_cpu: "1"
+standalone_container_registry_max_memory: "1g"
 # The container's name when it ran outside systemd (docker restart policy): retired.
 standalone_container_registry_name: "deepops-registry"
 # present, absent or kept (do nothing); a deploy sets it from deepops_components, so a

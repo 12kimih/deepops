@@ -7,6 +7,10 @@ grafana_data_dir: /var/lib/grafana
 grafana_user_id: "{{ system_accounts.grafana.uid }}"  # the image's user (roles/system_accounts)
 grafana_container: "grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf"
 grafana_svc_name: "docker.grafana.service"
+# The container's CPUs and memory (Docker's --cpus and --memory, roles/container_service);
+# "" for no limit.
+grafana_max_cpu: "1"
+grafana_max_memory: "2g"
 grafana_service_state: started
 grafana_service_enabled: true
 grafana_port: 3000

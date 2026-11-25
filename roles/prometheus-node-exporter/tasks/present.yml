@@ -46,8 +46,10 @@
       description: Prometheus Node Exporter
       image: "{{ node_exporter_container }}"
       options: >-
-        {{ ['--network host', '--pid=host', '--cpus=' ~ node_exporter_max_cpu]
+        {{ ['--network host', '--pid=host']
            + (['--security-opt apparmor=unconfined'] if _systemd else []) }}
+      cpus: "{{ node_exporter_max_cpu }}"
+      memory: "{{ node_exporter_max_memory }}"
       mounts: >-
         {{ [{'src': '/', 'dst': node_exporter_rootfs, 'readonly': true, 'propagation': 'rslave'},
             {'src': node_exporter_prom_dir, 'dst': node_exporter_prom_dir, 'readonly': true}]

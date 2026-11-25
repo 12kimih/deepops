@@ -56,6 +56,15 @@ def default(role, name):
     return yaml.safe_load((ROOT / "roles" / role / "defaults" / "main.yml").read_text())[name]
 
 
+def limits(role):
+    """The CPU and memory limits the role's unit gives its container (roles/container_service),
+    so an image that cannot start within them fails here, not on a host."""
+    defaults = role_defaults(role)
+    (cpus,) = [v for k, v in defaults.items() if k.endswith("_max_cpu")]
+    (memory,) = [v for k, v in defaults.items() if k.endswith("_max_memory")]
+    return [f"--cpus={cpus}"] * bool(cpus) + [f"--memory={memory}", f"--memory-swap={memory}"] * bool(memory)
+
+
 def docker(*args, check=True, timeout=300):
     return subprocess.run(["docker", *args], capture_output=True, text=True, check=check, timeout=timeout)
 
@@ -84,14 +93,14 @@ def wait_http(url, timeout=120, auth=None):
 class Container:
     """docker run --rm -d, published on 127.0.0.1 at a free port; stopped on exit."""
 
-    def __init__(self, image, port, *args, mounts=()):
-        self.image, self.port, self.args, self.mounts = image, port, args, mounts
+    def __init__(self, image, port, *args, mounts=(), limits=()):
+        self.image, self.port, self.args, self.mounts, self.limits = image, port, args, mounts, limits
 
     def __enter__(self):
         mounts = [a for m in self.mounts for a in ("--mount", m)]
         self.id = docker(
             "run", "--rm", "-d", "-u", f"{os.getuid()}:{os.getgid()}", "-p", f"127.0.0.1::{self.port}",
-            *mounts, self.image, *self.args,
+            *self.limits, *mounts, self.image, *self.args,
         ).stdout.strip()  # fmt: skip
         mapping = docker("port", self.id, str(self.port)).stdout.split()[0]
         self.url = "http://" + mapping
@@ -188,13 +197,13 @@ class MonitoringImages(unittest.TestCase):
         shutil.copytree(self.rendered / "prometheus", config)
         shutil.copytree(ROOT / "roles/prometheus/files/rules", config / "rules")
         (config / "endpoints").mkdir()
-        check = docker("run", "--rm", "-u", f"{os.getuid()}", "--mount", f"type=bind,src={config},dst=/etc/prometheus,readonly",
+        check = docker("run", "--rm", *limits("prometheus"), "-u", f"{os.getuid()}", "--mount", f"type=bind,src={config},dst=/etc/prometheus,readonly",
                        "--entrypoint", "promtool", image, "check", "config", "/etc/prometheus/prometheus.yml",
                        check=False)  # fmt: skip
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         with Container(
             image, 9090, "--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/tmp/data",
-            mounts=[f"type=bind,src={config},dst=/etc/prometheus,readonly"],
+            mounts=[f"type=bind,src={config},dst=/etc/prometheus,readonly"], limits=limits("prometheus"),
         ) as prom:  # fmt: skip
             wait_http(prom.url + "/-/ready")
             groups = json.loads(wait_http(prom.url + "/api/v1/rules"))["data"]["groups"]
@@ -208,7 +217,7 @@ class MonitoringImages(unittest.TestCase):
         shutil.copytree(self.rendered / "alertmanager", config)
         (config / "templates").mkdir()
         shutil.copy(ROOT / "roles/alertmanager/files/slack.tmpl", config / "templates")
-        check = docker("run", "--rm", "-u", f"{os.getuid()}", "--mount", f"type=bind,src={config},dst=/etc/alertmanager,readonly", "--entrypoint", "amtool", image,
+        check = docker("run", "--rm", *limits("alertmanager"), "-u", f"{os.getuid()}", "--mount", f"type=bind,src={config},dst=/etc/alertmanager,readonly", "--entrypoint", "amtool", image,
                        "check-config", "/etc/alertmanager/alertmanager.yml", check=False)  # fmt: skip
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         # Warnings (a tunnel, an exposed listener) reach Slack without the mention that
@@ -217,13 +226,13 @@ class MonitoringImages(unittest.TestCase):
             (["alertname=EgressTunnelRunning", "severity=warning", "host=n1"], "slack"),
             (["alertname=HostDown", "severity=critical", "host=n1"], "slack-critical"),
         ):
-            route = docker("run", "--rm", "-u", f"{os.getuid()}", "--mount", f"type=bind,src={config},dst=/etc/alertmanager,readonly", "--entrypoint", "amtool",
+            route = docker("run", "--rm", *limits("alertmanager"), "-u", f"{os.getuid()}", "--mount", f"type=bind,src={config},dst=/etc/alertmanager,readonly", "--entrypoint", "amtool",
                            image, "config", "routes", "test", "--config.file=/etc/alertmanager/alertmanager.yml", *labels,
                            check=False)  # fmt: skip
             self.assertEqual(route.stdout.strip(), receiver, route.stdout + route.stderr)
         with Container(
             image, 9093, "--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/tmp/data",
-            mounts=[f"type=bind,src={config},dst=/etc/alertmanager,readonly"],
+            mounts=[f"type=bind,src={config},dst=/etc/alertmanager,readonly"], limits=limits("alertmanager"),
         ) as am:  # fmt: skip
             wait_http(am.url + "/-/ready")
 
@@ -255,7 +264,7 @@ class MonitoringImages(unittest.TestCase):
                 "commonAnnotations": {"description": "No scrape for 5 minutes."}, "externalURL": "http://am",
             }))  # fmt: skip
             with self.subTest(case=name):
-                out = docker("run", "--rm", "-u", f"{os.getuid()}", "--network", "none",
+                out = docker("run", "--rm", *limits("alertmanager"), "-u", f"{os.getuid()}", "--network", "none",
                              "--mount", f"type=bind,src={data},dst=/t,readonly", "--entrypoint", "amtool", image,
                              "template", "render", "--template.glob=/t/slack.tmpl", f"--template.data=/t/{name}.json",
                              '--template.text={{ template "slack.title" . }} || {{ template "slack.text" . }}',
@@ -284,6 +293,7 @@ class MonitoringImages(unittest.TestCase):
                 f"type=bind,src={etc},dst=/etc/grafana,readonly",
                 f"type=bind,src={data},dst=/var/lib/grafana",
             ],
+            limits=limits("grafana"),
         ) as grafana:
             wait_http(grafana.url + "/api/health")
             auth = f"{default('grafana', 'grafana_cfg_user')}:{TEST_PASSWORD}"
@@ -307,7 +317,7 @@ class MonitoringImages(unittest.TestCase):
         shutil.copy(counters, copy)
         copy.chmod(0o644)
         # The unit's own mount and arguments (tasks/present.yml, Run dcgm-exporter), then the check.
-        check = docker("run", "--rm", "--mount", f"type=bind,src={copy},dst=/etc/dcgm-exporter/custom-counters.csv,readonly", image,
+        check = docker("run", "--rm", *limits("nvidia-dcgm-exporter"), "--mount", f"type=bind,src={copy},dst=/etc/dcgm-exporter/custom-counters.csv,readonly", image,
                        "--collectors", "/etc/dcgm-exporter/custom-counters.csv",
                        "--address", f":{default('prometheus_paths', 'dcgm_exporter_port')}",
                        "config", "validate", check=False)  # fmt: skip

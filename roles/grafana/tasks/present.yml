@@ -94,6 +94,8 @@
       description: Grafana
       image: "{{ grafana_container }}"
       options: [--network host]
+      cpus: "{{ grafana_max_cpu }}"
+      memory: "{{ grafana_max_memory }}"
       mounts:
         - {src: "{{ grafana_config_dir }}", dst: /etc/grafana, readonly: true}
         - {src: "{{ grafana_data_dir }}", dst: /var/lib/grafana}

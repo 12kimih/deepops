@@ -45,6 +45,19 @@ class Molecule(unittest.TestCase):
         self.assertLessEqual(set(platform.get("capabilities", [])), {"SYS_ADMIN", "SYS_PTRACE"})
         self.assertNotIn("network_mode", platform)
 
+    def test_the_platform_takes_only_the_run_s_share(self):
+        """Docker starts the container outside the slice of whoever runs the test, so
+        unlimited it took every CPU and the memory from the logins beside it."""
+        text = BASE.read_text()
+        self.assertIn("cpus: ${DEEPOPS_MOLECULE_CPUS:-", text)
+        self.assertRegex(
+            text,
+            r'memory: "\$\{DEEPOPS_MOLECULE_MEMORY:-(\w+)\}"\n *memory_swap: "\$\{DEEPOPS_MOLECULE_MEMORY:-\1\}"',
+        )
+        runner = (ROOT / "scripts/deepops/molecule.py").read_text()
+        self.assertIn('cpus.usable(("DEEPOPS_MOLECULE_CPUS",))', runner)
+        self.assertIn("DEEPOPS_MOLECULE_CPUS=usable", runner)
+
     def test_scenarios_state_only_what_they_add(self):
         scenarios = tracked("roles/*/molecule/*/molecule.yml")
         self.assertGreater(len(scenarios), 20)

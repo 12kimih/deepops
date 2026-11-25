@@ -23,6 +23,12 @@ ExecStart=/usr/bin/docker run --rm --name %n --label {{ deepops_container_label 
 {% for option in _container_service.options %}
   {{ option }} \
 {% endfor %}
+{% if _container_service.cpus | string %}
+  --cpus={{ _container_service.cpus }} \
+{% endif %}
+{% if _container_service.memory | string %}
+  --memory={{ _container_service.memory }} --memory-swap={{ _container_service.memory }} \
+{% endif %}
 {% for name, value in _container_service.env | dictsort %}
   --env {{ (name ~ '=' ~ value) | systemd_exec_arg }} \
 {% endfor %}

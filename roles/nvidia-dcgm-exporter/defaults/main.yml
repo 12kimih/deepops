@@ -15,4 +15,7 @@ dcgm_exporter_service_enabled: true
 
 has_gpus: false
 
+# The container's CPUs and memory (Docker's --cpus and --memory, roles/container_service);
+# "" for no limit.
 dcgm_exporter_max_cpu: "0.5"
+dcgm_exporter_max_memory: "1g"

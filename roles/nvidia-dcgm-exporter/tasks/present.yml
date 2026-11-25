@@ -53,7 +53,9 @@
       unit: "{{ dcgm_exporter_svc_name }}"
       description: NVIDIA DCGM Exporter
       image: "{{ dcgm_exporter_container }}"
-      options: [--device nvidia.com/gpu=all, --cap-add=SYS_ADMIN, "--cpus={{ dcgm_exporter_max_cpu }}", --network host]
+      options: [--device nvidia.com/gpu=all, --cap-add=SYS_ADMIN, --network host]
+      cpus: "{{ dcgm_exporter_max_cpu }}"
+      memory: "{{ dcgm_exporter_max_memory }}"
       # --device nvidia.com/gpu=all reads the CDI specification, which this unit
       # writes at boot (roles/nvidia_container_toolkit).
       after: [nvidia-cdi-refresh.service]
