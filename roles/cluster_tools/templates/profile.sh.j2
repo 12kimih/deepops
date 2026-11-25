@@ -9,3 +9,14 @@
 {% set rest = e.login[2:] if e.login.startswith('~/') else e.login %}
 [ -n {{ '"${' ~ e.name ~ ':-}"' }} ] || export {{ e.name }}={{ '"$HOME"/' if e.login.startswith('~/') else '' }}{{ rest | quote }}
 {% endfor %}
+{% if user_environment_thread_variables %}
+# Thread counts (user_environment_thread_variables): the CPUs this login may use, from
+# cluster_tools.cpus. CLUSTER_CPUS keeps the number, so a job started from here tells a
+# value set here from one the user chose (roles/slurm's task prolog).
+if [ -x {{ user_environment_cpus_command }} ] && CLUSTER_CPUS=$({{ user_environment_cpus_command }} 2>/dev/null); then
+    export CLUSTER_CPUS
+{% for name in user_environment_thread_variables %}
+    [ -n {{ '"${' ~ name ~ ':-}"' }} ] || export {{ name }}="$CLUSTER_CPUS"
+{% endfor %}
+fi
+{% endif %}

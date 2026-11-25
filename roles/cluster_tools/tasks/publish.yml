@@ -114,6 +114,22 @@
   loop_control:
     label: "{{ cluster_tools_bin_dir }}/{{ item.dest }}"
 
+# The thread counts' command (cluster_tools.cpus), which the profile.d files and the
+# task prolog run.
+- name: Install the command the thread counts come from
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command: {dest: "{{ user_environment_cpus_command }}", module: cluster_tools.cpus}
+  when: user_environment_thread_variables | length > 0
+
+- name: Remove the command the thread counts come from
+  ansible.builtin.file:
+    path: "{{ user_environment_cpus_command }}"
+    state: absent
+  when: user_environment_thread_variables | length == 0
+
 - name: Publish the shell environment defaults, for sh and csh
   ansible.builtin.template:
     src: "profile.{{ item }}.j2"
@@ -122,14 +138,14 @@
     group: root
     mode: "0644"
   loop: [sh, csh]
-  when: cluster_tools_profile_entries | length > 0
+  when: cluster_tools_profile_entries | length > 0 or user_environment_thread_variables | length > 0
 
 - name: Remove the shell environment defaults
   ansible.builtin.file:
     path: "/etc/profile.d/{{ cluster_tools_profile_name }}.{{ item }}"
     state: absent
   loop: [sh, csh]
-  when: cluster_tools_profile_entries | length == 0
+  when: cluster_tools_profile_entries | length == 0 and user_environment_thread_variables | length == 0
 
 # Each file keeps its mode from the source, so an example job script stays runnable;
 # a fixed 0644 took the execute bit off every one.

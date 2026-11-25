@@ -25,3 +25,15 @@ user_environment_defaults:
 # drops it. Tool defaults belong here too (SINFO_FORMAT, SQUEUE_FORMAT: see `man sinfo`): unlike an
 # alias, the environment reaches job scripts and remote commands.
 user_environment: {}
+
+# Thread counts: libraries that size their thread pool by the machine (OpenMP, MKL,
+# OpenBLAS, Python's os.cpu_count() from 3.13; GNU nproc reads OMP_NUM_THREADS) would
+# start one thread per CPU of the node, far more than a login's CPU quota or a job
+# worker's share, and be throttled. Each is set to what cluster_tools.cpus gives: a
+# login's usable CPUs (roles/cluster_tools' profile.d), a job worker's share (roles/slurm's
+# task prolog: --cpus-per-task, else the job's CPUs on the node over its tasks or GPUs
+# there). CLUSTER_CPUS carries the number set, so a job replaces the value its login
+# set and keeps one the user chose. A value the user set wins; [] sets none.
+user_environment_thread_variables: [OMP_NUM_THREADS, MKL_NUM_THREADS, OPENBLAS_NUM_THREADS, PYTHON_CPU_COUNT]
+# The command that prints them (cluster_tools.cpus; --job for a task's worker).
+user_environment_cpus_command: /usr/local/libexec/cluster-cpus
