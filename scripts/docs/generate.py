@@ -20,6 +20,8 @@ Generators:
   components            every component of the registry (roles/deploy_defaults/vars/main.yml):
                         its role, the switches and groups that place it, what it needs
                         and whether its removal is explicit
+  bot-subcommands       the cluster bot's subcommands (cluster_bot.commands
+                        SUBCOMMANDS), with the default command
 
 Usage: generate.py [--check]   (--check reports stale blocks and exits 1)
 """
@@ -172,12 +174,21 @@ def gen_components(_arg):
     return "\n".join(rows) + "\n"
 
 
+def gen_bot_subcommands(_arg):
+    sys.path.insert(0, str(ROOT / "roles" / "cluster_bot" / "files"))
+    from cluster_bot import commands
+
+    command = defaults("cluster_bot")["cluster_bot_command"]
+    return "\n".join(commands.doc_lines(command)) + "\n"
+
+
 GENERATORS = {
     "components": gen_components,
     "versions": gen_versions,
     "role-variables": gen_role_variables,
     "role-tree": gen_role_tree,
     "tree": gen_tree,
+    "bot-subcommands": gen_bot_subcommands,
 }
 
 

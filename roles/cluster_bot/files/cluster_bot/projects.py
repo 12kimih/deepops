@@ -1,6 +1,6 @@
 """Collaboration folder requests as a feature of the request engine: every change is a
 pull request on the roster's `projects` (plugins/filter/people.py), which an
-administrator merges and deploys, as for /join and /leave.
+administrator merges and deploys, as for the join and leave requests.
 
     ProjectFeature(repo, people, settings)
 

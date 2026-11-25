@@ -2,8 +2,8 @@
 # Hourly Slurm GPU usage report to Slack, and nudges for jobs whose GPUs sit idle, a
 # weekly per-person summary of GPU-hours held and left idle, and a daily disk usage
 # report. Runs on a host with the Slurm client commands and access to Prometheus. No-op
-# until the Slack bot token (slack_bot_token in roles/slack_defaults; scopes chat:write,
-# im:write, users:read.email) is set.
+# until the Slack bot token (slack_bot_token in roles/slack_defaults) is set; the app's
+# scopes are the generated manifest's (cluster_bot.commands API_SCOPES).
 
 # present or absent (docs/deepops/component-state.md); a deploy sets it from
 # deepops_components.

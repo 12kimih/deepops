@@ -43,7 +43,7 @@ def home(login, muted, features, command="/cluster", help_channel="", admin_grou
     blocks += [
         {"type": "divider"},
         {"type": "section", "text": {"type": "mrkdwn", "text":
-            f"*잡 알림*: {state}\n`--mail-type=END,FAIL`을 적은 잡이 끝나면 DM이 옵니다 (10분 안의 알림은 한 메시지로)."},
+            f"*잡 알림*: {state}\n`--mail-type=END,FAIL`을 적은 잡이 끝나면 DM이 옵니다 (짧은 사이에 생긴 알림은 한 메시지로)."},
          "accessory": button("알림 켜기" if muted else "알림 끄기", "home.notices", "on" if muted else "off")},
     ]  # fmt: skip
     blocks.append(

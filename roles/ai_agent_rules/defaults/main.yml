@@ -17,6 +17,8 @@ ai_agent_rules_sha256: ""
 ai_agent_rules_claude_file: /etc/claude-code/CLAUDE.md
 # This role owns the whole file: Codex admin requirements belong in this role.
 ai_agent_rules_codex_file: /etc/codex/requirements.toml
-# The file must start with this line, and stay under Codex's instruction limit.
+# The file must start with this line, and stay under Codex's instruction limit. The user
+# docs write it (cluster-docs scripts/agent_rules.py MARKER): a contract between the
+# repositories, held equal on both sides; change it here first, then there.
 ai_agent_rules_marker: "<!-- cluster-agent-rules -->"
 ai_agent_rules_max_bytes: 24000
