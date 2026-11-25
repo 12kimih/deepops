@@ -25,7 +25,6 @@ import os
 import sys
 import shutil
 import subprocess
-import tempfile
 import time
 import unittest
 import urllib.error
@@ -38,6 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import unrecorded  # noqa: E402
+import local_scratch  # noqa: E402
 from ansible_yaml import role_defaults  # noqa: E402
 
 ANSIBLE = ROOT / ".venv" / "bin" / "ansible-playbook"
@@ -117,18 +117,13 @@ class Container:
 class MonitoringImages(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # The Docker daemon reads a bind mount's source in its own mount namespace, where
-        # a login's own /tmp (roles/login_private_dirs) is not: under the home it is the
-        # same directory for both.
-        cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "deepops-tests"
-        cache.mkdir(parents=True, exist_ok=True)
-        cls.tmp = Path(tempfile.mkdtemp(prefix="monitoring-smoke-", dir=cache))
-        cls.tmp.chmod(0o700)
+        # Bind-mounted into the containers: where the Docker daemon sees it too.
+        cls.tmp = local_scratch.directory("monitoring-smoke", docker=True)
         cls.render()
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(cls.tmp, ignore_errors=True)
+        local_scratch.remove(cls.tmp)
 
     @classmethod
     def render(cls):

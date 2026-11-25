@@ -18,6 +18,7 @@ include site must include publicly (public: true); one that differs either way m
 resolved with a set_fact before the include.
 """
 
+import atexit
 import os
 import re
 import sys
@@ -29,6 +30,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 import unrecorded  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import local_scratch  # noqa: E402
 from repo_scan import ansible_files, module, tasks, tracked  # noqa: E402
 
 # Ansible's own defaults, not the repository's ansible.cfg (whose settings and
@@ -39,7 +41,10 @@ os.environ["ANSIBLE_ROLES_PATH"] = str(ROOT / "roles")
 os.environ["ANSIBLE_FILTER_PLUGINS"] = str(ROOT / "plugins" / "filter")
 os.environ["ANSIBLE_ACTION_PLUGINS"] = str(ROOT / "plugins" / "action")
 os.environ["ANSIBLE_COLLECTIONS_PATH"] = str(ROOT / "collections")
-os.environ["ANSIBLE_LOCAL_TEMP"] = str(Path.home() / ".cache" / "deepops" / "ansible-tmp")
+# Ansible's own default is ~/.ansible/tmp, on a login node the shared home.
+_LOCAL_TEMP = local_scratch.directory("ansible-tmp")
+atexit.register(local_scratch.remove, _LOCAL_TEMP)
+os.environ["ANSIBLE_LOCAL_TEMP"] = str(_LOCAL_TEMP)
 
 from ansible.inventory.manager import InventoryManager  # noqa: E402
 from ansible.parsing.dataloader import DataLoader  # noqa: E402
