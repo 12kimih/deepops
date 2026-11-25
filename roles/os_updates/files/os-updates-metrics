@@ -79,6 +79,30 @@ packages=$( { apt list --installed 2>/dev/null | awk -F/ '/\[installed,local\]/ 
         $1 ~ /^.i/ { name = $2; sub(/:.*/, "", name); gsub(/\\/, "\\\\", $3); gsub(/"/, "\\\"", $3);
         printf "os_updates_package_info{package=\"%s\",version=\"%s\",source=\"%s\"} 1\n", $2, $3,
                (name in local) ? "local" : "repo" }')
+# What deepops installed, from the host's component record (roles/component_record): each
+# component's recorded version, and which component installed each package, so an alert
+# on a package or a component names the playbook that brings its hosts level. The units
+# name the record (deepops_component_record); none there, no series.
+record=${OS_UPDATES_COMPONENT_RECORD:-}
+components=$([ -n "$record" ] && python3 - "$record" 2>/dev/null <<'PY' || true
+import json, sys
+def esc(s):
+    return str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+except (OSError, ValueError):
+    sys.exit(0)
+for name, entry in sorted((data.get("components") or {}).items()):
+    if isinstance(entry, dict) and entry.get("state") == "present":
+        print(f'os_updates_component_info{{component="{esc(name)}",version="{esc(entry.get("version", ""))}"}} 1')
+for item, owners in sorted((data.get("items") or {}).items()):
+    kind, _, package = item.partition(":")
+    if kind == "package":
+        for name in owners:
+            print(f'os_updates_package_component_info{{package="{esc(package)}",component="{esc(name)}"}} 1')
+PY
+)
 tmp=$(mktemp "$state/.os-updates.XXXXXX")
 cat > "$tmp" <<METRICS
 # HELP os_updates_pending_packages Packages a full upgrade would install or change.
@@ -103,6 +127,11 @@ os_updates_apt_ok $apt_ok
 # HELP os_updates_package_info An installed package and its version (value always 1).
 # TYPE os_updates_package_info gauge
 $packages
+# HELP os_updates_component_info A component deepops installed and its recorded version (value always 1).
+# TYPE os_updates_component_info gauge
+# HELP os_updates_package_component_info A package and the component that installed it (value always 1).
+# TYPE os_updates_package_component_info gauge
+$components
 # HELP os_updates_metrics_timestamp_seconds When these metrics were measured.
 # TYPE os_updates_metrics_timestamp_seconds gauge
 os_updates_metrics_timestamp_seconds $now

@@ -64,23 +64,49 @@ groups:
           summary: "apt on {{ $labels.host }} cannot plan an upgrade, so its pending-update counts mean nothing"
           description: "`apt-get -s dist-upgrade` on the host shows why (broken sources, held or conflicting packages)."
       # Hosts drift apart between maintenance windows: an update one node took and
-      # another held back, a package or kernel changed by hand. Unattended upgrades land
-      # on each node at its own time, so a difference counts once it outlasts a day.
-      # (roles/maintenance consistency.yml is the same comparison, run on demand.) A package
-      # no apt source offers (source="local": a .deb installed from a URL) is levelled by the
-      # role that installs it, not by an upgrade.
+      # another held back, a package or kernel changed by hand, a component's playbook
+      # run on some of its hosts only. Unattended upgrades land on each node at its own
+      # time, so a difference counts once it outlasts a day. (roles/maintenance
+      # consistency.yml is the same comparison, run on demand.) A package no apt source
+      # offers (source="local": a .deb installed from a URL) is levelled by the component
+      # that installs it (the hosts' component records name it; components.yml its
+      # playbook), not by an upgrade. A package whose component's recorded versions
+      # differ is that component's alert, below: one cause, one alert.
       - alert: OsPackageVersionsDiffer
-        expr: count by (package, source) (count by (package, version, source) (os_updates_package_info)) > 1
+        expr: |
+          count by (package, source) (count by (package, version, source) (os_updates_package_info)) > 1
+          unless on (package) max by (package) (
+            os_updates_package_component_info
+            * on (component) group_left ()
+            (count by (component) (count by (component, version) (os_updates_component_info{version!=""})) > 1)
+          )
         for: 26h
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.package }} is installed at {{ $value }} different versions across the hosts"
           description: >-
-            `count by (version, host) (os_updates_package_info{package="{{ $labels.package }}"})`
-            shows which host has which; {{ if eq $labels.source "local" }}no apt source offers it,
-            so an upgrade cannot change it: rerun the role that installs it (`grep -rln
-            {{ $labels.package }} roles/`).{{ else }}`ansible-playbook -K
-            playbooks/utilities/apt-upgrade.yml` brings them level.{{ end }}
+            {{ range printf "max by (host, version) (os_updates_package_info{package=%q})" $labels.package | query | sortByLabel "host" }}
+            {{- .Labels.host }}: {{ .Labels.version }}; {{ end -}}
+            {{ if eq $labels.source "local" }}No apt source offers it, so an upgrade cannot change it:
+            {{ range printf "max by (component, playbook) (deepops:component_playbook:info and on (component) os_updates_package_component_info{package=%q})" $labels.package | query }}
+            {{- .Labels.component }} installs it, and `ansible-playbook -K {{ .Labels.playbook }}` brings its hosts level.{{ else -}}
+            no host's component record names what installed it (a .deb installed by hand?).{{ end }}
+            {{- else }}`ansible-playbook -K playbooks/utilities/apt-upgrade.yml` brings them level.{{ end }}
+      # A component's playbook run on some of its hosts (a --limit) leaves the others at
+      # the version they had; their component records say so.
+      - alert: ComponentVersionsDiffer
+        expr: count by (component) (count by (component, version) (os_updates_component_info{version!=""})) > 1
+        for: 26h
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.component }} is at {{ $value }} different versions across the hosts"
+          description: >-
+            {{ range printf "max by (host, version) (os_updates_component_info{component=%q})" $labels.component | query | sortByLabel "host" }}
+            {{- .Labels.host }}: {{ .Labels.version }}; {{ end -}}
+            A run limited to some of its hosts left the others behind:
+            {{ range printf "deepops:component_playbook:info{component=%q}" $labels.component | query }}
+            {{- "" }}`ansible-playbook -K {{ .Labels.playbook }}`{{ end }} converges every host it belongs on
+            (one already there changes nothing).
       - alert: OsKernelsDiffer
         expr: count(count by (release) (max by (host, release) (node_uname_info))) > 1
         for: 26h

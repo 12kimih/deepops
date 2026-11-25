@@ -59,6 +59,7 @@ step "Galaxy collections and roles match roles/requirements.yml" "${python}" scr
 step "style is normalized" "${python}" scripts/deepops/normalize-ansible-style.py --check .
 step "generated docs are current" "${python}" scripts/docs/generate.py --check
 step "generated dashboards are current" "${python}" scripts/dashboards/build.py --check
+step "generated component playbook rules are current" "${python}" scripts/deepops/component_playbooks.py --check
 step "role templates parse as Jinja" "${python}" scripts/deepops/check-template-syntax.py
 step "people rosters are valid (config.example, and config if present)" "${python}" scripts/deepops/people.py check
 step "configs state only what differs, nothing set goes unread, docs name real paths and settings" "${python}" scripts/deepops/config_lint.py

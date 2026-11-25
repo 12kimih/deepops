@@ -76,6 +76,12 @@ or a run from another operator's machine.
   (`end_role`). After removal the component's entry goes.
 - **Check mode.** absent previews (host_baseline already lists what apt would purge)
   and nothing writes the record under `--check`.
+- **Seen by Prometheus.** roles/os_updates publishes each record daily
+  (`os_updates_component_info`, `os_updates_package_component_info`), and
+  `scripts/deepops/component_playbooks.py` generates each component's playbook as a
+  series (`roles/prometheus/files/rules/components.yml`): a component at two versions
+  across its hosts (a run limited to some of them) or a local package at two versions
+  alerts with each host's version and the playbook that brings them level.
 
 ## One desired-state map
 

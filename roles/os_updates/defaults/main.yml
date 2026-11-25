@@ -48,7 +48,10 @@ os_updates_allowed_holds: []
 # (os_updates_pending_packages{kind="security"|"all"}, os_updates_security_pending_since_seconds,
 # os_updates_reboot_required and _since_seconds, os_updates_dpkg_problems for an
 # interrupted dpkg, os_updates_apt_ok when apt cannot simulate, os_updates_package_info
-# per installed package for the fleet drift alert), measured daily, after every dpkg run
+# per installed package for the fleet drift alert, and from the host's component record
+# os_updates_component_info (each component's version) and os_updates_package_component_info
+# (each package's component), so the drift alerts name the playbook that levels it),
+# measured daily, after every dpkg run
 # and at every boot (the kept state from /var/lib/os-updates first), so updates that wait for a maintenance
 # window cannot pile up unseen. Debian family. false removes the timer.
 os_updates_metrics: true
