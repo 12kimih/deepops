@@ -62,6 +62,83 @@ def user_environment(defaults, site=None):
     return out
 
 
+# Each kind of knob (user_environment_cpu_knobs): the variable that carries the number a
+# login or a job set, so the next one tells a value it may replace from a user's own.
+KINDS = {"threads": "CLUSTER_CPUS", "build": "CLUSTER_BUILD_JOBS"}
+
+
+def cpu_knobs(knobs):
+    """KNOBS checked: [{name, kind, value}], value "{n}" unless given."""
+    out = []
+    for knob in knobs or []:
+        name, kind, value = str(knob.get("name", "")), knob.get("kind"), str(knob.get("value", "{n}"))
+        if not NAME.fullmatch(name) or name in KINDS.values():
+            raise ValueError(f"user_environment_cpu_knobs: {name!r} is not a variable this table may set")
+        if kind not in KINDS:
+            raise ValueError(
+                f"user_environment_cpu_knobs: {name}: kind {kind!r} is not one of {sorted(KINDS)}"
+            )
+        if "'" in value or '"' in value or "$" in value or "`" in value:
+            raise ValueError(
+                f"user_environment_cpu_knobs: {name}: value {value!r} must be plain text with {{n}}"
+            )
+        out.append({"name": name, "kind": kind, "value": value})
+    names = [k["name"] for k in out]
+    if len(set(names)) != len(names):
+        raise ValueError("user_environment_cpu_knobs: a name is listed twice")
+    return out
+
+
+def _with(value, number):
+    return value.replace("{n}", number)
+
+
+def cpu_knob_lines(knobs, shell, command):
+    """The lines that set KNOBS (user_environment_cpu_knobs) from COMMAND (cluster_tools.cpus):
+    "sh" and "csh" for a login's profile.d, "prolog" for a Slurm task prolog part (bash,
+    printing export lines). Only a variable not set yet, or in a job one still carrying the
+    value its login set, is set: a user's own value wins."""
+    knobs = cpu_knobs(knobs)
+    if not knobs:
+        return []
+    if shell == "sh":
+        lines = [f"if [ -x {command} ] && CLUSTER_CPUS=$({command} 2>/dev/null); then",
+                 "    CLUSTER_BUILD_JOBS=$CLUSTER_CPUS",
+                 "    export CLUSTER_CPUS CLUSTER_BUILD_JOBS"]  # fmt: skip
+        for k in knobs:
+            lines.append(
+                f'    [ -n "${{{k["name"]}:-}}" ] || export {k["name"]}="{_with(k["value"], "$" + KINDS[k["kind"]])}"'
+            )
+        return lines + ["fi"]
+    if shell == "csh":
+        lines = [f"if ( -x {command} ) then",
+                 f"    set _cluster_cpus = `{command}`",
+                 '    if ( "$_cluster_cpus" != "" ) then',
+                 '        setenv CLUSTER_CPUS "$_cluster_cpus"',
+                 '        setenv CLUSTER_BUILD_JOBS "$_cluster_cpus"']  # fmt: skip
+        for k in knobs:
+            value = _with(k["value"], "$" + KINDS[k["kind"]])
+            lines.append(f'        if (! $?{k["name"]}) setenv {k["name"]} "{value}"')
+            lines.append(f'        if ("${k["name"]}" == "") setenv {k["name"]} "{value}"')
+        return lines + ["    endif", "    unset _cluster_cpus", "endif"]
+    if shell == "prolog":
+        number = {"threads": "$threads", "build": "$build"}
+        lines = [f"set -- $({command} --job 2>/dev/null) || exit 0",
+                 'threads=${1:-} build=${2:-}',
+                 '[ -n "$threads" ] && [ -n "$build" ] || exit 0']  # fmt: skip
+        for k in knobs:
+            login = _with(k["value"], "${" + KINDS[k["kind"]] + ":-}")
+            lines.append(
+                f'case "${{{k["name"]}:-}}" in \'\'|"{login}") echo "export {k["name"]}={_with(k["value"], number[k["kind"]])}" ;; esac'
+            )
+        return lines + ['echo "export CLUSTER_CPUS=$threads"', 'echo "export CLUSTER_BUILD_JOBS=$build"']
+    raise ValueError(f"cpu_knob_lines: shell {shell!r} is not sh, csh or prolog")
+
+
 class FilterModule:
     def filters(self):
-        return {"user_environment": user_environment}
+        return {
+            "user_environment": user_environment,
+            "cpu_knobs": cpu_knobs,
+            "cpu_knob_lines": cpu_knob_lines,
+        }

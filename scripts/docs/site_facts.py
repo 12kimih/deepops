@@ -44,8 +44,10 @@ Facts:
             times disk_quota_inodes_per_tib) and its warn level (cluster_user_warn_fraction)
   dates     the site's announced dates (config schedule.yml, name: YYYY-MM-DD), so a
             page states each once; only date values pass
-  threads   the thread count variables a login and a job get (user_environment_thread_variables;
-            the person's own value wins)
+  threads   the knobs that size work by the machine a login and a job get
+            (user_environment_cpu_knobs): each one's name, kind (threads: a worker's
+            share; build: the job's CPUs on the node), value ({n} the number), what reads
+            it and its own default; the person's own value wins
   environment
             the users' environment (user_environment over user_environment_defaults,
             roles/user_environment_defaults), each {name, login, job} as the profile.d
@@ -472,6 +474,17 @@ def paths(settings_):
     }
 
 
+def threads(knobs):
+    """The knobs (user_environment_cpu_knobs) as the docs' table lists them, checked as the
+    profile.d files and the task prolog render them."""
+    _user_env.cpu_knobs(knobs)
+    return [
+        {"name": k["name"], "kind": k["kind"], "value": str(k.get("value", "{n}")),
+         "reader": k.get("reader", ""), "default": str(k.get("default", ""))}
+        for k in knobs
+    ]  # fmt: skip
+
+
 def login_limits(config, settings_):
     """{cpus, memory_gib, tasks, private_dirs}: the user-.slice limits the login nodes
     get (cluster_tools_user_slice_limits; group_vars/slurm-login.yml over the others),
@@ -537,7 +550,7 @@ def facts(config):
         "dates": schedule(config),
         "quota": quota_limits(config, s),
         "environment": environment(config),
-        "threads": {"variables": s.get("user_environment_thread_variables") or []},
+        "threads": {"variables": threads(s.get("user_environment_cpu_knobs") or [])},
         "cluster": cluster(config),
         "chat": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "bot": bot(s),

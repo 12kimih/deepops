@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
-# Thread counts inside a job (user_environment_thread_variables,
-# roles/user_environment_defaults): each worker's share of the job's CPUs on the node,
-# from cluster_tools.cpus (--cpus-per-task, else the CPUs over the tasks or GPUs here).
-# Set when the task has none or carries the value its login set (CLUSTER_CPUS, from
+# The knobs that size work by the machine, inside a job (user_environment_cpu_knobs,
+# roles/user_environment_defaults): threads get each worker's share of the job's CPUs on
+# the node, builds the job's CPUs there, from cluster_tools.cpus. Set when the task has
+# none or carries the value its login set (CLUSTER_CPUS, CLUSTER_BUILD_JOBS, from
 # /etc/profile.d); a value the user chose is left alone.
-{% if user_environment_thread_variables %}
-n=$({{ user_environment_cpus_command }} --job 2>/dev/null) || exit 0
-{% for name in user_environment_thread_variables %}
-case {{ '"${' ~ name ~ ':-}"' }} in
-    ''|"${CLUSTER_CPUS:-}") echo "export {{ name }}=$n" ;;
-esac
+{% for line in user_environment_cpu_knobs | cpu_knob_lines('prolog', user_environment_cpus_command) %}
+{{ line }}
 {% endfor %}
-echo "export CLUSTER_CPUS=$n"
-{% endif %}

@@ -22,7 +22,8 @@ sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import in_tree  # noqa: E402
 from repo_scan import tracked  # noqa: E402
 
-user_environment = in_tree.load("plugins/filter/user_environment.py").user_environment
+_filters = in_tree.load("plugins/filter/user_environment.py")
+user_environment = _filters.user_environment
 spec = importlib.util.spec_from_file_location("site_facts", ROOT / "scripts/docs/site_facts.py")
 site_facts = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(site_facts)
@@ -39,7 +40,7 @@ PROFILE_SH = "roles/cluster_tools/templates/profile.sh.j2"
 PROFILE_CSH = "roles/cluster_tools/templates/profile.csh.j2"
 PROLOG = "roles/slurm/templates/etc/slurm/task-prolog.d/60-user-environment"
 THREADS = "roles/slurm/templates/etc/slurm/task-prolog.d/65-thread-counts"
-THREAD_VARIABLES = DEFAULTS["user_environment_thread_variables"]
+KNOBS = DEFAULTS["user_environment_cpu_knobs"]
 # The only files that may set a name of the list: the list, its function, its renderers.
 OWNERS = {
     "roles/user_environment_defaults/defaults/main.yml",
@@ -50,7 +51,7 @@ OWNERS = {
 }
 
 
-def render(template, entries, cpus_command="/nonexistent", thread_variables=THREAD_VARIABLES):
+def render(template, entries, cpus_command="/nonexistent", knobs=KNOBS):
     """TEMPLATE as Ansible renders it (trim_blocks), with ENTRIES."""
     env = Environment(  # noqa: S701 (shell, not HTML)
         loader=FileSystemLoader(str(ROOT)),
@@ -59,13 +60,14 @@ def render(template, entries, cpus_command="/nonexistent", thread_variables=THRE
         keep_trailing_newline=True,
     )
     env.filters["quote"] = shlex.quote
+    env.filters["cpu_knob_lines"] = _filters.cpu_knob_lines
     profile = [e for e in entries if e["login"]]
     return env.get_template(template).render(
         ansible_managed="test",
         cluster_tools_profile_name="z10-test",
         cluster_tools_profile_entries=profile,
         user_environment_entries=entries,
-        user_environment_thread_variables=thread_variables,
+        user_environment_cpu_knobs=knobs,
         user_environment_cpus_command=cpus_command,
     )
 
@@ -158,31 +160,41 @@ class Rendered(unittest.TestCase):
         self.assertTrue(all(line.match(x) for x in self.prolog()))
 
 
-class ThreadCounts(unittest.TestCase):
-    """The thread counts (user_environment_thread_variables): a login's from its usable
-    CPUs, a task's from its worker's share, the user's own kept in both."""
+class CpuKnobs(unittest.TestCase):
+    """The knobs that size work by the machine (user_environment_cpu_knobs): every one set in
+    a login from its usable CPUs and in a task from its share (threads: the worker's; build:
+    the job's on the node), the user's own kept in both."""
+
+    LOGIN, WORKER, NODE = "6", "3", "12"
 
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.command = Path(tmp.name) / "cluster-cpus"
-        # Prints 6 for a login and 3 for a job worker (--job), as cluster_tools.cpus does.
-        self.command.write_text('#!/bin/sh\n[ "$1" = --job ] && echo 3 || echo 6\n')
+        # A login's usable CPUs, or a job's worker share and CPUs on the node (--job), as
+        # cluster_tools.cpus prints them.
+        self.command.write_text(
+            f'#!/bin/sh\n[ "$1" = --job ] && echo {self.WORKER} {self.NODE} || echo {self.LOGIN}\n'
+        )
         self.command.chmod(0o755)
 
+    def want(self, n_threads, n_build):
+        n = {"threads": n_threads, "build": n_build}
+        return {k["name"]: str(k.get("value", "{n}")).replace("{n}", n[k["kind"]]) for k in KNOBS}
+
     def login(self, shell, template, **preset):
+        names = ["CLUSTER_CPUS", "CLUSTER_BUILD_JOBS", *(k["name"] for k in KNOBS)]
         script = render(template, [], str(self.command)) + "".join(
-            f"printf '%s=%s\\n' {n} \"${n}\"\n" for n in ["CLUSTER_CPUS", *THREAD_VARIABLES]
+            f"printf '%s=%s\\n' {n} \"${n}\"\n" for n in names
         )
         env = {"PATH": os.environ["PATH"], "HOME": "/h", **preset}
         out = run(shell, script, env, *(["-f"] if shell != "sh" else []))
         return dict(line.split("=", 1) for line in out.splitlines())
 
-    def test_a_login_gets_its_usable_cpus_and_keeps_the_users(self):
-        got = self.login("sh", PROFILE_SH, OMP_NUM_THREADS="2")
-        self.assertEqual(
-            got, {"CLUSTER_CPUS": "6", **{n: "6" for n in THREAD_VARIABLES}, "OMP_NUM_THREADS": "2"}
-        )
+    def test_every_knob_in_a_login_from_its_usable_cpus_and_the_users_kept(self):
+        got = self.login("sh", PROFILE_SH, OMP_NUM_THREADS="2", MAKEFLAGS="-s")
+        want = {**self.want(self.LOGIN, self.LOGIN), "OMP_NUM_THREADS": "2", "MAKEFLAGS": "-s"}
+        self.assertEqual(got, {"CLUSTER_CPUS": self.LOGIN, "CLUSTER_BUILD_JOBS": self.LOGIN, **want})
 
     @unittest.skipUnless(shutil.which("tcsh") or shutil.which("csh"), "csh not installed")
     def test_a_csh_login_the_same(self):
@@ -198,16 +210,45 @@ class ThreadCounts(unittest.TestCase):
 
     def prolog(self, **preset):
         out = run("bash", render(THREADS, [], str(self.command)), {"PATH": os.environ["PATH"], **preset})
-        return sorted(out.splitlines())
+        return dict(line.removeprefix("export ").split("=", 1) for line in out.splitlines())
 
-    def test_a_task_replaces_the_logins_value_and_keeps_the_users(self):
-        want = sorted([f"export {n}=3" for n in THREAD_VARIABLES] + ["export CLUSTER_CPUS=3"])
+    def test_every_knob_in_a_task_threads_per_worker_builds_per_node(self):
+        want = {
+            **self.want(self.WORKER, self.NODE),
+            "CLUSTER_CPUS": self.WORKER,
+            "CLUSTER_BUILD_JOBS": self.NODE,
+        }
         self.assertEqual(self.prolog(), want, "unset")
-        inherited = {"CLUSTER_CPUS": "6", **{n: "6" for n in THREAD_VARIABLES}}
-        self.assertEqual(self.prolog(**inherited), want, "the login's, inherited")
-        mine = self.prolog(**{**inherited, "OMP_NUM_THREADS": "2"})
-        self.assertNotIn("export OMP_NUM_THREADS=3", mine, "the user's own")
-        self.assertIn("export CLUSTER_CPUS=3", mine)
+        login = {
+            **self.want(self.LOGIN, self.LOGIN),
+            "CLUSTER_CPUS": self.LOGIN,
+            "CLUSTER_BUILD_JOBS": self.LOGIN,
+        }
+        self.assertEqual(self.prolog(**login), want, "the login's, inherited")
+        mine = self.prolog(**{**login, "OMP_NUM_THREADS": "2", "MAKEFLAGS": "-j1"})
+        self.assertNotIn("OMP_NUM_THREADS", mine, "the user's own")
+        self.assertNotIn("MAKEFLAGS", mine, "the user's own")
+        self.assertEqual(mine["MAX_JOBS"], self.NODE)
+
+    def test_the_table_names_kinds_and_values(self):
+        self.assertEqual(_filters.cpu_knobs(KNOBS)[0]["value"], "{n}")
+        for bad in ({"name": "X Y", "kind": "threads"}, {"name": "X", "kind": "io"},
+                    {"name": "X", "kind": "build", "value": "$(id)"}, {"name": "CLUSTER_CPUS", "kind": "threads"}):  # fmt: skip
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                _filters.cpu_knobs([bad])
+        with self.assertRaisesRegex(ValueError, "twice"):
+            _filters.cpu_knobs([{"name": "X", "kind": "threads"}] * 2)
+        self.assertTrue(
+            all(
+                k.get("reader") and k.get("default") and k.get("doc", "").startswith("https://")
+                for k in KNOBS
+            )
+        )
+
+    def test_nvcc_threads_keeps_a_flash_attn_build_within_max_jobs(self):
+        knobs = {k["name"]: k for k in KNOBS}
+        self.assertEqual((knobs["NVCC_THREADS"]["kind"], knobs["NVCC_THREADS"]["value"]), ("build", "1"))
+        self.assertEqual(knobs["MAX_JOBS"]["kind"], "build")
 
     def test_none_listed_sets_none(self):
         self.assertEqual(render(THREADS, [], str(self.command), []).count("export"), 0)

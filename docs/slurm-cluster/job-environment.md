@@ -30,23 +30,30 @@ Slurm applies to the task's environment
 skipped: a task prolog that fails cancels the task. Pyxis builds its container
 environment from the job's submitted environment, not from these exports.
 
-## Thread counts
+## Threads and builds sized to the CPUs
 
-Libraries that size their thread pool by the machine (OpenMP, MKL, OpenBLAS, Python's
-`os.cpu_count()` from 3.13, and GNU `nproc`, which reads `OMP_NUM_THREADS`) would start
-one thread per CPU of the node: far more than a login's CPU quota, or a job worker's
-share, and throttled for it. `user_environment_thread_variables`
-(`roles/user_environment_defaults`) are set from `cluster_tools.cpus`, the one count the
-repository's own tools use too:
+A library or build tool left to itself starts one thread or compiler per CPU of the node
+(OpenMP, BLAS, Rayon, Go, Python's `os.cpu_count()`, ninja under PyTorch's extension
+builds, cargo, make): far more than a login's CPU quota or a job's share, and throttled for
+it. `user_environment_cpu_knobs` (`roles/user_environment_defaults`) is the one table of
+the variables that size them: each one's kind, what reads it, its own default and the doc
+that says so, and the knobs left out on purpose. Each is set from `cluster_tools.cpus`,
+the one count the repository's own tools use too:
 
-- in a login (`/etc/profile.d`, `roles/cluster_tools`), to the CPUs the login may use: its
-  cpuset, capped by every cgroup CPU quota above it (a login node's per-person slice);
-- in a task (`task-prolog.d/65-thread-counts`), to each worker's share: `--cpus-per-task`
-  when given, else the job's CPUs on the node over its tasks there or its GPUs there,
-  whichever is more (torchrun starts one worker per GPU).
+| Kind | In a login (`/etc/profile.d`, `roles/cluster_tools`) | In a task (`task-prolog.d/65-thread-counts`) |
+|---|---|---|
+| `threads` | the CPUs the login may use: its cpuset, capped by every cgroup CPU quota above it (a login node's per-person slice) | each worker's share: `--cpus-per-task` when given, else the job's CPUs on the node over its tasks there or its GPUs there, whichever is more (torchrun starts one worker per GPU) |
+| `build` | the same | the job's CPUs on the node |
 
-`CLUSTER_CPUS` carries the number set, so the task replaces a value its login set and
-keeps one the user chose: a person's own value wins in both. `[]` sets none.
+An entry's `value` is what the variable gets, `{n}` the number (`MAKEFLAGS=-j{n}`;
+`NVCC_THREADS=1`, so flash-attn's `MAX_JOBS` compilers do not each start four threads).
+One function (`plugins/filter/user_environment.py`, `cpu_knob_lines`) writes the sh and
+csh profile files and the task prolog part from the table, and the user docs list it
+(`scripts/docs/site_facts.py`, `threads`).
+
+`CLUSTER_CPUS` and `CLUSTER_BUILD_JOBS` carry the numbers set, so a task replaces a value
+its login set and keeps one the user chose: a person's own value wins in both. `[]` sets
+none.
 
 ## Per tool
 
