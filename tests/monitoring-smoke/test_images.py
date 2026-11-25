@@ -273,13 +273,12 @@ class MonitoringImages(unittest.TestCase):
 
     def test_grafana_provisions_every_dashboard(self):
         image = default("grafana", "grafana_container")
-        etc, data = self.tmp / "grafana-etc", self.tmp / "grafana-data"
+        etc = self.tmp / "grafana-etc"
         shutil.copytree(self.rendered / "grafana", etc)
         expected = set()
         # Each role's dashboards in its own directory under grafana_dashboards_dir, which
         # lies in the configuration the container mounts at /etc/grafana.
         dashboards = etc / default("prometheus_paths", "grafana_dashboards_dir").split("}}/", 1)[-1]
-        data.mkdir()
         for folder, names in default("prometheus_paths", "grafana_dashboard_sets").items():
             (dashboards / folder).mkdir(parents=True)
             for path in (ROOT / "src/dashboards" / name for name in names):
@@ -291,11 +290,14 @@ class MonitoringImages(unittest.TestCase):
             port,
             mounts=[
                 f"type=bind,src={etc},dst=/etc/grafana,readonly",
-                f"type=bind,src={data},dst=/var/lib/grafana",
+                # Its database in memory, as on a host's local disk: on the shared home
+                # the first start's migrations (small synced writes) took 35 s alone and
+                # past two minutes beside a full check, at any CPU count; 6 s here at 1.
+                "type=tmpfs,dst=/var/lib/grafana,tmpfs-mode=1777",
             ],
             limits=limits("grafana"),
         ) as grafana:
-            wait_http(grafana.url + "/api/health")
+            wait_http(grafana.url + "/api/health", timeout=60)  # 6 s at its CPU limit
             auth = f"{default('grafana', 'grafana_cfg_user')}:{TEST_PASSWORD}"
             for _ in range(60):  # provisioning finishes shortly after the health check
                 found = json.loads(wait_http(grafana.url + "/api/search?type=dash-db", auth=auth))
