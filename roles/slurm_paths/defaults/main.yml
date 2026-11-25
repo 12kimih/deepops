@@ -107,3 +107,8 @@ job_notice_command: /usr/local/sbin/job-notice
 # Who may not submit for now and why (roles/submit_holds writes it on the controllers;
 # the rendered job_submit.lua reads it).
 slurm_submit_holds_file: "{{ slurm_config_dir }}/submit-holds"
+# QoS, accounts and members declared in one YAML file (see
+# config.example/files/slurm/accounting.yml); the controller converges the accounting
+# database to it with the slurm_accounting module (roles/slurm); the cluster bot's
+# account requests read its teams. Empty = accounting is not managed.
+slurm_accounting_file: ""

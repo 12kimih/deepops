@@ -18,8 +18,9 @@
 # on the filesystem: under noatime a file only read looks unused.
 scratch_space_state: present
 
-# The scratch filesystem's mount point on this host.
-scratch_space_root: /scratch
+# The scratch filesystem's mount point (scratch_space_root) and its stale period
+# (scratch_space_stale_days): roles/scratch_space_defaults, which the bot reads too.
+
 # The top directory's mode, root's: only the personal directories (and a collaboration
 # folders' directory) live at the top, so nobody makes a directory of their own there.
 scratch_space_root_mode: "0755"
@@ -30,7 +31,6 @@ scratch_space_mode: "{{ people_home_mode }}"
 # The cleanup: off removes the timer and stops removing (the list files stay as last
 # written); the periods are the cluster's one stale period and one grace period.
 scratch_space_purge: true
-scratch_space_stale_days: "{{ cluster_user_stale_days }}"
 scratch_space_grace_days: "{{ cluster_user_grace_days }}"
 # The collaboration folders' directory: each folder's files count to their owners.
 scratch_space_projects: "{{ scratch_space_root }}/projects"

@@ -13,7 +13,7 @@ the people_check filter, so a roster that passes here is one the deploy accepts.
 add and leave are the one way the roster is edited, by a person or by the cluster bot
 (an account request becomes a pull request of their change): add gives the next free
 UID (after the roster's, never a system account's), an account declared in the
-Slurm accounting file beside the roster (files/slurm/accounting.yml), keeps the people in order and the
+Slurm accounting file (slurm_accounting_file in the config), keeps the people in order and the
 file's comments; leave --ends sets someone's last day (they keep their account for the
 grace period, people_leave_grace_days), and leave alone makes them `status: left` at
 once with no roles or accounts, keeping the entry so the UID stays reserved. Either writes nothing unless the result passes
@@ -57,10 +57,26 @@ def edit(path, change):
     return result
 
 
+def accounting_file(config):
+    """The site's accounting file (slurm_accounting_file in CONFIG's group_vars, rendered
+    as Ansible does with CONFIG as inventory_dir), or None when the site manages none."""
+    import jinja2
+
+    value = ""
+    for name in ("all.yml", "slurm-cluster.yml"):
+        path = config / "group_vars" / name
+        if path.is_file():
+            value = (yaml.safe_load(path.read_text()) or {}).get("slurm_accounting_file", value)
+    if not value:
+        return None
+    rendered = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(value)  # noqa: S701
+    return Path(rendered.render(inventory_dir=str(config)))
+
+
 def add(path, login, account, name=None, slack=None):
-    accounting = path.parent / "files" / "slurm" / "accounting.yml"
+    accounting = accounting_file(path.parent)
     declared = None
-    if accounting.is_file():
+    if accounting is not None and accounting.is_file():
         declared = (yaml.safe_load(accounting.read_text()) or {}).get("accounts") or {}
     done = edit(path, lambda t: people.roster_add(t, login, account, name, slack, system_ids(), declared))
     if done is None:

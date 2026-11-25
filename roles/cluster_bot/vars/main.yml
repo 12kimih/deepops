@@ -74,7 +74,9 @@ _cluster_bot_cfg:
     key_file: "{{ _cluster_bot_github_key }}"
   roster:
     roster: people.yml
-    accounting: files/slurm/accounting.yml
+    # The config repository's own paths: the roster beside the inventory, and the
+    # accounting file wherever the site points it.
+    accounting: "{{ slurm_accounting_file | relpath(inventory_dir) if slurm_accounting_file | length > 0 else '' }}"
     reserved: "{{ system_accounts.values() | map(attribute='uid') | list }}"
     exclude: "{{ cluster_bot_join_exclude }}"
   ssh:
@@ -92,6 +94,7 @@ _cluster_bot_cfg:
   projects:
     deployed: "{{ shared_projects }}"
     root: "{{ shared_space_root }}/projects"
+    places: {home: "{{ shared_space_root }}", scratch: "{{ scratch_space_root }}", scratch_stale_days: "{{ scratch_space_stale_days | int }}"}
     gid_min: "{{ shared_projects_gid_min | int }}"
     reserved_gids: "{{ directory_groups | map(attribute='gid') | map('int') | list }}"
     seen: "{{ _cluster_bot_home }}/projects-seen.json"
