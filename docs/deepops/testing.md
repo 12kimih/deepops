@@ -34,6 +34,10 @@ stashed or touched (a shared clone's other edits stay put), nothing untracked in
 counts, and a fix a hook would make is shown for you to apply. To skip roles that have known issues or are
 still in development, list them under `exclude_paths` in `.ansible-lint`.
 
+Do not run a whole-file `ansible-lint --fix`: it re-serializes every file it touches
+(it has folded long commands, capitalized a Jinja filter and renamed handlers
+without their `notify:` callers). Make targeted edits and read `git diff`.
+
 ### Secrets and site data
 
 [`scripts/deepops/sensitive_guard.py`](../../scripts/deepops/sensitive_guard.py) keeps

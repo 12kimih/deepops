@@ -17,7 +17,6 @@ The role has two implementation paths:
 | Ubuntu 26.04 | DGX OS 7 software stack | No dedicated DGX OS yet; follows the DGX OS 7 (24.04) path. |
 | Red Hat Enterprise Linux 8 / Rocky Linux 8 | DGX Software for RHEL 8 | Uses the official NVIDIA repository setup RPM and DGX configuration groups. |
 | Red Hat Enterprise Linux 9 / Rocky Linux 9 | DGX Software for RHEL 9 | Uses the official NVIDIA repository setup RPM and DGX configuration groups. |
-| Red Hat Enterprise Linux 10 / Rocky Linux 10 | DGX Software for RHEL family | Uses the official NVIDIA repository setup RPM and DGX configuration groups. |
 
 The legacy DGX OS 4/5 (Ubuntu 18.04/20.04) and RHEL 7 paths have been removed; the
 role now fails on Ubuntu older than 22.04 and on RHEL-family majors older than 8.

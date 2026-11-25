@@ -316,8 +316,7 @@ class DocAnchors(unittest.TestCase):
 
 
 class DocRepeats(unittest.TestCase):
-    """A section pasted in twice: config-defaults-vs-upstream.md carried four sections
-    twice, the copies already disagreeing."""
+    """A section pasted in twice, the copies already disagreeing."""
 
     def test_a_run_of_text_seen_before_is_found(self):
         block = "".join(f"line {i}\n" for i in range(cl.DOC_REPEAT))

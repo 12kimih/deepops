@@ -17,6 +17,9 @@ Generators:
   tree:DIR              what is directly under DIR: its directories holding tracked
                         files, its submodules and its tracked files, as a tree
   role-tree             tree:roles (Galaxy's roles/galaxy left out)
+  components            every component of the registry (roles/deploy_defaults/vars/main.yml):
+                        its role, the switches and groups that place it, what it needs
+                        and whether its removal is explicit
 
 Usage: generate.py [--check]   (--check reports stale blocks and exits 1)
 """
@@ -145,7 +148,32 @@ def gen_role_tree(_arg):
     return gen_tree("roles")
 
 
+SWITCH_NAME = re.compile(r"\b([a-z][a-z0-9]*_[a-z0-9_]+)\b")
+
+
+def gen_components(_arg):
+    path = ROOT / "roles" / "deploy_defaults" / "vars" / "main.yml"
+    registry = yaml.safe_load(path.read_text(encoding="utf-8"))["deepops_component_registry"]
+    rows = ["| Component | Role | Switches | Hosts | Needs | Removal |", "|---|---|---|---|---|---|"]
+    for name, entry in registry.items():
+        rules = entry.get("rules") or []
+        switches = sorted({w for r in rules for w in SWITCH_NAME.findall(str(r.get("switch", "")))})
+        hosts = [
+            ("the first " if r.get("first") else "") + f"`{r['group']}`" for r in rules if r.get("group")
+        ]
+        rows.append("| " + " | ".join([
+            f"`{name}`",
+            f"`{entry.get('role', name)}`",
+            ", ".join(f"`{w}`" for w in switches) or "-",
+            ", ".join(dict.fromkeys(hosts)) or "-",
+            ", ".join(f"`{n}`" for n in entry.get("needs") or []) or "-",
+            entry.get("removal", "with its switch"),
+        ]) + " |")  # fmt: skip
+    return "\n".join(rows) + "\n"
+
+
 GENERATORS = {
+    "components": gen_components,
     "versions": gen_versions,
     "role-variables": gen_role_variables,
     "role-tree": gen_role_tree,

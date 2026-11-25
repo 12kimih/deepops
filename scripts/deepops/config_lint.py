@@ -130,13 +130,12 @@ def known_paths(files):
 
 def documents():
     """(shown, text, site) for each Markdown page that names deepops' paths, settings
-    and commands: deepops' own (but MODERNIZATION.md, the change log, which names what
-    was removed on purpose) and the site config's (its admin and user guides hand out
+    and commands: deepops' own and the site config's (its admin and user guides hand out
     deepops' playbooks too; config.example's are deepops' own already). `site` is None
     for deepops' pages, else (the site's own paths, its inventory's words): a site page
     also names its own files (its docs/) and hosts (-l <node>). A site page is private."""
     for doc in tracked("*.md"):
-        if doc.is_file() and doc.name != "MODERNIZATION.md":
+        if doc.is_file():
             yield str(doc.relative_to(ROOT)), doc.read_text(errors="ignore"), None
     for _, tree, private in configs():
         if not private:

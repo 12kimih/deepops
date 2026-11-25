@@ -92,6 +92,10 @@ reader writes `| default(...)` for a defined variable;
 `scripts/validation/tests/test_shared_role_defaults.py` enforces all of this.
 `scripts/deepops/settings.py` models what each host resolves from these defaults and
 `config/` (see [configuration](configuration.md#finding-variables-to-change)).
+A role this repository changes is kept in `roles/` rather than pinned from Ansible Galaxy,
+so it is reviewed with the rest of the tree and `ansible-galaxy install` cannot
+overwrite it; `roles/requirements.yml` lists only what is used unmodified.
+
 <!-- BEGIN GENERATED: role-tree -->
 ```text
 ├── roles

@@ -50,3 +50,6 @@ __pycache__/
 .vault-pass
 *.vault-pass
 vault-password*
+# Claude Code's per-clone state: agent worktrees and local settings
+/.claude/worktrees/
+/.claude/settings.local.json

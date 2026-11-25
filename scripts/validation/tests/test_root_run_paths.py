@@ -4,7 +4,7 @@ slurmd runs the prolog, the epilog, their parts and the libraries they source as
 Owned by the slurm account or group-writable for it, or in a directory it owns, any of
 them is root for whoever holds that account: it can edit a file, or rename the
 directory and put its own in its place. So nothing under the Slurm configuration
-directory (slurm_config_dir, slurmctl_config_dir, /etc/slurm) is installed or created
+directory (slurm_config_dir, /etc/slurm) is installed or created
 as Slurm's. slurmdbd.conf is the exception Slurm itself demands (slurmdbd refuses one
 it does not own), and it is a file root never runs.
 """

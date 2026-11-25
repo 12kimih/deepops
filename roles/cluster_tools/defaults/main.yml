@@ -19,11 +19,8 @@ cluster_tools_bin_dir: /usr/local/bin
 # several commands must agree on, instead of a copy each that drifts apart.
 cluster_tools_libs: []  # cluster_tools_lib_dir comes from cluster_tools_lib (a dependency)
 
-# Built-in commands to publish, by name: any of sq (the queue, who holds what, why jobs
-# wait, and what each partition pool has left), qos (the QoS a user may submit against
-# and how full each quota is), gpu-usage (what a job's GPUs did, from Slurm's
-# accounting or Prometheus) and scratch-space (which of one's files on the scratch space
-# are due to be cleaned up, and when: roles/scratch_space). Each is cluster_tools.<name, - as _>, installed by
+# Built-in commands to publish, by name: any of cluster_tools_builtin, each described by
+# its own definition (cluster_tools.<name, - as _>.COMMAND.summary). Each is installed by
 # cluster_tools_lib with the rest of the cluster's Python; this role adds the command
 # wrapper and bash completion asked of the command itself, so both always match the
 # installed version. Empty publishes none and removes what was published.

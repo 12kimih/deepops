@@ -28,8 +28,8 @@ maintenance_slurm_bin: "{{ slurm_install_prefix }}/bin"
 # The reason recorded on the nodes this run drains; resume only touches those (and
 # those an earlier run drained with the same reason).
 maintenance_reason: "maintenance: upgrade"
-# How long to wait for running jobs to finish, and how often to look (the cluster's
-# rule: no scheduler polling faster than every 30 s).
+# How long to wait for running jobs to finish, and how often to look (one scheduler
+# query each time, so not faster than the site's polling rule allows).
 maintenance_drain_timeout: 86400
 maintenance_drain_poll: 60
 
