@@ -81,8 +81,8 @@ Access rules:
 
 Root manages the server over the local socket (`ldapi:///`, SASL EXTERNAL).
 
-The CA (`roles/internal_ca`) lives on the server and lasts 20 years. It signs the
-server's certificate for `ldap_server_names` and renews it 30 days before it expires.
+The CA (`roles/internal_ca`) lives on the server and lasts `internal_ca_days`. It signs the
+server's certificate for `ldap_server_names` and renews it `internal_ca_renew_days` before it expires.
 Every client trusts the CA at `ldap_ca_file`. The CA is never bought and never renewed
 by hand.
 

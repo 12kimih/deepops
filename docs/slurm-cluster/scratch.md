@@ -44,8 +44,8 @@ A daily timer on the scratch server (`scratch-space-purge.timer`, `roles/scratch
 `scratch_space_purge`) looks at every file in each person's directory and in the
 collaboration folders (`/scratch/projects`, each file counted to its owner):
 
-1. A file nobody has used, read or written, for `cluster_user_stale_days` (60 days) is
-   listed for its owner, with its removal date: `cluster_user_grace_days` (14 days) after
+1. A file nobody has used, read or written, for `cluster_user_stale_days` is
+   listed for its owner, with its removal date: `cluster_user_grace_days` after
    it was first listed. The date stays the same on the next runs.
 2. Using a listed file in the meantime (a job reading it is enough) takes it off the list
    on the next run. Nothing else keeps a file: there is no button to press.

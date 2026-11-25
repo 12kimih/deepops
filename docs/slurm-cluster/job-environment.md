@@ -11,7 +11,7 @@ name order by `shared/bin/run-parts.sh` (prolog, epilog) and `task-prolog.sh`.
 | Job runtime dir, the job's `XDG_RUNTIME_DIR` (`/run/slurm-users/<uid>`) | `slurm_user_runtime_root` | prolog `40-all-runtime-dir` (root, 0700, owned by the user) | epilog `50-lastuserjob-runtime-dir`, with the user's last job on the node |
 | enroot runtime (`/run/enroot/user-<uid>`) | `enroot_runtime_path`, written to `/etc/enroot/enroot.conf.d/90-deepops.conf` | prolog `50-all-enroot-dirs` (as the user) | epilog `50-lastuserjob-all-enroot-dirs`, last job |
 | enroot data, unpacked containers (`/tmp/enroot-data/user-<uid>`) | `enroot_data_path` (same file) | prolog `50-all-enroot-dirs` | named containers of the job: pyxis (`container_scope=job`); the rest: epilog `50-lastuserjob-all-enroot-dirs`, last job |
-| enroot cache, image layers (`/var/lib/enroot-cache/user-<uid>`) | `enroot_cache_path` (same file) | prolog `50-all-enroot-dirs` | `container-storage-gc` daily: unused 14 days, user left, or disk full |
+| enroot cache, image layers (`/var/lib/enroot-cache/user-<uid>`) | `enroot_cache_path` (same file) | prolog `50-all-enroot-dirs` | `container-storage-gc` daily: unused for `container_storage_gc_unused_days`, user left, or disk full |
 | pyxis runtime (`/run/pyxis/<uid>`) | `slurm_pyxis_runtime_path` (plugstack.conf) | pyxis | its squashfs files by pyxis; the directory is empty after each step |
 | podman storage (`/var/lib/podman-storage/<uid>`) | `podman_storage_root`, written to `/etc/containers/storage.conf` | `roles/podman`, per roster person | `container-storage-gc` daily, as for the enroot cache |
 | podman runtime (`$XDG_RUNTIME_DIR/containers`, `libpod`) | the job runtime dir | podman | with the job runtime dir |

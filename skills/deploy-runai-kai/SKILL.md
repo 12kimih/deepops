@@ -18,9 +18,10 @@ the GPU Operator or the NVIDIA driver. Full guide: `docs/k8s-cluster/runai.md`.
    there; the install adds cluster-wide admission webhooks.
 3. Pick one mode. `kai` and `platform` exclude each other (the platform ships its
    own KAI). `platform` is experimental and also needs a default StorageClass,
-   `kube-prometheus-stack` 88.6.5+, a DNS name and TLS (see the guide).
-4. Fractioning with hard memory limits (`runai_kai_gpu_fractioning: true`) needs GPU
-   Operator v26.7.1+ and an r615+ driver already in place. Do not change the
+   `kube-prometheus-stack` at `runai_platform_prometheus_min_version` or newer, a DNS name and TLS (see the guide).
+4. Fractioning with hard memory limits (`runai_kai_gpu_fractioning: true`) needs a GPU
+   Operator and a driver at the minimums in `roles/runai` (`runai_gpu_operator_min_version`,
+   `runai_gpu_fractioning_min_driver_major`) or newer already in place. Do not change the
    default driver to get it without the cluster owner's agreement.
 
 ## Procedure
@@ -51,7 +52,7 @@ the GPU Operator or the NVIDIA driver. Full guide: `docs/k8s-cluster/runai.md`.
 |---|---|
 | Role stops with "No node advertises nvidia.com/gpu" | GPU stack not ready; wait, or run the GPU Operator playbook. Do not bypass with `runai_require_gpu: false` on a real install. |
 | Role stops with "ships its own KAI" | Remove the other mode first (`runai_state: absent`). |
-| Role stops on GPU Operator version or `r615` | Missing fractioning prerequisites. Set `runai_kai_gpu_fractioning: false`, or ask the cluster owner to approve the GPU stack change. |
+| Role stops on GPU Operator or driver version | Missing fractioning prerequisites. Set `runai_kai_gpu_fractioning: false`, or ask the cluster owner to approve the GPU stack change. |
 | Validator `scheduler deployments missing/not available` | KAI operator still starting; wait and rerun. `kubectl -n kai-scheduler get pods`. |
 | `gpu_job_ok` false, pod `Pending` | Wrong queue or none: `kubectl get queues.scheduling.run.ai`; pod must set `schedulerName: kai-scheduler` and the queue label. |
 | `fraction_job_ok` false: pods on different GPUs | The node has more than one GPU and KAI chose another; with one GPU this means sharing is off (`global.gpuSharingMode`). |

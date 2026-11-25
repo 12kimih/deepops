@@ -30,7 +30,7 @@ and any DeepOps-owned UI. The web UI in `platform` mode is the upstream one.
     NodePort, and `LoadBalancer` with MetalLB on a single node for both the
     ingress and the Gateway API paths; reaching that address from another
     machine was not part of the test)
-  - `kube-prometheus-stack` 88.6.5 or newer (`scripts/k8s/deploy_monitoring.sh`
+  - `kube-prometheus-stack` at `runai_platform_prometheus_min_version` or newer (`scripts/k8s/deploy_monitoring.sh`
     installs a newer one by default)
   - a DNS name for the control plane, and a TLS certificate for it
   - room: the control plane alone wants about 10 CPU cores, 12 GB of memory and
@@ -114,11 +114,13 @@ scheduler stays the default.
 caps each pod's GPU memory. It is opt-in because it needs a GPU stack the
 DeepOps defaults do not use:
 
-- GPU Operator **v26.7.1 or newer** (check `gpu_operator_chart_version` in `roles/nvidia-gpu-operator/defaults/main.yml` for the DeepOps default), and
-- an NVIDIA driver **r615 or newer** on every GPU node. The GPU Operator does not
-  choose r615 by default; set `gpu_operator_driver_version` to an r615 release
-  and `gpu_operator_preinstalled_nvidia_software: false` (or install an r615 host
-  driver yourself).
+- a GPU Operator at **`runai_gpu_operator_min_version`** (`roles/runai/defaults/main.yml`)
+  or newer (check `gpu_operator_chart_version` in `roles/nvidia-gpu-operator/defaults/main.yml`
+  for the DeepOps default), and
+- an NVIDIA driver of major **`runai_gpu_fractioning_min_driver_major`** or newer on every
+  GPU node. The GPU Operator does not choose that branch by default; set
+  `gpu_operator_driver_version` to a release of it and
+  `gpu_operator_preinstalled_nvidia_software: false` (or install such a host driver yourself).
 
 The role checks both and stops with an explanation if either is missing. It never
 changes your driver or GPU Operator. Then verify the limits actually hold:
@@ -290,7 +292,7 @@ too (this deletes any queues and projects still defined).
 |---|---|
 | Role stops: "No node advertises nvidia.com/gpu" | GPU stack not ready. Install the GPU Operator and wait for the node to report GPUs. |
 | Role stops: "ships its own KAI" | Both modes are installed. Remove one first. |
-| Role stops: GPU Operator or `r615` | Fractioning prerequisites missing; see above. |
+| Role stops: GPU Operator or driver version | Fractioning prerequisites missing; see above. |
 | Pod stays `Pending` with `schedulerName: kai-scheduler` | No queue label, or the queue does not exist: `kubectl get queues.scheduling.run.ai`. |
 | A half-GPU pod is rejected | It also asks for a whole `nvidia.com/gpu`, or the fraction is not between 0 and 1. |
 | Validator: scheduler deployments missing | The KAI operator is still starting. Wait a minute and rerun. |

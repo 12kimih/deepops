@@ -121,9 +121,9 @@ rsyslog_client_tcp_host: "{{ groups['kube_control_plane'][0] }}"
 # The modes exclude each other: the platform's cluster chart ships its own KAI.
 #runai_mode: "off"
 
-# Hard GPU-memory limits for fractional pods (kai mode). Needs GPU Operator
-# v26.7.1+ and an r615+ driver, which you must set up first; DeepOps's default
-# driver is not changed. Leave false unless you need enforced memory limits.
+# Hard GPU-memory limits for fractional pods (kai mode). Needs a GPU Operator and a
+# driver at runai_gpu_operator_min_version and runai_gpu_fractioning_min_driver_major
+# or newer, which you must set up first; DeepOps's default driver is not changed. Leave false unless you need enforced memory limits.
 #runai_kai_gpu_fractioning: false
 
 # Platform mode only. Keep the admin login in an Ansible vault.
