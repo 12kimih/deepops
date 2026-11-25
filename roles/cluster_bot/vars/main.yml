@@ -24,7 +24,16 @@ _cluster_bot_ready: "{{ slack_bot_token | length > 0 and slack_app_token | lengt
 # (roles/cluster_bot_access), and their cluster addresses (the from= of its key).
 _cluster_bot_ban_hosts: "{{ deepops_component_registry | component_hosts(groups, 'fail2ban', deepops_component_removals) }}"
 _cluster_bot_data_hosts: "{{ deepops_component_registry | component_hosts(groups, 'shared_space', deepops_component_removals) }}"
-_cluster_bot_reaches: "{{ (_cluster_bot_ban_hosts + _cluster_bot_data_hosts[:1]) | unique }}"
+# The services the bot uses on those hosts, each with the playbook that offers it there:
+# the config's host lists, the host keys pinned, and the deploy's check (reach.yml).
+_cluster_bot_services:
+  - name: bans  # cluster_bot.bans.SERVICE, offered by roles/fail2ban
+    hosts: "{{ _cluster_bot_ban_hosts }}"
+    playbook: playbooks/generic/fail2ban.yml
+  - name: shared-data  # cluster_bot.data.SERVICE, offered by roles/shared_space; the first host's
+    hosts: "{{ _cluster_bot_data_hosts[:1] }}"
+    playbook: playbooks/slurm-cluster/shared-space.yml
+_cluster_bot_reaches: "{{ _cluster_bot_services | map(attribute='hosts') | flatten | unique }}"
 _cluster_bot_addresses: "{{ hostvars | cluster_addresses(_cluster_bot_reaches, cluster_networks) }}"
 _cluster_bot_cfg:
   bot_token_file: "{{ _cluster_bot_tokens.bot }}"

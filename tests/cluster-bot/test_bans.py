@@ -14,6 +14,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 from cluster_bot import bans, remote, requests  # noqa: E402
 
 BAN = {"ip": "192.0.2.7", "jail": "sshd", "since": "2026-11-20 03:12:44"}
@@ -143,9 +144,18 @@ class Watch(unittest.TestCase):
 
 class Services(unittest.TestCase):
     def test_the_bot_asks_for_the_services_the_roles_offer(self):
-        for role, var, name in (("fail2ban", "_fail2ban_bot_service", bans.SERVICE),):
+        from cluster_bot import data
+
+        used = {s["name"]: s for s in yaml.safe_load((ROOT / "roles/cluster_bot/vars/main.yml").read_text())[
+            "_cluster_bot_services"]}  # fmt: skip
+        for role, var, name in (("fail2ban", "_fail2ban_bot_service", bans.SERVICE),
+                                ("shared_space", "_shared_space_bot_service", data.SERVICE)):  # fmt: skip
             offered = yaml.safe_load((ROOT / "roles" / role / "vars/main.yml").read_text())[var]["name"]
             self.assertEqual(offered, name, role)
+            # The deploy's check names the playbook that offers it: one that runs the role.
+            playbook = ROOT / used[name]["playbook"]
+            self.assertIn(f"role: {role}", playbook.read_text(), playbook)
+        self.assertEqual(sorted(used), sorted([bans.SERVICE, data.SERVICE]))
 
     def test_the_request_goes_as_the_service_and_its_quoted_words(self):
         done = mock.Mock(returncode=0, stdout='{"ok": 1}', stderr="")
@@ -163,7 +173,80 @@ class Services(unittest.TestCase):
         garbled = mock.Mock(returncode=0, stdout="Welcome!\n", stderr="")
         with mock.patch("subprocess.run", return_value=garbled), self.assertRaises(requests.Failed) as e:
             remote.Remote("10.0.0.5", "/k", "bot", "/kh", "bans")("unban", "203.0.113.9")
-        self.assertIn("10.0.0.5", str(e.exception))
+        self.assertIn("Welcome!", str(e.exception))
+
+    def test_the_client_is_the_bots_own_never_the_sites_ssh_config(self):
+        """The site's ssh_config turns on host-based authentication; inherited, the bot's
+        ssh tried it first and its failure ("sign using hostkey ... failed") hid why."""
+        argv = remote.Remote("10.0.0.5", "/k", "bot", "/kh", "bans").argv("bans list")
+        self.assertEqual(argv[1:3], ["-F", "none"])
+        for option in ("IdentitiesOnly=yes", "PreferredAuthentications=publickey", "BatchMode=yes",
+                       "StrictHostKeyChecking=yes", "UserKnownHostsFile=/kh", "GlobalKnownHostsFile=none"):  # fmt: skip
+            self.assertIn(option, argv)
+        self.assertEqual(argv[argv.index("-i") + 1], "/k")
+
+
+# What ssh said for each of the 9 hosts on 2026-11-25 (the owner's #admin paste).
+DENIED = (
+    "no reply\nsign using hostkey ssh-ed25519 SHA256:AAAA failed\n"
+    "cluster-bot@192.0.2.10: Permission denied (publickey,password,hostbased).\n"
+)
+
+
+class Reasons(unittest.TestCase):
+    def test_each_failure_is_one_short_line_with_what_to_do(self):
+        cases = (
+            (255, DENIED, "봇의 키가 허용되지 않았습니다", "cluster-bot.yml"),
+            (
+                255,
+                "Host key verification failed.\n",
+                "호스트 키가 봇이 아는 것과 다릅니다",
+                "cluster-bot.yml",
+            ),
+            (
+                255,
+                "ssh: connect to host 192.0.2.10 port 22: Connection timed out\n",
+                "접속되지 않습니다",
+                "sshd",
+            ),
+            (
+                2,
+                "cluster-bot-serve: this host offers no 'bans'\n",
+                "이 서비스를 제공하지 않습니다",
+                "cluster-bot.yml",
+            ),
+            (2, "cluster-bans: not banned 203.0.113.8\n", "not banned 203.0.113.8", ""),
+        )
+        for code, stderr, reason, fix in cases:
+            with self.subTest(reason):
+                e = remote.failure(code, stderr)
+                self.assertEqual(str(e), reason)
+                self.assertNotIn("\n", str(e))
+                self.assertIn(fix, e.fix)
+
+    def test_the_hosts_of_one_reason_are_one_line(self):
+        names = [f"gpu{i}" for i in range(1, 9)] + ["master"]
+        errors = {h: remote.failure(255, DENIED) for h in names}
+        errors["login"] = remote.failure(255, "Connection refused")
+        self.assertEqual(
+            bans.bans_blocks.by_reason(errors),
+            "gpu[1-8],master: 봇의 키가 허용되지 않았습니다; login: 접속되지 않습니다",
+        )
+
+    def test_the_list_of_no_host_read_says_so_once(self):
+        """2026-11-25: "현재 차단된 주소 0개", then "없음", then nine raw SSH errors."""
+        errors = {h: remote.failure(255, DENIED) for h in [f"gpu{i}" for i in range(1, 9)] + ["master"]}
+        text, blocks = bans.bans_blocks.ban_list([], errors, read=False)
+        shown = str(blocks)
+        self.assertEqual(text, "차단 목록을 읽지 못했습니다")
+        self.assertNotIn("없음", shown)
+        self.assertNotIn("0개", shown)
+        self.assertNotIn("Permission denied", shown)
+        self.assertEqual(shown.count("gpu[1-8],master"), 1)
+        self.assertIn("cluster-bot.yml", shown)
+        text, blocks = bans.bans_blocks.ban_list([], {})
+        self.assertEqual(text, "현재 차단된 주소가 없습니다")
+        self.assertEqual([b["type"] for b in blocks], ["section", "context"], "said once, in the header")
 
 
 if __name__ == "__main__":

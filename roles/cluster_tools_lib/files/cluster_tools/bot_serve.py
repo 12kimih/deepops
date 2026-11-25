@@ -9,6 +9,10 @@ the request, so each service parses and limits its own (cluster-bans serve, for 
 nothing is run through a shell. A service file must be root's and writable by
 nobody else, or the request is refused: the files decide what root runs.
 
+The one request that names no service, `offers`, answers the names of the services this
+host offers ({"offers": [name, ...]}) and runs nothing: the deploy's proof that the bot
+reaches each host it uses for what it uses it for (roles/cluster_bot, reach.yml).
+
 A service reads its request with request(), the one way to split it: as a shell
 would split words (a quoted reason stays one), never run by one, and only operations
 with the number of arguments the service allows.
@@ -28,6 +32,8 @@ import sys
 from . import proc
 
 NAME = re.compile(r"[a-z][a-z0-9-]{0,31}")
+# The dispatcher's own request; no service takes the name (roles/cluster_bot_access).
+OFFERS = "offers"
 # The environment a service starts with: nothing of the caller's but the request.
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -66,11 +72,30 @@ def resolve(directory, original, owner=0):
     return argv, shlex.join(words[1:])
 
 
+def offers(directory, owner=0):
+    """The services DIRECTORY offers: each file resolve() would run, by name."""
+    try:
+        names = sorted(n[: -len(".json")] for n in os.listdir(directory) if n.endswith(".json"))
+    except FileNotFoundError:
+        return []
+    found = []
+    for name in names:
+        try:
+            if NAME.fullmatch(name) and resolve(directory, name, owner):
+                found.append(name)
+        except (Error, OSError, ValueError):
+            pass
+    return found
+
+
 def main(argv=None):
     args = (sys.argv if argv is None else argv)[1:]
     if len(args) != 1:
         print("usage: cluster-bot-serve DIR  (the request in SSH_ORIGINAL_COMMAND)", file=sys.stderr)
         return 2
+    if (os.environ.get("SSH_ORIGINAL_COMMAND") or "").strip() == OFFERS:
+        print(json.dumps({OFFERS: offers(args[0])}))
+        return 0
     try:
         command, request = resolve(args[0], os.environ.get("SSH_ORIGINAL_COMMAND"))
     except (Error, OSError, ValueError) as e:

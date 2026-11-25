@@ -24,7 +24,12 @@ class Refused(Exception):
 
 
 class Failed(Exception):
-    """The system the request acts on refused or could not be reached; str() says why."""
+    """The system the request acts on refused or could not be reached: str() says why in
+    one short line; FIX, when known, what an administrator does about it."""
+
+    def __init__(self, reason, fix=""):
+        super().__init__(reason)
+        self.fix = fix
 
 
 @dataclass

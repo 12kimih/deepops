@@ -1,0 +1,46 @@
+---
+# The proof that the bot reaches every host it uses for what it uses it there: each is
+# asked as the bot, with the bot's own client (cluster_bot.remote), which services it
+# offers. A host that keeps the bot out or offers nothing fails the run here, with the
+# playbook that offers the service, never only in the bot's messages later. Run by
+# playbooks/generic/cluster-bot.yml after every host authorized its key; on the bot's
+# host alone (cluster_bot_state present).
+- name: Prove what the bot uses, on its host
+  when: cluster_bot_state == 'present'
+  block:
+    - name: Ask each host the bot uses what it offers, as the bot
+      ansible.builtin.command:
+        argv: ["{{ _cluster_bot_venv }}/bin/python", -m, cluster_bot.remote, "{{ _cluster_bot_config }}", "{{ _cluster_bot_addresses[item] }}"]
+      environment:
+        PYTHONPATH: "{{ _cluster_bot_lib }}:{{ cluster_tools_lib_dir }}"
+      become: true
+      become_user: "{{ cluster_bot_user }}"
+      loop: "{{ _cluster_bot_reaches }}"
+      register: cluster_bot_reach
+      changed_when: false
+      check_mode: false  # a read; a preview reports the same
+      failed_when: cluster_bot_reach.rc != 0
+
+    - name: Require every service the bot uses on every host it uses it
+      ansible.builtin.assert:
+        that: _missing | length == 0
+        fail_msg: >-
+          The cluster bot cannot use: {{ _missing | join('; ') }}.
+        success_msg: >-
+          The cluster bot reaches {{ _cluster_bot_reaches | join(', ') }} for
+          {{ _cluster_bot_services | selectattr('hosts') | map(attribute='name') | join(', ') }}.
+      vars:
+        _answers: "{{ dict(cluster_bot_reach.results | map(attribute='item') | zip(cluster_bot_reach.results | map(attribute='stdout') | map('from_json'))) }}"
+        # One line per service: the hosts that do not offer it, why, and the playbook to run.
+        _missing: >-
+          {%- set out = [] -%}
+          {%- for s in _cluster_bot_services -%}
+          {%- set hosts = s.hosts | reject('in', _answers | dict2items | selectattr('value.offers', 'defined')
+                            | selectattr('value.offers', 'contains', s.name) | map(attribute='key')) | list -%}
+          {%- if hosts -%}
+          {%- set why = hosts | map('extract', _answers) | selectattr('failed', 'defined') | map(attribute='failed') | unique | list -%}
+          {%- set _ = out.append(s.name ~ ' on ' ~ hosts | join(',') ~ ' (' ~ (why | join('; ') if why else 'not offered')
+                                 ~ '): run ' ~ s.playbook ~ ' -l ' ~ hosts | join(',')) -%}
+          {%- endif -%}
+          {%- endfor -%}
+          {{ out }}
