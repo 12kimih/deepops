@@ -108,7 +108,12 @@ class Container:
 class MonitoringImages(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = Path(tempfile.mkdtemp(prefix="monitoring-smoke-"))
+        # The Docker daemon reads a bind mount's source in its own mount namespace, where
+        # a login's own /tmp (roles/login_private_dirs) is not: under the home it is the
+        # same directory for both.
+        cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "deepops-tests"
+        cache.mkdir(parents=True, exist_ok=True)
+        cls.tmp = Path(tempfile.mkdtemp(prefix="monitoring-smoke-", dir=cache))
         cls.tmp.chmod(0o700)
         cls.render()
 
