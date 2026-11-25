@@ -21,6 +21,17 @@ if neither origin/main nor the site config's origin moved since its check. If on
 it rebases and checks again holding the lock, so what is pushed is always what was
 checked, and the next worktree waits only for pushes and re-checks.
 
+The check reads the site config (`DEEPOPS_CONFIG_DIR`; by default the checkout's
+`config/`, else the clone's; `none` checks without one, and with no config at all the
+push is refused) at its origin's main. Its pages carry blocks generated from deepops: a
+change that makes them stale regenerates them in the push's throwaway config tree,
+commits them there and pushes that commit to the config's origin right after deepops,
+so the two land together. The config's own commit hook
+([`scripts/deepops/config-pre-commit.sh`](../../scripts/deepops/config-pre-commit.sh))
+judges its pages by deepops' origin/main, the deepops `scripts/deepops/sync.py` brings
+in (or by `DEEPOPS_REV` when push.sh names it), never by the shared clone's HEAD, which
+stays behind main until it is synced.
+
 `scripts/check.sh` runs every repository check: the style normalizer, generated docs,
 yamllint, `ansible-lint` with the project [`.ansible-lint`](../../.ansible-lint)
 configuration, playbook syntax checks and the unit suites. The few tools it runs from
