@@ -21,6 +21,7 @@ PROGRAMS = {
     "sq",
     "qos",
     "gpu_usage",
+    "disk_usage",
     "usage_report",
     "metrics",
     "slurm_backup",

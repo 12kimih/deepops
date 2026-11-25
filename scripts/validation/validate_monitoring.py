@@ -71,6 +71,8 @@ ABSENT_OK = {
     # Usage is counted from the start; limits exist once the site sets some, and project
     # series only where it declares projects (roles/disk_quota).
     "only with limits": r"disk_quota_limit_(bytes|inodes)|disk_quota_project_\w+",
+    # Folders unused past the stale period: none while every folder is in use.
+    "only when something is due": r"disk_cleanup_candidate_\w+",
     "Prometheus' own": r"ALERTS|ALERTS_FOR_STATE",
 }
 
@@ -98,6 +100,8 @@ SOURCES = {
     "egress_policy": r"egress_policy_\w+",
     "disk_quota": r"disk_quota_\w+",
     "scratch_space": r"scratch_space_\w+",  # the scratch cleanup (roles/scratch_space)
+    # Folders worth cleaning (cluster_tools.cleanup), from disk_quota's scan and the scratch cleanup.
+    "disk_cleanup": r"disk_cleanup_\w+",
     "shared_data": r"shared_data_\w+",  # the shared data's export, the bot's rounds (roles/shared_space)
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)
     "gpu_diag_idle": r"gpu_diag_idle_\w+",  # the weekly GPU diagnostics (roles/gpu_diag_idle)
