@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -153,6 +154,57 @@ class Edits(unittest.TestCase):
         self.assertEqual(self.posted, [])
         entries = json.loads(Path(self.seen).read_text())
         self.assertEqual(entries[notice("old", "2026-01-01")["id"]], {"date": "2026-01-01"})
+
+
+def md_notice(nid, day, lead="**팀 QoS**로 제출해 주세요."):
+    return {"id": f"https://docs.example.org/news/{nid}/", "date": day, "text": nid, "title": f":mega: {nid}",
+            "markdown": lead, "link": {"text": "자세히 보기", "url": f"https://docs.example.org/news/{nid}/"},
+            "context": "정책  |  " + day}  # fmt: skip
+
+
+class Markdown(unittest.TestCase):
+    """The docs send each notice as Markdown and the bot renders it with cluster_tools.rich,
+    the one renderer: the docs keep no converter of their own (two of one grammar drift)."""
+
+    def test_a_notice_is_rendered_by_rich(self):
+        msg = notices.render(md_notice("qos", "2026-02-01"))
+        self.assertEqual([b["type"] for b in msg["blocks"]], ["header", "rich_text", "actions", "context"])
+        self.assertEqual(msg["blocks"][1]["elements"][0]["elements"][0],
+                         {"type": "text", "text": "팀 QoS", "style": {"bold": True}}, "bold before a particle")  # fmt: skip
+        self.assertEqual(msg["blocks"][2]["elements"][0]["url"], "https://docs.example.org/news/qos/")
+
+    def test_a_notice_of_blocks_is_posted_as_it_is(self):
+        old = notice("old", "2026-01-01")
+        self.assertEqual(notices.render(old), {"text": "old", "blocks": [{"type": "x"}]})
+
+    def test_check_finds_what_the_bot_could_not_show(self):
+        good = {"notices": [md_notice("qos", "2026-02-01")]}
+        self.assertEqual(notices.check(good), [])
+        bad = {"notices": [md_notice("a", "2026-02-01", "*하나의 별*과 ## 제목"), md_notice("b" * 160, "2026-02-01"),
+                           {"id": "c", "date": "2026-02-01"}]}  # fmt: skip
+        found = notices.check(bad)
+        self.assertEqual(len(found), 3, found)
+        self.assertIn("title", found[1])
+        self.assertEqual(notices.check({"nope": []}), ['notices.json: no "notices" list'])
+
+    def test_a_rendering_change_edits_no_post_a_reworded_notice_does(self):
+        with tempfile.TemporaryDirectory() as d:
+            seen, updated = os.path.join(d, "seen.json"), []
+            doc = {"notices": [md_notice("qos", "2026-01-01")]}
+
+            def run():
+                notices.round_(lambda: doc, lambda text, blocks: "ts-1", seen, "2026-02-01",
+                               update=lambda ts, text, blocks: updated.append(text))  # fmt: skip
+
+            Path(seen).write_text("{}")
+            run()
+            with mock.patch.object(notices.rich, "blocks", lambda text: []):
+                run()
+            self.assertEqual(updated, [], "the digest is of the Markdown, not of its rendering")
+            doc["notices"][0]["markdown"] = "**팀 QoS**로 제출해 주세요. 바뀐 문장."
+            run()
+            run()
+            self.assertEqual(updated, ["qos"])
 
 
 if __name__ == "__main__":

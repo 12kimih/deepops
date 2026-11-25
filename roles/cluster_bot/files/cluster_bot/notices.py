@@ -1,9 +1,17 @@
 """The user docs' notices in the announcement channel: the docs site publishes each notice
-already rendered as a Slack message (notices.json next to the site, written by the docs'
-scripts/notices.py export), and the bot posts each one once, on its date, through the
-cluster's own Slack app. The docs repository holds no Slack credential.
+(notices.json next to the site, written by the docs' scripts/notices.py export), and the
+bot posts each one once, on its date, through the cluster's own Slack app. The docs
+repository holds no Slack credential.
 
-    notices.json  {"notices": [{"id", "date" (YYYY-MM-DD), "text", "blocks"}]}
+    notices.json  {"notices": [{"id", "date" (YYYY-MM-DD), "text" (the fallback),
+                                "title", "markdown", "link": {"text", "url"}, "context"}]}
+
+The notice is Markdown, rendered here by cluster_tools.rich, the one renderer of Slack
+text: render(notice) is the message, a header (TITLE), the lead (MARKDOWN), a button to
+the page (LINK) and a line of small print (CONTEXT, Markdown too). check(document) says
+what of a notices.json the bot could not show as written; the docs run it on every
+commit (scripts/deepops/notice_render.py, the notice-render hook). A notice published
+before the docs sent Markdown carries its own "blocks", posted as they are.
 
 round_(fetch, post, seen_path, today, pin=None, update=None, pinned_path=None) posts every
 notice due (its date today or before) that SEEN_PATH does not list, oldest first, and
@@ -23,6 +31,8 @@ import hashlib
 import json
 import urllib.request
 
+from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+
 from . import state
 from .channels import channel_ids
 
@@ -34,21 +44,74 @@ def fetch_json(url):
         return json.load(resp)
 
 
+HEADER_MAX = 150  # characters Slack shows in a header
+MAX_BLOCKS = 50  # blocks in one message
+# What a notice in Markdown says, and what the bot shows of it (render).
+SOURCE = ("text", "title", "markdown", "link", "context")
+
+
+def render(notice):
+    """NOTICE as the message the bot posts: {"text", "blocks"}. A notice in Markdown is
+    rendered here; one with only its own blocks (before the docs sent Markdown) keeps them."""
+    if "markdown" not in notice:
+        return {"text": notice["text"], "blocks": notice["blocks"]}
+    title = notice.get("title") or notice["text"]
+    blocks = [{"type": "header", "text": {"type": "plain_text", "text": title, "emoji": True}}]
+    blocks += rich.blocks(notice["markdown"])
+    link = notice.get("link") or {}
+    if link.get("url"):
+        blocks.append({"type": "actions", "elements": [
+            {"type": "button", "text": {"type": "plain_text", "text": link.get("text") or link["url"]},
+             "url": link["url"]}]})  # fmt: skip
+    if notice.get("context"):
+        blocks.append(rich.context(notice["context"]))
+    return {"text": rich.plain(notice["text"]) or title, "blocks": blocks}
+
+
+def check(document):
+    """What of DOCUMENT (a notices.json) the bot could not post as written: ["what"], empty
+    when every notice renders within Slack's limits and shows no marker left as typed."""
+    notices = (document or {}).get("notices") if isinstance(document, dict) else None
+    if not isinstance(notices, list):
+        return ['notices.json: no "notices" list']
+    out = []
+    for i, n in enumerate(notices):
+        where = f"notice {n.get('id', i) if isinstance(n, dict) else i}"
+        if not isinstance(n, dict) or not _complete(n):
+            out.append(f"{where}: needs id, date, text and markdown (or blocks)")
+            continue
+        msg = render(n)
+        header = msg["blocks"][0]["text"]["text"] if msg["blocks"][0].get("type") == "header" else ""
+        if len(header) > HEADER_MAX:
+            out.append(f"{where}: the title is {len(header)} characters, Slack shows {HEADER_MAX}")
+        if len(msg["blocks"]) > MAX_BLOCKS:
+            out.append(f"{where}: {len(msg['blocks'])} blocks, Slack takes {MAX_BLOCKS}")
+        out += rich.problems((msg["text"], msg["blocks"]), where)
+    return out
+
+
+def _complete(n):
+    return all(n.get(k) for k in ("id", "date", "text")) and bool(n.get("markdown") or n.get("blocks"))
+
+
 def due(document, today):
-    """The notices of DOCUMENT dated TODAY (YYYY-MM-DD) or before, oldest first; one
-    without an id, date, text or blocks is left out."""
-    notices = [
-        n
-        for n in (document or {}).get("notices", [])
-        if isinstance(n, dict) and all(n.get(k) for k in ("id", "date", "text", "blocks"))
-    ]
-    return sorted((n for n in notices if n["date"] <= today), key=lambda n: (n["date"], n["id"]))
+    """The notices of DOCUMENT dated TODAY (YYYY-MM-DD) or before, oldest first, each as
+    the bot posts it (render) with its digest; one missing what it needs is left out."""
+    notices = []
+    for n in (document or {}).get("notices", []):
+        if isinstance(n, dict) and _complete(n) and n["date"] <= today:
+            notices.append({"id": n["id"], "date": n["date"], **render(n), "digest": digest(n)})
+    return sorted(notices, key=lambda n: (n["date"], n["id"]))
 
 
 def digest(notice):
-    """What a posted notice said: its text and blocks, hashed."""
-    said = json.dumps([notice["text"], notice["blocks"]], sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(said.encode()).hexdigest()
+    """What a notice says, hashed: its Markdown (the rendering may change without a new
+    edit of every post), or for a notice of blocks its text and blocks."""
+    if "markdown" in notice:
+        said = [notice.get(k) for k in SOURCE]
+    else:
+        said = [notice["text"], notice["blocks"]]
+    return hashlib.sha256(json.dumps(said, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
 def _entries(seen, pinned_path):
@@ -68,7 +131,7 @@ def round_(fetch, post, seen_path, today, pin=None, update=None, pinned_path=Non
     first = state.read(seen_path, None) is None
     if first:
         with state.locked(seen_path, {}) as seen:
-            seen.update({n["id"]: {"date": n["date"], "digest": digest(n)} for n in notices})
+            seen.update({n["id"]: {"date": n["date"], "digest": n["digest"]} for n in notices})
         return
     with state.locked(seen_path, {}) as seen:
         _entries(seen, pinned_path)
@@ -78,10 +141,10 @@ def round_(fetch, post, seen_path, today, pin=None, update=None, pinned_path=Non
             entry = seen.get(n["id"])
             if entry is None:
                 posted = post(n["text"], n["blocks"])
-                seen[n["id"]] = {"date": n["date"], "ts": posted, "digest": digest(n)}
-            elif update is not None and entry.get("ts") and entry.get("digest") != digest(n):
+                seen[n["id"]] = {"date": n["date"], "ts": posted, "digest": n["digest"]}
+            elif update is not None and entry.get("ts") and entry.get("digest") != n["digest"]:
                 update(entry["ts"], n["text"], n["blocks"])
-                entry["digest"] = digest(n)
+                entry["digest"] = n["digest"]
         if posted is not None and pin is not None:
             pin(posted)
 

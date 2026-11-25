@@ -91,9 +91,13 @@ token is ever on those hosts: the bot reads them over the `bans` service. Invite
 to the admin channel so it can pin the list.
 
 The user docs' notices: when `cluster_info.docs_url` is set, the bot reads
-`<docs_url>/notices.json` every `NOTICES_EVERY` seconds (`cluster_bot/app.py`; each
-notice already rendered as a Slack message by the docs site's build) and posts each
-notice in `slack_channels.announce` once, on its date. The docs repository holds no Slack
+`<docs_url>/notices.json` every `NOTICES_EVERY` seconds (`cluster_bot/app.py`) and posts
+each notice in `slack_channels.announce` once, on its date. A notice comes as Markdown
+(its title, lead, link and small print) and the bot renders it with
+`cluster_tools.rich`, the one renderer of every Slack text; the docs keep no converter
+of their own and check each commit with this repository's `notice-render` hook
+(`scripts/deepops/notice_render.py`), so a notice the bot could not show fails where it
+is written. A notice still published as Slack blocks is posted as it is. The docs repository holds no Slack
 credential; the announcement goes through this app. Its first look posts nothing: every
 notice already due counts as announced, so a new deploy never repeats one; a notice
 dated later still goes out on its date. A site it cannot reach is tried again at the
