@@ -70,9 +70,7 @@ The DeepOps project encapsulates best practices in the deployment of GPU server 
 - An existing cluster that needs a resource manager / batch scheduler, where DeepOps is used to install Slurm or Kubernetes
 - A single machine where no scheduler is desired, only NVIDIA drivers, Docker, and the NVIDIA Container Runtime
 
-Latest release: [DeepOps 26.11 Release](https://github.com/NVIDIA/deepops/releases/tag/26.11)
-
-It is recommended to check out the latest release tag for stable code (linked above), for example `git checkout 26.11`. All development takes place on the master branch, which is generally [functional](docs/deepops/testing.md) but may change significantly between releases.
+This fork has one branch, `main`, which every change reaches only through the full check (`scripts/check.sh`, [testing](docs/deepops/testing.md)); upstream releases ([NVIDIA DeepOps releases](https://github.com/NVIDIA/deepops/releases)) come in by merge.
 
 Operating this repository with an AI agent (or onboarding as a new human)? Start with [AGENTS.md](AGENTS.md) for the golden paths, operating rules, and [machine-readable validation tools](docs/deepops/validation.md), and [skills/](skills/README.md) for step-by-step procedures.
 
@@ -89,11 +87,16 @@ The legacy paths for DGX OS 4/5 (Ubuntu 18.04/20.04) and the DGX EL7 stack have 
 
 ### Cluster System
 
-The cluster nodes will follow the requirements described by Slurm or Kubernetes. You may also use a cluster node as a provisioning system but it is not required. Current release validation focuses on:
+The cluster nodes will follow the requirements described by Slurm or Kubernetes. You may also use a cluster node as a provisioning system but it is not required. Each part supports the releases its role names (generated from those tables):
 
-- Ubuntu 22.04 LTS and 24.04 LTS for generic Kubernetes and Slurm deployments
-- NVIDIA DGX OS 6 and 7 for DGX systems
-- Ubuntu 26.04 and Red Hat Enterprise Linux / Rocky Linux 8 and 9 for DGX platform software installation through the `nvidia-dgx` role
+<!-- BEGIN GENERATED: os-matrix -->
+| Part | Ubuntu | Red Hat Enterprise Linux / Rocky Linux |
+|---|---|---|
+| Slurm cluster (the packages are built per release, `slurm_deb_build_images`) | 22.04, 24.04 | - |
+| NVIDIA DGX software (`nvidia-dgx`) | 22.04, 24.04, 26.04 | 8, 9 |
+<!-- END GENERATED: os-matrix -->
+
+Kubernetes follows [Kubespray's supported operating systems](submodules/kubespray/README.md); DGX systems run the DGX OS of their Ubuntu release (DGX OS 6 on 22.04, DGX OS 7 on 24.04).
 
 The legacy DGX OS 4/5 and DGX EL7 paths have been removed (see above); other older releases are not validated.
 
@@ -126,7 +129,7 @@ For more information on Slurm in general, refer to the [official Slurm docs](htt
 [NVIDIA Bright Cluster Manager](https://www.brightcomputing.com/brightclustermanager) is recommended as an enterprise solution which enables managing multiple workload managers within a single cluster, including Kubernetes, Slurm, Univa Grid Engine, and PBS Pro.
 
 **DeepOps does not test or support a configuration where nodes have a heterogenous OS running.**
-The `nvidia-dgx` role can install NVIDIA DGX platform software on supported DGX systems running Red Hat Enterprise Linux / Rocky Linux 8 or 9; broader Kubernetes or Slurm cluster support on RHEL still requires site-specific validation.
+The `nvidia-dgx` role can install NVIDIA DGX platform software on the Red Hat family releases in the table above; broader Kubernetes or Slurm cluster support on RHEL still requires site-specific validation.
 
 ### Virtual
 
@@ -144,10 +147,8 @@ This project is released under the [BSD 3-clause license](https://github.com/NVI
 
 ## Issues
 
-NVIDIA DGX customers should file an NVES ticket via [NVIDIA Enterprise Services](https://nvid.nvidia.com/enterpriselogin/).
-
-Otherwise, bugs and feature requests can be made by [filing a GitHub Issue](https://github.com/NVIDIA/deepops/issues/new).
+Bugs in this fork: [this repository's issues](https://github.com/12kimih/deepops/issues). Bugs in upstream DeepOps: [NVIDIA DeepOps issues](https://github.com/NVIDIA/deepops/issues/new); NVIDIA DGX customers file an NVES ticket via [NVIDIA Enterprise Services](https://nvid.nvidia.com/enterpriselogin/).
 
 ## Contributing
 
-To contribute, please issue a [signed](https://raw.githubusercontent.com/NVIDIA/deepops/master/CONTRIBUTING.md) [pull request](https://help.github.com/articles/using-pull-requests/) against the master branch from a local fork. See the [contribution document](https://raw.githubusercontent.com/NVIDIA/deepops/master/CONTRIBUTING.md) for more information.
+Changes to this fork follow [AGENTS.md, Contributing changes](AGENTS.md#contributing-changes): the full check, `scripts/push.sh`, the commit message standard and the sensitive-data guard. A change meant for upstream goes to NVIDIA DeepOps as a signed pull request ([CONTRIBUTING.md](CONTRIBUTING.md)).

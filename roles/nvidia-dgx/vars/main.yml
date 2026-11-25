@@ -1,0 +1,8 @@
+---
+# The Ubuntu releases this role supports, each with the DGX OS task path it follows:
+# 22.04 is DGX OS 6, 24.04 DGX OS 7; 26.04 has no DGX OS of its own yet and follows 7.
+# One table: the role's check, its task choice and the docs' OS matrix read it.
+dgx_ubuntu_releases:
+  "22.04": "22.04"
+  "24.04": "24.04"
+  "26.04": "24.04"
