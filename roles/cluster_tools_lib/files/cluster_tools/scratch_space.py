@@ -3,7 +3,7 @@
     scratch-space                       (people) what of yours is due to go, and when
     scratch-space CONFIG.json purge [--check]   (root, a daily timer) find, list, remove
 
-/scratch is for data in use. A file nobody has used (read or written: the later of its
+The scratch space is for data in use. A file nobody has used (read or written: the later of its
 access and modification times) for stale_days is due: it is listed in its owner's list
 file and removed grace_days after it was first listed, unless it is used before then.
 
@@ -59,7 +59,7 @@ import sys
 import time
 from collections import defaultdict
 
-from . import cleanup, config, slurm, vocab
+from . import cleanup, config, site, slurm, vocab
 from .cleanup import last_use, walk
 from .cli import Command, Opt, run_main
 from .files import write_atomic, write_textfile
@@ -67,7 +67,6 @@ from .prom import key, render
 from .render import size
 
 DAY = 86400
-DEFAULT_ROOT = "/scratch"
 LIST_NAME = ".purge-list"
 HEADER = "# scratch-space purge list"
 
@@ -567,9 +566,8 @@ COMMAND = Command(
         Opt(
             "--root",
             metavar="DIR",
-            default=DEFAULT_ROOT,
             brief=True,
-            help=f"the scratch space (default {DEFAULT_ROOT})",
+            help="the scratch space (default: the cluster's, scratch_root in cluster.json)",
         )
     ],
     notes=[
@@ -594,7 +592,13 @@ def main(argv=None):
     args, _ = COMMAND.parse(argv)
 
     def body():
-        text, status = show(Host(), args.root, pwd.getpwuid(os.getuid()).pw_name, time.time())
+        root = args.root or site.info().get("scratch_root")
+        if not root:
+            raise SystemExit(
+                "scratch-space: the cluster names no scratch space (scratch_root in "
+                f"{site.PATH}); give --root DIR"
+            )
+        text, status = show(Host(), root, pwd.getpwuid(os.getuid()).pw_name, time.time())
         sys.stdout.write(text)
         return status
 

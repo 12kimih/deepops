@@ -1,7 +1,8 @@
 ---
 # The scratch space (roles/scratch_space), named once for the roles that tell people
 # about it: the cluster bot's collaboration folders form names the place and its
-# cleanup.
+# cleanup, and roles/cluster_tools_lib publishes the root in cluster.json (scratch_root),
+# where scratch-space and the disk report read it.
 
 # The scratch filesystem's mount point on this host.
 scratch_space_root: /scratch
