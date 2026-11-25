@@ -348,13 +348,16 @@ SLURM_SECONDS = {
 
 
 def slurm_values(config):
-    """KillWait from the site's slurm.conf template (config/files/slurm/slurm.conf), else
-    the role's, the preemption times that follow from it, and SLURM_SECONDS."""
+    """KillWait as slurm.conf says it, the preemption times that follow from it, and
+    SLURM_SECONDS: from the site's own slurm.conf template while it has one
+    (config/files/slurm/slurm.conf), else the settings roles/slurm renders."""
     text = _slurm_conf_path(config).read_text()
+    rendered = slurm_conf_settings(config)
 
     def seconds(key):
         m = re.search(rf"(?m)^\s*{key}\s*=\s*(\d+)\s*$", text)
-        return int(m.group(1)) if m else None
+        found = m.group(1) if m else rendered.get(key.lower())
+        return int(found) if found not in (None, "") else None
 
     out = {field: seconds(key) for field, key in SLURM_SECONDS.items() if seconds(key) is not None}
     kill_wait = seconds("KillWait")
@@ -363,6 +366,22 @@ def slurm_values(config):
             kill_wait_seconds=kill_wait, preempt_grace_seconds=kill_wait, sigkill_after_seconds=2 * kill_wait
         )
     return out
+
+
+def slurm_conf_settings(config):
+    """{key (lower-case): value} of slurm.conf as roles/slurm renders it: slurm_conf over
+    slurm_conf_defaults, and the values the role works out (_slurm_conf_computed) that
+    render from the settings."""
+    s = settings(config)
+    computed = _yaml(ROOT / "roles/slurm/vars/main.yml").get("_slurm_conf_computed", {})
+    out = {}
+    for layer in (s.get("slurm_conf_defaults") or {}, s.get("slurm_conf") or {}):
+        out.update({str(k).lower(): v for k, v in layer.items()})
+    for key, value in computed.items():
+        resolved = _resolve(value, s)
+        if resolved is not None:
+            out[key.lower()] = resolved
+    return {k: v for k, v in out.items() if v is not None}
 
 
 def schedule(config):

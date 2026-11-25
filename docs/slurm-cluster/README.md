@@ -143,28 +143,20 @@ Read through the [slurm usage guide](slurm-usage.md) for more information.
 
 ## Customizing the Slurm configuration
 
-The `slurm.conf`, `cgroup.conf`, `gres.conf`, `slurmdbd.conf`, and (optional)
-`job_submit.lua` files come from templates in the `slurm` role. By default the role
-generates them from gathered facts; to take full control, drop your own **complete**
-template files under `config/files/slurm/` and point the role at them in your
-git-untracked `config/group_vars/slurm-cluster.yml`:
-
-```yaml
-slurm_conf_template:        "{{ inventory_dir }}/files/slurm/slurm.conf.j2"
-slurm_cgroup_conf_template: "{{ inventory_dir }}/files/slurm/cgroup.conf.j2"
-slurm_gres_conf_template:   "{{ inventory_dir }}/files/slurm/gres.conf.j2"
-slurm_dbd_conf_template:    "{{ inventory_dir }}/files/slurm/slurmdbd.conf.j2"
-```
-
-Each file is rendered verbatim (Jinja still works, e.g. `{{ slurm_db_password }}` from
-the vault), so your whole cluster config -- node/partition/gres lines and every
-`slurm.conf` option -- lives in one place you control, instead of scattered across role
-variables. These files are server-specific, so keep them in `config/` (git-ignored).
+The `slurm.conf`, `cgroup.conf`, `gres.conf` and `slurmdbd.conf` files come from the
+`slurm` role's templates, rendered from settings: deepops' defaults under the site's own
+(`slurm_conf`, `slurm_cgroup_conf`, `slurm_gres_conf`, `slurm_dbd_conf`), each node's
+line from what the role measures there under `slurm_node_policy` and the host's
+`slurm_node`, and the partitions from `slurm_partitions`. Every key is checked against
+Slurm's own parameter list: [Slurm's config files from settings](slurm-conf.md).
 They live on the controller only: the nodes fetch them from `slurmctld` (configless).
-The controller refuses a `slurm.conf` template without `enable_configless` in
-`SlurmctldParameters`, with a `ClusterName` other than `{{ slurm_cluster_name }}`, or
-with a `PluginDir` other than the packages'; leave `PluginDir` out. Keep
-`MetricsType=metrics/openmetrics` for the Prometheus scrape.
+
+A site may still point `slurm_conf_template` (or the cgroup, gres and dbd ones) at its
+own complete template; `playbooks/slurm-cluster/slurm-conf-compare.yml` lists how it
+differs from the settings. The controller refuses a `slurm.conf` without
+`enable_configless` in `SlurmctldParameters`, with a `ClusterName` other than
+`{{ slurm_cluster_name }}`, or with a `PluginDir` other than the packages'; leave
+`PluginDir` out. Keep `MetricsType=metrics/openmetrics` for the Prometheus scrape.
 
 Optional submit-time routing (e.g. GPU jobs to per-GPU-type partitions) is available
 by setting `slurm_job_submit_plugins: "lua"` and the site's `slurm_job_submit_policy`

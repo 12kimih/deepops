@@ -15,11 +15,11 @@ import unittest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
-from ansible_yaml import condition, load, render, role_defaults, same_name  # noqa: E402
+from ansible_yaml import condition, load, render, role_variables, same_name  # noqa: E402
 
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 ROLE = ROOT / "roles/slurm"
-DEFAULTS = role_defaults("slurm")
+DEFAULTS = role_variables("slurm")
 EXAMPLE = yaml.safe_load((ROOT / "config.example/group_vars/slurm-cluster.yml").read_text())
 FACTS = {
     "ansible_facts": {
@@ -53,7 +53,7 @@ def variables(**overrides):
     }
     # Each node's TmpDisk, as the controller works it out before rendering (controller.yml).
     if "slurm_tmp_disk" not in overrides:
-        work = task("roles/slurm/tasks/controller.yml", "Work out each node's TmpDisk")
+        work = task("roles/slurm/tasks/tmp-disk.yml", "Work out each node's TmpDisk")
         values["slurm_tmp_disk"] = render(work["set_fact"]["slurm_tmp_disk"], values)
     return values
 
@@ -102,8 +102,7 @@ class SlurmConf(unittest.TestCase):
         self.assertNotIn("PluginDir", conf)
         self.assertTrue(conf["SlurmctldPidFile"].startswith("/run/slurmctld/"))
         self.assertTrue(conf["SlurmdPidFile"].startswith("/run/slurm/"))
-        # Read, not rendered: it uses the repository's required_secret filter.
-        dbd = settings((ROLE / "templates" / DEFAULTS["slurm_dbd_conf_template"]).read_text())
+        dbd = settings(rendered("slurm_dbd_conf_template", slurm_db_password="stub"))
         self.assertNotIn("PluginDir", dbd)
         self.assertTrue(dbd["PidFile"].startswith("/run/slurmdbd/"))
 
@@ -164,7 +163,9 @@ class GresConf(unittest.TestCase):
 
     def test_no_gpu_management_no_gres(self):
         lines = [
-            x for x in rendered("slurm_gres_conf_template", slurm_manage_gpus=False).splitlines() if x.strip()
+            x
+            for x in rendered("slurm_gres_conf_template", slurm_manage_gpus=False).splitlines()
+            if x.strip() and not x.startswith("#")
         ]
         self.assertEqual(lines, [])
 

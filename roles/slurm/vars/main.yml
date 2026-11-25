@@ -6,3 +6,56 @@ _slurm_build_account: "{{ system_accounts[slurm_deb_build_user] }}"
 # The controller's files slurmctld reads or serves (configless) that a run may rewrite:
 # kept before it does, put back when slurmctld refuses them (tasks/controller_restart.yml).
 slurm_controller_conf_files: [slurm.conf, job_submit.lua, cgroup.conf, gres.conf, namespace.yaml, plugstack.conf]
+
+# What the role works out for its config files from the inventory and its other settings
+# (defaults/main.yml renders the rest): no site setting overrides these. An empty value
+# leaves the key out.
+_slurm_conf_computed:
+  ClusterName: "{{ slurm_cluster_name }}"
+  SlurmctldHost: "{{ groups['slurm-master'] if slurm_enable_ha else groups['slurm-master'][:1] }}"
+  StateSaveLocation: "{{ slurm_state_save_location }}"
+  SlurmUser: "{{ slurm_username }}"
+  SlurmctldPort: "{{ slurm_slurmctld_port }}"
+  SlurmdPort: "{{ slurm_slurmd_port }}"
+  SlurmctldLogFile: "{{ slurm_log_files.slurmctld }}"
+  SlurmdLogFile: "{{ slurm_log_files.slurmd }}"
+  ReturnToService: "{{ slurm_return_to_service }}"
+  RebootProgram: "{{ slurm_reboot_program }}"
+  ResumeTimeout: "{{ slurm_resume_timeout }}"
+  JobSubmitPlugins: "{{ slurm_job_submit_plugins }}"
+  # Contain: ssh sessions adopted into a job (pam_slurm_adopt), and the per-job private
+  # directories (namespace.yaml, slurm_job_private_dirs), need the extern step.
+  PrologFlags: "{{ ['Alloc', 'Serial'] + (['Contain'] if slurm_contain_ssh | bool or slurm_job_private_dirs | length > 0 else []) }}"
+  NamespaceType: "{{ 'namespace/linux' if slurm_job_private_dirs | length > 0 else '' }}"
+  # The per-job private directories' filesystem: slurmd reports its size, a job's --tmp
+  # asks for that much of it (roles/job_scratch gives it a filesystem of its own).
+  TmpFS: "{{ slurm_job_private_base if slurm_job_private_dirs | length > 0 else '' }}"
+  Prolog: "{{ slurm_config_dir ~ '/prolog.sh' if slurm_enable_prolog_epilog else '' }}"
+  Epilog: "{{ slurm_config_dir ~ '/epilog.sh' if slurm_enable_prolog_epilog else '' }}"
+  # Before every task of every step, as the job user: the job environment the parts in
+  # task-prolog.d export.
+  TaskProlog: "{{ slurm_config_dir ~ '/task-prolog.sh' if slurm_enable_prolog_epilog else '' }}"
+  # Every node, allocated ones too, spread over the interval rather than all at once
+  # (CYCLE), as NHC's README recommends. https://github.com/mej/nhc
+  HealthCheckProgram: "{{ slurm_health_check_program }}"
+  HealthCheckInterval: "{{ slurm_health_check_interval if slurm_health_check_program else '' }}"
+  HealthCheckNodeState: "{{ 'ANY,CYCLE' if slurm_health_check_program else '' }}"
+  # Job notices (--mail-type) go to Slack, not mail (roles/job_notice).
+  MailProg: "{{ job_notice_command if deepops_components.job_notice | default('absent') == 'present' else '' }}"
+  AccountingStorageHost: "{{ groups['slurm-master'][0] }}"
+  AccountingStoragePort: "{{ slurm_slurmdbd_port }}"
+  GresTypes: "{{ 'gpu' if slurm_manage_gpus else '' }}"
+  # GPUs in all, and each type the nodes' gres.conf lines name (slurm_gres).
+  AccountingStorageTRES: >-
+    {{ (['gres/gpu'] + (groups['slurm-node'] | map('extract', hostvars) | map(attribute='slurm_gres', default=[])
+        | flatten | selectattr('Type', 'defined') | map(attribute='Type') | unique | sort | map('regex_replace', '^', 'gres/gpu:') | list))
+       if slurm_manage_gpus else '' }}
+_slurm_cgroup_conf_computed: {}
+_slurm_gres_conf_computed: {}
+_slurm_dbd_conf_computed:
+  DbdHost: "{{ groups['slurm-master'][0] }}"
+  DbdPort: "{{ slurm_slurmdbd_port }}"
+  LogFile: "{{ slurm_log_files.slurmdbd }}"
+  SlurmUser: "{{ slurm_username }}"
+  StorageUser: "{{ slurm_db_username }}"
+  StoragePass: "{{ slurm_db_password | required_secret('slurm_db_password') }}"

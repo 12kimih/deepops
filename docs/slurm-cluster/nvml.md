@@ -162,24 +162,24 @@ We then deploy a Slurm cluster across the two nodes by running:
 ansible-playbook -b -l slurm-cluster playbooks/slurm-cluster.yml
 ```
 
-#### Custom slurm.conf and nhc.conf
+#### MIG in slurm.conf, and nhc.conf
 
-Because we are using MIG, we will need to use a custom Slurm config to specify the number and type of MIG instances. To do this, we first copy the `slurm.conf` from the Slurm controller (the nodes are configless and keep no `/etc/slurm/slurm.conf`) and the node's `nhc.conf` to our DeepOps repo:
+Because we are using MIG, the node's `Gres` must list the MIG instances by type
+([Slurm's config files from settings](slurm-conf.md)). Because we have 8 physical GPUs on
+the node, we have 8x 3g.40gb instances, 8x 2g.20gb instances, and 16x 1g.10gb instances;
+in `config/host_vars/dgx01`:
+
+```yaml
+slurm_node_conf:
+  Gres: "gpu:3g.40gb:8,gpu:2g.20gb:8,gpu:1g.10gb:16"
+```
+
+NHC does not yet support MIG, so we disable the GPU check in a copy of the node's
+`nhc.conf` (the nodes are configless and keep no `/etc/slurm/slurm.conf`):
 
 ```
-$ scp user@<slurm-master>:/etc/slurm/slurm.conf config/files/slurm/slurm.conf
 $ scp user@dgx01:/etc/nhc/nhc.conf config/files/slurm/nhc.conf
 ```
-
-Edit the `slurm.conf` to specify the GPUs on the node according to our configured MIG instances. Note that because we have 8 physical GPUs on the node, we have 8x 3g.40gb instances, 8x 2g.20gb instances, and 16x 1g.10gb instances:
-
-```
-< NodeName=dgx01  Gres=gpu:8     CPUs=256 Sockets=2 CoresPerSocket=64 ThreadsPerCore=2 Procs=128 RealMemory=1960850 State=UNKNOWN
----
-> NodeName=dgx01  Gres=gpu:3g.40gb:8,gpu:2g.20gb:8,gpu:1g.10gb:16  CPUs=256 Sockets=2 CoresPerSocket=64 ThreadsPerCore=2 Procs=128 RealMemory=1960850 State=UNKNOWN
-```
-
-NHC does not yet support MIG, so we just disable the GPU check:
 
 ```
 <  dgx01 || check_nv_gpu_count 8
@@ -187,10 +187,9 @@ NHC does not yet support MIG, so we just disable the GPU check:
 > # dgx01 || check_nv_gpu_count 8
 ```
 
-We edit `config/group_vars/slurm-cluster.yml` to specify our custom files:
+and point the role at it in `config/group_vars/slurm-cluster.yml`:
 
 ```yaml
-slurm_conf_template: "{{ inventory_dir }}/files/slurm/slurm.conf"
 nhc_config_template: "{{ inventory_dir }}/files/slurm/nhc.conf"
 ```
 

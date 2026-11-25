@@ -1,0 +1,39 @@
+---
+# The site settings that say what the files here say (test_render.py): group_vars, then
+# each node's host_vars under hosts.
+group_vars:
+  slurm_cluster_name: example
+  slurm_job_submit_plugins: lua
+  slurm_conf:
+    PropagateResourceLimits: NONE
+    PropagateResourceLimitsExcept: null
+    SlurmctldPidFile: /var/run/slurmctld/slurmctld.pid
+    SlurmdPidFile: /var/run/slurm/slurmd.pid
+    TaskPlugin: task/affinity,task/cgroup
+    MinJobAge: 120
+    UnkillableStepTimeout: 180
+    SlurmctldParameters: [enable_configless, rl_enable]
+    PriorityType: priority/multifactor
+    PriorityWeightFairshare: 1000
+    AccountingStorageEnforce: [associations, limits, qos]
+    SlurmctldDebug: info
+    SlurmdDebug: info
+  slurm_partition_defaults: {State: UP, OverSubscribe: "NO", MaxTime: 7-00:00:00}
+  slurm_partitions:
+    - {PartitionName: gpu, Nodes: "gpu[01-02]", Default: true, DefCpuPerGPU: 4, TRESBillingWeights: "CPU=0,Mem=0,GRES/gpu:gtype=1.0"}
+  slurm_cgroup_conf: {CgroupPlugin: cgroup/v2, ConstrainSwapSpace: true}
+  slurm_gres_conf: {AutoDetect: null}
+  slurm_dbd_conf: {DebugLevel: info, PidFile: /var/run/slurmdbd/slurmdbd.pid}
+hosts:
+  gpu01:
+    ansible_host: 192.0.2.1
+    slurm_node_policy: {CoreSpecCount: 1, RealMemory: 1024}
+    slurm_node_conf: {NodeAddr: 192.0.2.1, Weight: 10}
+    slurm_gres: [{Name: gpu, Type: gtype, File: "/dev/nvidia[0-1]", Cores: 0-3}]
+  gpu02:
+    ansible_host: 192.0.2.2
+    slurm_node_policy: {CoreSpecCount: 1, RealMemory: 1024}
+    slurm_node_conf: {NodeAddr: 192.0.2.2, Weight: 20}
+    slurm_gres:
+      - {Name: gpu, Type: gtype, File: /dev/nvidia0, Cores: 0-1}
+      - {Name: gpu, Type: gtype, File: /dev/nvidia1, Cores: 2-3}

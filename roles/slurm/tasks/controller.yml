@@ -115,19 +115,8 @@
     quiet: true
   when: slurm_state_clustername.content is defined
 
-# One place works out each node's TmpDisk, for the bundled template and a site's own:
-# its job filesystem (roles/job_scratch, the local fact) in whole MiB rounded down to a
-# GiB like RealMemory (never above what slurmd measures, which drains the node), only
-# with per-job private directories on it; nodes without one are not listed.
-- name: Work out each node's TmpDisk
-  ansible.builtin.set_fact:
-    slurm_tmp_disk: >-
-      {%- set ns = namespace(out={}) -%}
-      {%- for node in groups['slurm-node'] if slurm_job_private_dirs | length > 0 -%}
-      {%- set mb = hostvars[node]['ansible_facts']['ansible_local']['job_scratch']['size_mb'] | default(0) | int // 1024 * 1024 -%}
-      {%- if mb > 0 %}{% set ns.out = ns.out | combine({node: mb}) %}{% endif -%}
-      {%- endfor -%}
-      {{ ns.out }}
+- name: Each node's TmpDisk, for slurm.conf
+  ansible.builtin.import_tasks: tmp-disk.yml
   tags:
     - config
 
@@ -366,7 +355,7 @@
 # slurmdbd converts the database before it listens.
 - name: Wait for slurmdbd to be available
   ansible.builtin.wait_for:
-    port: 6819
+    port: "{{ slurm_slurmdbd_port }}"
     delay: 5
     timeout: "{{ slurm_dbd_wait_timeout }}"
 

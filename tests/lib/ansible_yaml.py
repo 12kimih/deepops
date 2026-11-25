@@ -46,6 +46,16 @@ def role_defaults(role):
     return found
 
 
+def role_variables(role):
+    """What a role's templates see of it: role_defaults, then its vars/main.yml (role vars
+    win over defaults, as in a play)."""
+    found = role_defaults(role)
+    own = ROOT / "roles" / role / "vars" / "main.yml"
+    if own.is_file():
+        found.update(yaml.safe_load(own.read_text(encoding="utf-8")) or {})
+    return found
+
+
 def same_name(actual, expected):
     """Task names compare without regard to case."""
     return isinstance(actual, str) and isinstance(expected, str) and actual.casefold() == expected.casefold()

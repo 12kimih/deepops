@@ -218,10 +218,100 @@ slurm_resume_timeout: 900
 # Sets: Gres=gpu:{{ gpu_topology|count }}, and AutoDetect=nvml in gres.conf
 slurm_manage_gpus: true
 
-# Configuration file templates to use for configuring Slurm.
-# The default values are relative paths that will point to files within the
-# templates/ directory of this role, but we provide variables so that they
-# can be overridden.
+# Slurm's config files, rendered by the role (docs/slurm-cluster/slurm-conf.md): for each,
+# deepops' recommended settings (*_defaults) under the site's own (slurm_conf and the
+# like), both mappings of Slurm's own keys; a key set to null is left out, so Slurm's
+# default applies. Every key is checked against Slurm's parameter list for
+# slurm_version (plugins/filter/slurm_parameters.json). The values the role works out
+# (hosts, ports, paths, the features it turns on) are its own and cannot be overridden
+# (roles/slurm/vars/main.yml, _slurm_*_computed).
+# https://slurm.schedmd.com/slurm.conf.html
+slurm_conf_defaults:
+  AccountingStoragePass: /var/run/munge/munge.socket.2
+  AccountingStorageType: accounting_storage/slurmdbd
+  AuthType: auth/munge
+  # Slurm waits for a prolog or epilog for ever by default; one stuck on a hung NFS
+  # server or controller would hold the node in COMPLETING. Past this it drains instead.
+  PrologEpilogTimeout: 600
+  # A launch waits for the prolog (PrologFlags=Alloc): as long as the prolog may run.
+  BatchStartTimeout: 600
+  InactiveLimit: 0
+  JobAcctGatherType: jobacct_gather/cgroup
+  JobCompType: jobcomp/none
+  KillWait: 120
+  # Scheduler, job, node and partition metrics on slurmctld's port, /metrics/<set>, for
+  # Prometheus. https://slurm.schedmd.com/metrics.html
+  MetricsType: metrics/openmetrics
+  MinJobAge: 300
+  # PMIx (the distribution's libpmix)
+  MpiDefault: pmix
+  ProctrackType: proctrack/cgroup
+  PropagateResourceLimitsExcept: MEMLOCK
+  SchedulerType: sched/backfill
+  SelectType: select/cons_tres
+  SelectTypeParameters: [CR_Core_Memory, CR_CORE_DEFAULT_DIST_BLOCK, CR_ONE_TASK_PER_CORE]
+  SlurmctldDebug: 3
+  # The nodes fetch slurm.conf, gres.conf, cgroup.conf and plugstack.conf from slurmctld
+  # (slurmd --conf-server); none keeps a copy. A site's list keeps enable_configless.
+  # https://slurm.schedmd.com/configless_slurm.html
+  SlurmctldParameters: [enable_configless]
+  SlurmctldPidFile: /run/slurmctld/slurmctld.pid
+  SlurmctldTimeout: 120
+  SlurmdDebug: 3
+  SlurmdPidFile: /run/slurm/slurmd.pid
+  SlurmdSpoolDir: /var/spool/slurmd
+  SlurmdTimeout: 300
+  SwitchType: switch/none
+  TaskPlugin: affinity,cgroup
+  WaitTime: 0
+slurm_conf: {}
+# Each node's line: what the role measures (CPUs, boards, sockets, cores, threads,
+# RealMemory, Gres, TmpDisk), under slurm_node_policy (group_vars: CoreSpecCount,
+# MemSpecLimit, RestrictedCoresPerGPU, Weight, NodeAddr: "{{ ansible_host }}" ...) under
+# the host's own slurm_node_conf (host_vars); null leaves a key out. A node's gres.conf
+# lines are its slurm_gres (host_vars), each a mapping of gres.conf keys without NodeName
+# ({Name: gpu, Type: <type>, File: /dev/nvidia[0-3], Cores: 0-47}); its Gres then counts
+# them by type, and without any slurmd finds the GPUs itself (AutoDetect, below). The
+# role reads these three from each node's hostvars, which hold no role default: none of
+# them has one here, and unset is none.
+# The partitions, each a mapping of partition keys with its PartitionName, every one over
+# slurm_partition_defaults. The default is one partition of every node.
+slurm_partition_defaults: {}
+slurm_partitions:
+  - PartitionName: batch
+    Nodes: ALL
+    Default: true
+    DefMemPerCPU: 0
+    State: UP
+    OverSubscribe: "{{ slurm_oversubscribe }}"
+    MaxTime: "{{ slurm_max_job_timelimit }}"
+    DefaultTime: "{{ slurm_default_job_timelimit }}"
+# cgroup.conf(5)
+slurm_cgroup_conf_defaults:
+  ConstrainCores: true
+  ConstrainDevices: true
+  ConstrainRAMSpace: true
+slurm_cgroup_conf: {}
+# gres.conf(5): slurmd finds each node's NVIDIA GPUs, their device files and CPU affinity
+# through NVML (the driver's libnvidia-ml); a node without one only logs that it found
+# none. https://slurm.schedmd.com/gres.html#AutoDetect
+slurm_gres_conf_defaults:
+  AutoDetect: "{{ 'nvml' if slurm_manage_gpus else '' }}"
+slurm_gres_conf: {}
+# slurmdbd.conf(5)
+slurm_dbd_conf_defaults:
+  AuthType: auth/munge
+  DebugLevel: 4
+  PidFile: /run/slurmdbd/slurmdbd.pid
+  StorageLoc: slurm_acct_db
+  StorageType: accounting_storage/mysql
+slurm_dbd_conf: {}
+# How often slurmd runs the health check (slurm_health_check_program), in seconds.
+slurm_health_check_interval: 300
+
+# The files the role installs: its own templates, which render the settings above. A
+# site may point one at its own complete template instead (then the settings above do
+# not apply to that file); roles/slurm/tasks/conf-compare.yml lists what differs.
 slurm_conf_template: "etc/slurm/slurm.conf"
 # Each node's TmpDisk in MiB, {node: size}: worked out on the controller from the
 # job filesystem's fact (roles/job_scratch) before slurm.conf is rendered; a site's own
@@ -265,8 +355,7 @@ slurm_accounting_users: {}
 slurm_accounting_revoke: []
 
 # job_submit plugin (empty = none; "lua" deploys job_submit.lua from
-# slurm_job_submit_template and slurm_job_submit_policy). All other slurm.conf tuning belongs in your own complete
-# template under config/files/slurm/ (slurm_conf_template), not in role variables.
+# slurm_job_submit_template and slurm_job_submit_policy).
 slurm_job_submit_plugins: ""
 
 # Partition OverSubscribe value used by the bundled slurm.conf template ("NO",

@@ -1,0 +1,41 @@
+---
+# Whether the role's own config files (its templates, rendered from slurm_conf and the
+# like) say what the site's own templates say, setting by setting: every global key, and
+# every node, partition and gres.conf line field by field (plugins/filter/slurm_conf.py,
+# slurm_conf_diff). For moving a site from its own files to the role's: a site file goes
+# once nothing is listed for it. Renders on the controller only and changes nothing; the
+# database password is compared as a placeholder, never rendered.
+# playbooks/slurm-cluster/slurm-conf-compare.yml
+- name: Work out each node's TmpDisk
+  ansible.builtin.import_tasks: tmp-disk.yml
+
+# A site's own file is an absolute path (under inventory_dir); the role's are relative.
+- name: Compare each site file with the role's rendering
+  vars:
+    slurm_db_password: "@slurm_db_password@"
+    _site: "{{ lookup('ansible.builtin.template', item.site) }}"
+    _role: "{{ lookup('ansible.builtin.template', role_path ~ '/templates/etc/slurm/' ~ item.conf) }}"
+  ansible.builtin.set_fact:
+    slurm_conf_differences: "{{ slurm_conf_differences | default([]) + (_site | slurm_conf_diff(_role, item.conf)) }}"
+  loop:
+    - {conf: slurm.conf, site: "{{ slurm_conf_template }}"}
+    - {conf: cgroup.conf, site: "{{ slurm_cgroup_conf_template }}"}
+    - {conf: gres.conf, site: "{{ slurm_gres_conf_template }}"}
+    - {conf: slurmdbd.conf, site: "{{ slurm_dbd_conf_template }}"}
+  loop_control:
+    label: "{{ item.conf }}"
+  when: item.site is abs
+
+- name: Show what differs (site file, then the role's rendering)
+  ansible.builtin.debug:
+    msg: "{{ slurm_conf_differences | default([]) | map('slurm_conf_difference_line') | list }}"
+
+- name: Refuse any difference
+  ansible.builtin.assert:
+    that: slurm_conf_differences | default([]) | length == 0
+    fail_msg: >-
+      The role's rendering differs from the site's own files in
+      {{ slurm_conf_differences | length }} settings (listed above). Set each in slurm_conf,
+      slurm_node_policy, slurm_node_conf, slurm_gres, slurm_partitions or the other files'
+      settings (docs/slurm-cluster/slurm-conf.md), or decide the role's value is right.
+    quiet: true
