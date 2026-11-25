@@ -234,6 +234,7 @@ class PublicAllowList(unittest.TestCase):
             "chat": {"channels": {"admin": "#x"}, "admin_group": "@ops", "admin_group_id": "S0"},
             "bot": {"command": "/c", "subcommands": [], "token": "x"},
             "reports": {"usage": "hourly", "weekly": "Mon", "disk": "daily", "host": "h"},
+            "schedules": {"scratch_purge": "*-*-* 03:30:00", "host": "h"},
             "quotas": {"hosts": {"n": {}}},
             "anything_new": {"a": 1},
         }
@@ -258,6 +259,7 @@ class PublicAllowList(unittest.TestCase):
         self.assertEqual(out["chat"], {"channels": {"admin": "#x"}, "admin_group": "@ops"})
         self.assertEqual(set(out["bot"]), {"command", "subcommands"})
         self.assertEqual(set(out["reports"]), {"usage", "weekly", "disk"})
+        self.assertEqual(out["schedules"], {"scratch_purge": "*-*-* 03:30:00"})
         self.assertEqual(set(out["commands"]["sq"]) - {"summary_ko"}, {"summary", "usage", "options"})
 
     def test_the_allow_list_holds_nothing_private(self):

@@ -55,6 +55,8 @@ Facts:
             with their Korean help, in order (cluster_bot.commands SUBCOMMANDS)
   reports   when the status channel's reports run (systemd OnCalendar):
             usage (slurm_usage_report_schedule), weekly, disk
+  schedules when the cluster's other timers that people meet run (OnCalendar):
+            scratch_purge (scratch_space_purge_on_calendar: the purge list and cleanup)
   quotas    each host's disk_quota_filesystems and disk_quota_inodes_per_tib (private)
 
 A site value set in the config overrides a role default. A template is rendered (Jinja,
@@ -124,12 +126,14 @@ PUBLIC = {
     "chat": {"channels", "admin_group"},
     "bot": {"command", "subcommands"},
     "reports": {"usage", "weekly", "disk"},
+    "schedules": {"scratch_purge"},
 }
 REPORTS = {
     "usage": "slurm_usage_report_schedule",
     "weekly": "slurm_usage_report_weekly_schedule",
     "disk": "slurm_usage_report_disk_schedule",
 }
+SCHEDULES = {"scratch_purge": "scratch_space_purge_on_calendar"}
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 QUOTA_FIELDS = {"block_hard_tib", "block_warn_tib", "inode_hard", "inode_warn"}
 _TIB = {"K": 1 / 1024**3, "M": 1 / 1024**2, "G": 1 / 1024, "T": 1}
@@ -457,6 +461,7 @@ def facts(config):
         "services": services(config, s),
         "paths": paths(s),
         "reports": {field: s.get(key) for field, key in REPORTS.items()},
+        "schedules": {field: s.get(key) for field, key in SCHEDULES.items()},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
     }
     return every
