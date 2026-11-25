@@ -8,8 +8,8 @@ After=network-online.target
 [Service]
 User={{ cluster_bot_user }}
 Group={{ cluster_bot_user }}
-Environment=PYTHONPATH={{ _cluster_bot_lib }}:{{ cluster_tools_lib_dir }}
-ExecStart={{ _cluster_bot_venv }}/bin/python -m cluster_bot.app {{ _cluster_bot_config }}
+Environment=PYTHONPATH={{ _cluster_bot_pythonpath }}
+ExecStart={{ _cluster_bot_python }} -m cluster_bot.app {{ _cluster_bot_config }}
 Restart=on-failure
 RestartSec=30
 NoNewPrivileges=yes

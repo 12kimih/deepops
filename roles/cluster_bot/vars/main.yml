@@ -9,6 +9,11 @@ _cluster_bot_venv_steps:
       slack_sdk=={{ cluster_bot_slack_sdk_version }} --hash=sha256:{{ cluster_bot_sha256.slack_sdk[cluster_bot_slack_sdk_version] }}
       ruamel.yaml=={{ cluster_bot_ruamel_yaml_version }} --hash=sha256:{{ cluster_bot_sha256.ruamel_yaml[cluster_bot_ruamel_yaml_version] }}
 _cluster_bot_lib: "{{ _cluster_bot_prefix }}/lib"
+# How the bot's Python runs: its unit and the administrators' command (cluster-bot.j2)
+# both take these, so the two never name a different interpreter, path or config.
+_cluster_bot_python: "{{ _cluster_bot_venv }}/bin/python"
+_cluster_bot_pythonpath: "{{ _cluster_bot_lib }}:{{ cluster_tools_lib_dir }}"
+_cluster_bot_admin_command: /usr/local/sbin/cluster-bot
 _cluster_bot_etc: /etc/cluster-bot
 _cluster_bot_config: "{{ _cluster_bot_etc }}/config.json"
 _cluster_bot_tokens: {bot: "{{ _cluster_bot_etc }}/bot.token", app: "{{ _cluster_bot_etc }}/app.token"}
@@ -113,6 +118,7 @@ _cluster_bot_cfg:
 cluster_bot_items:
   - "unit:{{ _cluster_bot_unit }}"
   - "file:/etc/systemd/system/{{ _cluster_bot_unit }}"
+  - "file:{{ _cluster_bot_admin_command }}"
   - "file:{{ _cluster_bot_config }}"
   - "file:{{ _cluster_bot_manifest }}"
   - "file:{{ _cluster_bot_tokens.bot }}"

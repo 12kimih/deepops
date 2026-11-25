@@ -114,14 +114,16 @@ changes nothing. A post of another app or a person is never touched.
 
 A post from before the metadata (an older bot's, or this app's webhook's) is found by
 its button to the notice's page, or by its title. The bot's rounds leave those as they
-are; you change them with one run, after reading what it would do, as the bot's user:
+are; you change them with one run, after reading what it would do:
 
-    sudo -u <cluster_bot_user> env PYTHONPATH=<deepops_dir>/cluster-bot/lib:<cluster_tools_lib_dir> \
-      <deepops_dir>/cluster-bot/venv/bin/python -m cluster_bot.notices /etc/cluster-bot/config.json --dry-run
+    sudo cluster-bot notices --dry-run
+    sudo cluster-bot notices
 
-The dry run prints each `update`, `delete` (with the replies it takes), `post`, `pin`,
+`cluster-bot` (`/usr/local/sbin`, the administrators' command) runs the bot's code as the
+bot's user with the interpreter, path and config of its unit; the role renders both from
+the same vars. The dry run prints each `update`, `delete` (with the replies it takes), `post`, `pin`,
 `missing` and `foreign` (another app's post, left) and changes nothing, the record
-neither. The same command without `--dry-run` does it; from then on those posts carry
+neither. The second command does it; from then on those posts carry
 metadata. A post the app may not change (`cant_update_message`) is said and left.
 
 The channels' guides: each channel `slack_channels` names gets its purpose, topic, a
@@ -262,6 +264,7 @@ Who the bot knows comes from the people roster: `cluster_bot_members` (each pers
 
 | Path | What |
 |---|---|
+| `/usr/local/sbin/cluster-bot` | The administrators' command (`sudo cluster-bot notices [--dry-run]`): the bot's code as its user, with its unit's interpreter, path and config |
 | `/etc/cluster-bot/config.json` | Channels, members, admins, feature settings (0640, the bot's group) |
 | `/etc/cluster-bot/bot.token`, `app.token` | The tokens, read by the bot alone; never on a command line |
 | `/etc/cluster-bot/github-app.pem` | The GitHub App's private key, read by the bot alone |

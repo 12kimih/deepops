@@ -203,6 +203,14 @@
     mode: "0644"
   notify: Restart the cluster bot
 
+- name: Install the administrators' command (cluster-bot notices [--dry-run])
+  ansible.builtin.template:
+    src: cluster-bot.j2
+    dest: "{{ _cluster_bot_admin_command }}"
+    owner: root
+    group: root
+    mode: "0755"
+
 # Without both tokens there is nothing to connect with: installed, not running.
 - name: Run the cluster bot, or keep it stopped without both tokens
   systemd_unit:
