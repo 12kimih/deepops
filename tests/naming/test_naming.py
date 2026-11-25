@@ -73,6 +73,7 @@ MODULE_NOT_ROLE = {
 RULE_FILE_NOT_KEY = {"backup.yml": "slurm_backup", "container-storage.yml": "container_storage_gc"}
 # Rule files about the cluster as a whole, not one component.
 GENERAL_RULE_FILES = {
+    "components.yml",
     "gpu.yml",
     "host.yml",
     "monitoring.yml",

@@ -161,6 +161,7 @@
             [Service]
             Type=oneshot
             TimeoutStartSec=15min
+            Environment=OS_UPDATES_COMPONENT_RECORD={{ deepops_component_record }}
             ExecStart=/usr/local/sbin/os-updates-metrics {{ node_exporter_prom_dir }}
             Nice=10
           # At every boot: the kept metrics at once (the textfile directory is usually
@@ -177,6 +178,7 @@
             [Service]
             Type=oneshot
             TimeoutStartSec=15min
+            Environment=OS_UPDATES_COMPONENT_RECORD={{ deepops_component_record }}
             ExecStart=/usr/local/sbin/os-updates-metrics --publish {{ node_exporter_prom_dir }}
             ExecStart=/usr/local/sbin/os-updates-metrics {{ node_exporter_prom_dir }}
             Nice=10

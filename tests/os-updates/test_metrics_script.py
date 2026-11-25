@@ -5,6 +5,7 @@ could not simulate the upgrade knows nothing about them; resetting the clock the
 restarted the count after every transient apt failure.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -18,7 +19,7 @@ from sandbox_path import sandbox_path  # noqa: E402
 SCRIPT = Path(__file__).resolve().parents[2] / "roles/os_updates/files/os-updates-metrics"
 # What the script runs besides the package tools each test fakes (dpkg, dpkg-query,
 # apt-get, apt): never the host's, whose packages and pending reboot are not the test's.
-TOOLS = ("sh", "awk", "cat", "chmod", "date", "grep", "mkdir", "mktemp", "mv", "rm", "sed")
+TOOLS = ("sh", "awk", "cat", "chmod", "date", "grep", "mkdir", "mktemp", "mv", "python3", "rm", "sed")
 STUBS = {"dpkg": "exit 0\n", "dpkg-query": "exit 0\n", "apt-get": "exit 0\n", "apt": "exit 0\n"}
 
 
@@ -92,6 +93,53 @@ class PackageInfoTests(unittest.TestCase):
                 'os_updates_package_info{package="enroot",version="4.2.0-1",source="local"} 1', text
             )
             self.assertIn('package="libc6:amd64",version="2.39-0ubuntu8.6",source="repo"', text)
+
+
+class ComponentTests(unittest.TestCase):
+    """The host's component record as series, so an alert names a package's component."""
+
+    RECORD = {
+        "components": {
+            "enroot": {"state": "present", "version": "4.2.1-1"},
+            "half": {"state": "installing", "version": "2"},
+            'odd"name': {"state": "present", "version": ""},
+        },
+        "items": {
+            "package:enroot": ["enroot"],
+            "package:enroot+caps": ["enroot", "pyxis"],
+            "unit:x": ["enroot"],
+        },
+    }
+
+    def series(self, record_text=None, named=True):
+        with tempfile.TemporaryDirectory() as d:
+            bin_, state, textfile = Path(d, "bin"), Path(d, "state"), Path(d, "textfile")
+            env = environment(bin_, state)
+            record = Path(d, "deepops_components.fact")
+            if record_text is not None:
+                record.write_text(record_text)
+            if named:
+                env["OS_UPDATES_COMPONENT_RECORD"] = str(record)
+            subprocess.run(["sh", str(SCRIPT), str(textfile)], env=env, check=True, capture_output=True)
+            text = (textfile / "os-updates.prom").read_text()
+            return [line for line in text.splitlines() if "_component_info{" in line]
+
+    def test_present_components_and_each_packages_components(self):
+        self.assertEqual(
+            self.series(json.dumps(self.RECORD)),
+            [
+                'os_updates_component_info{component="enroot",version="4.2.1-1"} 1',
+                'os_updates_component_info{component="odd\\"name",version=""} 1',
+                'os_updates_package_component_info{package="enroot",component="enroot"} 1',
+                'os_updates_package_component_info{package="enroot+caps",component="enroot"} 1',
+                'os_updates_package_component_info{package="enroot+caps",component="pyxis"} 1',
+            ],
+        )
+
+    def test_no_record_or_a_broken_one_is_no_series_and_no_failure(self):
+        self.assertEqual(self.series(None), [])
+        self.assertEqual(self.series("{not json"), [])
+        self.assertEqual(self.series(json.dumps(self.RECORD), named=False), [])
 
 
 class BootRepublishTests(unittest.TestCase):
