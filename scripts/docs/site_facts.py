@@ -79,6 +79,7 @@ import json
 import re
 import os
 import sys
+import tomllib
 from pathlib import Path
 
 import jinja2
@@ -592,6 +593,21 @@ def render(data):
     return json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
 
 
+def docs_url_mismatch(public_file, config):
+    """Where the docs site says it is published (site_url in the zensical.toml beside
+    its data/ directory) against where the cluster tells people to read it
+    (cluster_info.docs_url: the login banner, the bot, the agent rules): a message when
+    both are set and differ, else None. Neither read the other, unchecked (2026-11-27)."""
+    toml = Path(public_file).resolve().parents[1] / "zensical.toml"
+    url = ((settings(config).get("cluster_info") or {}).get("docs_url") or "") if config else ""
+    if not toml.is_file() or not url:
+        return None
+    site = (tomllib.loads(toml.read_text()).get("project") or {}).get("site_url") or ""
+    if site and site.rstrip("/") != str(url).rstrip("/"):
+        return f"{toml}: site_url {site} is not cluster_info.docs_url {url} (the site config)"
+    return None
+
+
 def main(argv=None):
     ap = cli.parser(__doc__)
     ap.add_argument("--config", default=os.environ.get("DEEPOPS_CONFIG_DIR", str(ROOT / "config")))
@@ -600,6 +616,10 @@ def main(argv=None):
     args = ap.parse_args(argv)
     config = args.config if Path(args.config).is_dir() else None
     path, text = Path(args.public), render(public(facts(config)))
+    mismatch = docs_url_mismatch(path, config)
+    if mismatch:
+        print(mismatch, file=sys.stderr)
+        return 1
     if not args.check:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
