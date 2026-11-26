@@ -135,6 +135,15 @@ class TableTests(unittest.TestCase):
         nodes = out("-d", "-N", "--no-queue", "--no-users")
         self.assertRegex(nodes, r"gpu7 +down\+not_responding")
 
+    def test_a_node_reads_as_sinfo_prints_it(self):
+        """2026-11-26: sinfo said idle* (not responding) where sq said down. A node's
+        state is sinfo's word; its colour and the free count still follow its class."""
+        nodes = ANSI.sub("", out("-N", "--no-queue", "--no-users"))
+        for name, short in (("gpu7", "down*"), ("gpu5", "idle~"), ("gpu4", "drng"), ("gpu2", "alloc")):
+            with self.subTest(node=name):
+                self.assertRegex(nodes, rf"(?m)^\W*{name} +{re.escape(short)} ")
+        self.assertEqual(row(model(), "node", "gpu7")["class"], "down")
+
     def test_users_by_default_and_no_legends(self):
         text = out()
         self.assertIn("USERS", text)

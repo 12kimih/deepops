@@ -90,6 +90,49 @@ class NodeStateTests(unittest.TestCase):
     def test_full_state(self):
         self.assertEqual(vocab.node_state(["MIXED", "DRAIN"]), "mixed+drain")
 
+    def test_short_state_is_sinfos(self):
+        """2026-11-26: sinfo said idle* (not responding) where sq said down. sq prints
+        sinfo's %t, Slurm 26.05's node_state_string_compact, case by case."""
+        cases = [
+            (["IDLE"], "idle"),
+            (["IDLE", "NOT_RESPONDING"], "idle*"),
+            (["MIXED", "PLANNED"], "mix-"),
+            (["IDLE", "PLANNED"], "plnd"),
+            (["MIXED"], "mix"),
+            (["ALLOCATED"], "alloc"),
+            (["ALLOCATED", "COMPLETING"], "alloc+"),
+            (["IDLE", "COMPLETING"], "comp"),
+            (["IDLE", "DRAIN"], "drain"),
+            (["MIXED", "DRAIN"], "drng"),
+            (["IDLE", "COMPLETING", "DRAIN"], "drng"),
+            (["DOWN", "DRAIN", "NOT_RESPONDING"], "drain*"),
+            (["MIXED", "DRAIN", "MAINTENANCE"], "drng$"),
+            (["DOWN"], "down"),
+            (["DOWN", "NOT_RESPONDING"], "down*"),
+            (["DOWN", "POWERED_DOWN", "NOT_RESPONDING"], "down~"),
+            (["IDLE", "POWERED_DOWN"], "idle~"),
+            (["IDLE", "POWERING_UP"], "idle#"),
+            (["IDLE", "MAINTENANCE", "RESERVED"], "maint"),
+            (["IDLE", "MAINTENANCE", "NOT_RESPONDING"], "maint*"),
+            (["MIXED", "MAINTENANCE"], "mix$"),
+            (["IDLE", "RESERVED"], "resv"),
+            (["IDLE", "BLOCKED"], "block"),
+            (["IDLE", "REBOOT_ISSUED"], "boot^"),
+            (["IDLE", "REBOOT_REQUESTED", "NOT_RESPONDING"], "boot*"),
+            (["MIXED", "REBOOT_REQUESTED"], "mix@"),
+            (["IDLE", "FAIL"], "fail"),
+            (["MIXED", "FAIL", "NOT_RESPONDING"], "failg*"),
+            (["IDLE", "INVALID_REG"], "inval"),
+            (["FUTURE"], "futr"),
+            (["UNKNOWN"], "unk"),
+            (["UNKNOWN", "NOT_RESPONDING"], "unk*"),
+            (["ERROR"], "?"),
+            ("MIXED+PLANNED", "mix-"),
+        ]
+        for flags, short in cases:
+            with self.subTest(flags=flags):
+                self.assertEqual(vocab.node_short(flags), short)
+
     def test_unavailable_order(self):
         cases = [
             (["IDLE"], None),
