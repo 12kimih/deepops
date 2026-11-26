@@ -173,6 +173,36 @@ class Watch(unittest.TestCase):
             [m["text"] for m in self.slack.posts()], ["현재 차단된 주소 1개"], "back again is not new"
         )
 
+    def test_a_first_round_that_read_no_host_tells_nothing_new_after(self):
+        """The bot's key was refused on every host in its first round (2026-11-26): the
+        next round, the first that read them, told all 57 bans as new."""
+        for h in self.hosts.values():
+            h.down = True
+        self.round()
+        for h in self.hosts.values():
+            h.down = False
+        self.round()
+        self.assertEqual([m["text"] for m in self.slack.posts()], ["현재 차단된 주소 1개"], "no notice")
+        self.hosts["node1"].banned = [{**BAN, "ip": "198.51.100.9"}]
+        self.round()
+        self.assertTrue(any(m["text"].endswith("새로 차단된 주소 1개") for m in self.slack.posts()))
+
+    def test_a_host_read_for_the_first_time_tells_nothing_new(self):
+        self.hosts["node1"].down = True
+        self.round()
+        self.hosts["node1"].down, self.hosts["node1"].banned = False, [{**BAN, "ip": "198.51.100.9"}]
+        self.round()
+        self.assertFalse(
+            any("새로" in m["text"] for m in self.slack.posts()), "what it banned before is not new"
+        )
+
+    def test_a_record_from_before_read_keeps_telling_new_bans(self):
+        self.round()
+        del self.seen["read"]
+        self.hosts["login"].banned = [BAN, {**BAN, "ip": "198.51.100.9"}]
+        self.round()
+        self.assertTrue(any(m["text"].endswith("새로 차단된 주소 1개") for m in self.slack.posts()))
+
     def test_a_deleted_list_is_posted_again(self):
         self.round()
         self.slack.messages.clear()
