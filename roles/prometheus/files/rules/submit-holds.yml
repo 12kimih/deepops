@@ -1,7 +1,9 @@
 ---
 # The submission holds (roles/submit_holds, cluster_tools.submit_holds): job_submit.lua
 # trusts their file for submit_holds_max_age seconds, then holds no one, so a writer that
-# stopped is said at half of it (the writer's submit_holds_max_age_seconds).
+# stopped is said at half of it (the writer's submit_holds_max_age_seconds). A writer that
+# reports no such value (its config written before the key) leaves that alert blind, which
+# is said itself.
 groups:
   - name: submit-holds
     rules:
@@ -13,3 +15,12 @@ groups:
           description: >-
             Past submit_holds_max_age, twice this alert's wait, job_submit.lua holds no one. `journalctl -u submit-holds` and
             `systemctl list-timers submit-holds.timer` on the host (Prometheus reachable?).
+      - alert: SubmitHoldsMaxAgeNotReported
+        expr: submit_holds_last_success_timestamp_seconds unless on (instance) submit_holds_max_age_seconds
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "The submission holds writer on {{ $labels.host }} reports no submit_holds_max_age"
+          description: >-
+            Its config predates the setting, so SubmitHoldsStale cannot fire for it. Run
+            playbooks/slurm-cluster/submit-holds.yml.

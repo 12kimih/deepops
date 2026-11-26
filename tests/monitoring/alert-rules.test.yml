@@ -1074,6 +1074,29 @@ tests:
             exp_annotations:
               summary: "The submission holds on ctl have not been worked out for 16m 0s"
               description: "Past submit_holds_max_age, twice this alert's wait, job_submit.lua holds no one. `journalctl -u submit-holds` and `systemctl list-timers submit-holds.timer` on the host (Prometheus reachable?)."
+      - eval_time: 29m
+        alertname: SubmitHoldsMaxAgeNotReported
+        exp_alerts: []
+
+  - name: a submission holds writer that reports no submit_holds_max_age warns, the stale alert being blind
+    interval: 1m
+    input_series:
+      - series: 'submit_holds_last_success_timestamp_seconds{host="ctl", instance="ctl:9100"}'
+        values: '0+60x70'
+    alert_rule_test:
+      - eval_time: 59m
+        alertname: SubmitHoldsMaxAgeNotReported
+        exp_alerts: []
+      - eval_time: 61m
+        alertname: SubmitHoldsMaxAgeNotReported
+        exp_alerts:
+          - exp_labels: {severity: warning, host: ctl, instance: "ctl:9100"}
+            exp_annotations:
+              summary: "The submission holds writer on ctl reports no submit_holds_max_age"
+              description: "Its config predates the setting, so SubmitHoldsStale cannot fire for it. Run playbooks/slurm-cluster/submit-holds.yml."
+      - eval_time: 61m
+        alertname: SubmitHoldsStale
+        exp_alerts: []
 
   - name: disk quota usage that stops, or never starts, being reported warns
     interval: 1m
