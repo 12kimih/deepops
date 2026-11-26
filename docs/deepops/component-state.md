@@ -89,6 +89,10 @@ or a run from another operator's machine.
   (`component_expected_dir`, the site's resolved state on its own host, never in the
   repository): every prometheus.yml run writes it, and so does `scripts/deepops/sync.py`
   after each move of the checkouts, so it follows the checkouts without a playbook run.
+  Its directory is writable by the controller user's group only when that is the user's
+  own private group on the host (whoever can write it can silence or spoof the alerts
+  that read it); otherwise it stays root's, the run says so, and only prometheus.yml
+  writes it.
   `ComponentVersionNotPinned` names each host whose recorded version is another, with
   the playbook that installs it. A component whose version only the host can work out
   (a fact, a value set at run time) is named in the head of that file, unchecked, with

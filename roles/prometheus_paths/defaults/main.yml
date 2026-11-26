@@ -37,10 +37,12 @@ node_exporter_prom_dir: /run/prometheus
 # component as the checkouts are now (scripts/deepops/component_expected.py), written by
 # roles/prometheus at each run and by scripts/deepops/sync.py after each move of the
 # checkouts. Persistent (it changes only then), and writable by component_expected_group,
-# the group of the controller's user, so sync.py writes it without root: data only, no
-# code anything runs from it (roles/textfile_keep, tasks_from: expected).
+# the controller user's primary group, so sync.py writes it without root; only when that
+# group is the user's own private one (whoever writes it can silence or spoof the alerts
+# that read it), root's otherwise (roles/textfile_keep, tasks_from: expected).
 component_expected_dir: "{{ deepops_state_dir }}/expected"
 component_expected_file: component-expected.prom
+component_expected_user: "{{ lookup('ansible.builtin.pipe', 'id -un') }}"
 component_expected_group: "{{ lookup('ansible.builtin.pipe', 'id -gn') }}"
 # A textfile that changes only when a role runs (a fact the deploy knows, roles/
 # textfile_keep): kept here and copied into node_exporter_prom_dir at every boot,
