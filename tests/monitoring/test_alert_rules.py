@@ -14,6 +14,17 @@ HERE = Path(__file__).resolve().parent
 # interval over each case's whole span.
 CASE_FILES = sorted(p.name for p in HERE.glob("alert-rules*.test.yml"))
 RULES = promtool_runner.ROOT / "roles/prometheus/files/rules"
+# promtool evaluates every rule once a step (the file's evaluation_interval) from 0 to
+# a case's last eval_time, so a case costs its span in steps. A day at a minute is 1440.
+MAX_STEPS = 1500
+UNITS = {"ms": 0.001, "s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "y": 31536000}
+
+
+def seconds(duration):
+    """A Prometheus duration (1d12h, 90m) in seconds."""
+    parts = re.findall(r"(\d+)(ms|[smhdwy])", duration)
+    assert parts and "".join(n + u for n, u in parts) == duration, duration
+    return sum(int(n) * UNITS[u] for n, u in parts)
 
 
 def eval_order():
@@ -49,6 +60,19 @@ class AlertRuleTests(unittest.TestCase):
         self.assertEqual(sorted(order), sorted(g["name"] for g in groups))
         self.assertEqual(len(order), len(set(order)), "group names must be unique across rule files")
         self.assertLess(order.index("components"), order.index("os-updates"))
+
+    def test_every_case_fits_its_files_step(self):
+        """2026-11-26: two cases of daily samples spanning 10 and 40 days sat in the
+        minute file, 72,000 of its 76,834 steps, and the test took nine minutes. A case
+        spanning days belongs in the file that evaluates hourly."""
+        for name in CASE_FILES:
+            case_file = yaml.safe_load((HERE / name).read_text())
+            step = seconds(case_file["evaluation_interval"])
+            for case in case_file["tests"]:
+                checks = case.get("alert_rule_test", []) + case.get("promql_expr_test", [])
+                steps = max((seconds(c["eval_time"]) for c in checks), default=0) / step
+                with self.subTest(file=name, case=case["name"]):
+                    self.assertLessEqual(steps, MAX_STEPS, "a span of days goes in alert-rules-long.test.yml")
 
     def test_every_alert_has_a_firing_case(self):
         alerts = {
