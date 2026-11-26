@@ -61,7 +61,7 @@ from cluster_tools.slurm import hostnames  # noqa: E402
 
 try:
     from ansible.errors import AnsibleFilterError as Error
-except ImportError:  # scripts/deepops/slurm_conf_diff.py without Ansible
+except ImportError:  # loaded without Ansible: scripts/docs/site_facts.py, the tests
     Error = ValueError
 
 PARAMETERS = json.loads(Path(__file__).with_name("slurm_parameters.json").read_text())

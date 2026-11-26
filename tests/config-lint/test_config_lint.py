@@ -341,6 +341,29 @@ class DocRepeats(unittest.TestCase):
         self.assertIsNone(cl.repeats(code + "text\n" + code + short + "x\n" + short))
 
 
+class CodeComments(unittest.TestCase):
+    """2026-11-27: a comment named a script that never existed; only the
+    *.md pages were checked."""
+
+    def test_comments_and_docstrings_are_read_and_code_is_not(self):
+        text = '"""Mod: roles/a/x.py."""\nX = "roles/not/a/comment"  # see plugins/b.py\ndef f():\n    """roles/c"""\n'
+        self.assertEqual(
+            {n: t.strip() for n, t in cl.comment_lines("m.py", text).items()},
+            {1: "Mod: roles/a/x.py.", 2: "# see plugins/b.py", 4: "roles/c"},
+        )
+        self.assertEqual(
+            cl.comment_lines("t.yml", "k: roles/v  # roles/w\n# roles/z\n"), {1: " roles/w", 2: " roles/z"}
+        )
+
+    def test_placeholders_stand_for_any_path(self):
+        for path in ("roles/ROLE/defaults/main.yml", "tests/x/test_y.py", "roles/ROLE-x"):
+            self.assertTrue(cl.placeholder(path), path)
+        self.assertFalse(cl.placeholder("roles/slurm/tasks/main.yml"))
+
+    def test_the_repository_names_only_what_it_has(self):
+        self.assertEqual([p for p in cl.check_doc_paths() if "config/" not in p], [])
+
+
 class SiteDocs(Configs):
     """The site's own guides hand out deepops' playbooks: a page there kept sending
     admins to playbooks deepops had removed, since only deepops' pages were checked."""

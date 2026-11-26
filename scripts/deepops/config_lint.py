@@ -66,10 +66,13 @@ The site's own commit hook (scripts/deepops/config-pre-commit.sh, installed by
 scripts/setup.sh) passes what it is committing as DEEPOPS_SITE_REV.
 """
 
+import ast
+import io
 import os
 import re
 import subprocess
 import sys
+import tokenize
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -414,6 +417,71 @@ def source_key(path):
     return f"config.example/{path.relative_to(EXAMPLE)}" if EXAMPLE in path.parents else str(path)
 
 
+# Paths a code comment names that are not this repository's, and why (doc-paths).
+NOT_OURS = {
+    "scripts/notices.py": "the user docs site's (cluster-docs)",
+    "scripts/agent_rules.py": "the user docs site's (cluster-docs)",
+    "docs/sidebar/md5sum.txt": "NVIDIA's download site",
+    "roles/docker-rootless": "retired (roles/retired_settings)",
+    "roles/galaxy": "where Galaxy installs roles, git-ignored (roles/requirements.yml)",
+}
+CODE = re.compile(r"\.(py|ya?ml|sh|j2|cfg|toml)$|^scripts/|/files/")
+
+
+def comment_lines(rel, text):
+    """{line: text} of the comments of the code file REL, and in Python its docstrings."""
+    lines = {}
+    if rel.endswith(".py"):
+        try:
+            for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+                if tok.type == tokenize.COMMENT:
+                    lines[tok.start[0]] = tok.string
+            tree = ast.parse(text)
+        except (SyntaxError, tokenize.TokenError):
+            return lines
+        for node in ast.walk(tree):
+            body = getattr(node, "body", None)
+            if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and body:
+                doc = body[0]
+                if (
+                    isinstance(doc, ast.Expr)
+                    and isinstance(doc.value, ast.Constant)
+                    and isinstance(doc.value.value, str)
+                ):
+                    for i, line in enumerate(doc.value.value.splitlines()):
+                        lines[doc.lineno + i] = lines.get(doc.lineno + i, "") + " " + line
+    else:
+        for number, line in enumerate(text.splitlines(), 1):
+            comment = re.search(r"(?:^|\s)#(.*)$", line)
+            if comment:
+                lines[number] = comment.group(1)
+    return lines
+
+
+def code_comments():
+    """(shown, {line: text}) for each tracked code file: its comments and docstrings,
+    where paths are named as in a page (plugins/filter/slurm_conf.py named a script that
+    never existed, 2026-11-27)."""
+    for path in tracked():
+        rel = str(path.relative_to(ROOT))
+        if not CODE.search(rel) or rel.endswith(".md") or path.is_symlink() or not path.is_file():
+            continue
+        try:
+            lines = comment_lines(rel, path.read_text())
+        except UnicodeDecodeError:
+            continue
+        if lines:
+            yield rel, lines
+
+
+def placeholder(path):
+    """A path that stands for any (roles/ROLE/defaults, tests/x/test_y.py)."""
+    return any(
+        part in ("x", "y") or any(word.isupper() for word in re.split(r"[-_.]", part) if word.isalpha())
+        for part in path.split("/")
+    )
+
+
 def check_doc_paths():
     # A path counts when git tracks it (a file, or a directory holding tracked files):
     # a doc naming a file only this checkout has would pass here and fail in CI.
@@ -426,6 +494,20 @@ def check_doc_paths():
                     continue
                 if path.rstrip("/") not in known and not (site and path.rstrip("/") in site[0]):
                     problems.append(found("doc-paths", shown, number, f"{path} does not exist", site))
+
+    def module(path):
+        # a Python module or one of its names, by path (plugins/action/systemd_unit,
+        # tests/lib/in_tree.load)
+        return f"{path}.py" in known or f"{path.rsplit('.', 1)[0]}.py" in known
+
+    for shown, lines in code_comments():
+        for number, line in sorted(lines.items()):
+            for path in PATH.findall(line):
+                path = path.rstrip("/")
+                if any(c in path for c in "*<>{}") or "..." in path or placeholder(path):
+                    continue
+                if path not in known and path not in NOT_OURS and not module(path):
+                    problems.append(found("doc-paths", shown, number, f"{path} does not exist", None))
     return problems
 
 

@@ -63,6 +63,30 @@ class Facts(unittest.TestCase):
         )
 
 
+class DocsUrl(unittest.TestCase):
+    """The docs site's site_url and the config's cluster_info.docs_url were never
+    compared (2026-11-27): the banner, the bot and the agent rules send people to one."""
+
+    def check(self, site_url, docs_url):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp, f"cluster_info: {{docs_url: '{docs_url}'}}\n")
+            docs = Path(tmp) / "docs-site"
+            (docs / "data").mkdir(parents=True)
+            (docs / "zensical.toml").write_text(f'[project]\nsite_url = "{site_url}"\n')
+            return sf.docs_url_mismatch(docs / "data" / "site.json", config)
+
+    def test_the_same_address_passes_a_trailing_slash_aside(self):
+        self.assertIsNone(self.check("https://docs.example/guide/", "https://docs.example/guide"))
+
+    def test_another_address_is_named(self):
+        self.assertIn(
+            "is not cluster_info.docs_url", self.check("https://docs.example/a/", "https://docs.example/b/")
+        )
+
+    def test_an_unset_docs_url_is_not_compared(self):
+        self.assertIsNone(self.check("https://docs.example/a/", ""))
+
+
 class Resolved(unittest.TestCase):
     def test_a_setting_renders_over_only_the_names_it_uses(self):
         raw = {"a": 2, "b": "{{ a * 3 }}", "c": ["{{ b }}", "x"], "d": {"k": "{{ b }}"},
