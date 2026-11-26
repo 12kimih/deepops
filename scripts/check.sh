@@ -213,15 +213,25 @@ run_one() {
     wait "${pid}" || status=FAILED
     rm -f "${logs}/${i}.pid"
     echo "${status}" >"${logs}/${i}.status"
+    printf '%s\t%s\n' "$((SECONDS - start))" "${names[$i]}" >"${logs}/${i}.time"
     printf '%-6s %4ss  %s\n' "${status}" "$((SECONDS - start))" "${names[$i]}"
 }
+# Longest first, from each step's time in the last run in this clone (any worktree):
+# the run then ends about when its work per CPU does (scripts/deepops/check_times.py).
+# Outside a git checkout there are no times, and the order is the declared one.
+git_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+times="${git_dir:+${git_dir}/deepops-check-times}"
+mapfile -t order < <(printf '%s\n' "${names[@]}" | "${python}" scripts/deepops/check_times.py order "${times}")
 echo "Running ${#names[@]} checks, ${jobs_max} at a time (${usable} usable CPUs, ${running} run(s) of this person)"
 started=${SECONDS}
-for i in "${!names[@]}"; do
+for i in "${order[@]}"; do
     while [ "$(jobs -rp | wc -l)" -ge "${jobs_max}" ]; do wait -n || true; done
     run_one "${i}" &
 done
 wait
+if [ -n "${times}" ]; then
+    cat "${logs}"/*.time | "${python}" scripts/deepops/check_times.py record "${times}"
+fi
 
 failed=()
 for i in "${!names[@]}"; do
