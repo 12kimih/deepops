@@ -256,6 +256,52 @@ class SubmitRules(unittest.TestCase):
         self.assertNotIn("gtype", json.dumps(policy), "a GPU type is the site's, never public")
 
 
+class SubmitLimits(unittest.TestCase):
+    """What the troubleshooting page says refuses a submission: the queued-job cap of the
+    accounting file, as Slurm inherits it, and how the submit holds' refusals begin."""
+
+    ACCOUNTING = (
+        "accounts:\n  root: {members: [root]}\n"
+        "  lab: {parent: root, max_submit_jobs: %s}\n"
+        "  team: {parent: lab, members: [alice, %s]}\n"
+    )
+
+    def cap(self, lab, member="bob"):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp, 'slurm_accounting_file: "{{ inventory_dir }}/files/accounting.yml"\n')
+            (config / "files").mkdir()
+            (config / "files" / "accounting.yml").write_text(self.ACCOUNTING % (lab, member))
+            return sf.public(sf.facts(config))["policy"]["max_submit_jobs"]
+
+    def test_the_cap_every_account_inherits(self):
+        self.assertEqual(self.cap(500), 500, "team inherits lab's")
+        self.assertEqual(self.cap(500, "{user: bob, max_submit_jobs: 500}"), 500)
+
+    def test_no_one_number_when_they_differ_or_none_is_set(self):
+        self.assertIsNone(self.cap(500, "{user: bob, max_submit_jobs: 50}"))
+        self.assertIsNone(self.cap("null"))
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(sf.facts(site(tmp))["policy"]["max_submit_jobs"], "accounting not managed")
+
+    def test_the_refusals_begin_as_the_holds_write_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = sf.public(sf.facts(site(tmp)))
+        self.assertTrue(sf.submit_holds.ends_holds({"a": {"ends": "2000-01-01", "login_expires": "x"}}, 10**10)["a"]
+                        .startswith(out["messages"]["hold_ended"]))  # fmt: skip
+        self.assertEqual(out["messages"]["hold_disk"], "Your disk use on")
+        self.assertIs(out["policy"]["submit_holds"], False, "the role default")
+
+
+class Storage(unittest.TestCase):
+    def test_each_measured_filesystems_speeds_and_nothing_else(self):
+        model = "{rbps: 1200000000, wbps: 900000000, rrandiops: 1600, wrandiops: 500, rseqiops: 1}"
+        with tempfile.TemporaryDirectory() as tmp:
+            text = f"io_fairness_models:\n  /home: {{measured: x, command: y, model: {model}}}\n"
+            out = sf.public(sf.facts(site(tmp, text)))["storage"]
+        self.assertEqual(out, {"/home": {"read_bps": 1200000000, "write_bps": 900000000,
+                                         "read_iops": 1600, "write_iops": 500}})  # fmt: skip
+
+
 class LoginLimits(unittest.TestCase):
     def test_the_login_groups_user_slice_limits_as_people_read_them(self):
         """The login nodes' per-person limits (cluster_tools_user_slice_limits in

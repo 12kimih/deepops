@@ -31,6 +31,8 @@ class HoldTests(unittest.TestCase):
         self.assertEqual(list(held), [1002], "bob is at his hard limit; alice only past her warn level")
         self.assertIn("at the hard limit 20G", held[1002])
         self.assertIn("New jobs are held until you free space there", held[1002])
+        # The command that shows one's own use anywhere, not quota on a host they cannot log in to.
+        self.assertIn("(`disk-usage` shows it)", held[1002])
 
     def test_no_one_before_the_grace_ends_nor_without_an_account(self):
         self.assertEqual(submit_holds.holds(self.data(), {**DISK, "disk_from": NOW + 1}, NOW, UIDS.get), {})

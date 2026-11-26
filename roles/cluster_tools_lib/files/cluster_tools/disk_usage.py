@@ -21,7 +21,7 @@ import sys
 import time
 
 from .cli import Command, Opt, me, opt_json, opt_user, run_main
-from .disk_report import host_of, where
+from .disk_report import USAGE, host_of, where
 from .io_report import quoted
 from .prometheus import Error as PrometheusError
 from .prometheus import Prometheus
@@ -89,7 +89,7 @@ NOTES = [
 ]
 
 COMMAND = Command(
-    "disk-usage",
+    USAGE,
     "your space and files on each filesystem against their limits, folders worth cleaning, recent I/O",
     [
         opt_user("someone else's figures instead of yours", metavar="NAME"),

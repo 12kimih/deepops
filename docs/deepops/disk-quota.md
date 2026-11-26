@@ -120,7 +120,7 @@ With `slurm_enable_submit_holds` (off by default; `roles/submit_holds`, on the c
 and `submit_holds_disk`, someone at a hard limit, of space or of files, on any counted
 filesystem cannot submit
 Slurm jobs until they free space there. `sbatch`, `srun` and `salloc` refuse the job
-with the reason (where, how much, `quota -s` to look); their running jobs go on.
+with the reason (where, how much, `disk-usage` to look); their running jobs go on.
 
 | Setting | What it does |
 |---|---|

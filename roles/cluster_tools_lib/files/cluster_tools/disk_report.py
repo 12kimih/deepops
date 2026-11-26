@@ -41,7 +41,10 @@ STALE = 3600
 # A daily timer runs a little earlier or later each day: a notice due every N days may
 # go this much early (cluster_tools.notices), so a weekly one never slips to the eighth day.
 LEEWAY = 3600
-HOW = "내 사용량은 그 호스트에서 `quota -s`로 보실 수 있습니다."
+# The command that shows a person their own use, on any host (cluster_tools.disk_usage):
+# every notice and refusal about disk use names it.
+USAGE = "disk-usage"
+HOW = f"내 사용량은 `{USAGE}`로 보실 수 있습니다."
 
 # The disks behind the counted filesystems: node_exporter's mount point is the quota
 # metrics' filesystem.
