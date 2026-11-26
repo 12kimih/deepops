@@ -308,8 +308,7 @@ deepops_component_registry:
 deepops_components: >-
   {{ deepops_component_registry | components_desired(groups, inventory_hostname, deepops_component_removals) }}
 
-# submit_holds_from (YYYY-MM-DD, local midnight) as Unix time, 0 for "" (at once): one
-# reading for the holds (roles/submit_holds) and the disk report that announces them.
-submit_holds_from_time: >-
-  {{ (((submit_holds_from ~ ' 00:00:00') | to_datetime('%Y-%m-%d %H:%M:%S')).strftime('%s') | int)
-     if submit_holds_from | length > 0 else 0 }}
+# submit_holds_from's local midnight as Unix time, 0 for "" (at once): one reading for
+# the holds (roles/submit_holds) and the disk report that announces them. A day quoted
+# or not (plugins/filter/days.py).
+submit_holds_from_time: "{{ submit_holds_from | day_start }}"

@@ -55,6 +55,11 @@ way a roster file is edited (scripts/deepops/people.py, the cluster bot's reques
 """
 
 import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import days  # noqa: E402  (plugins/filter/days.py: the one reading of a day)
 
 STATUSES = ("active", "left")
 KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status", "disk_quota", "ends"}
@@ -75,16 +80,9 @@ PROJECT_NAME = re.compile(r"^[a-z][a-z0-9-]{1,26}$")
 
 
 def _date(value):
-    """A roster date (YAML reads 2027-02-28 as a date; quoted, a string) or None."""
-    import datetime
-
-    if value in (None, ""):
-        return None
-    if isinstance(value, datetime.datetime):
-        return value.date()
-    if isinstance(value, datetime.date):
-        return value
-    return datetime.date.fromisoformat(str(value))
+    """A roster date (YAML reads 2027-02-28 as a date; quoted, a string) or None: the one
+    reading of a day, plugins/filter/days.py."""
+    return days.parse(value)
 
 
 def _today(today=None):
