@@ -89,6 +89,10 @@ slurm_ha_state_save_location: "/sw/slurm"
 #cluster_bot_command: /cluster
 #cluster_bot_app_name: cluster-bot
 #cluster_bot_extra_scopes: []
+# The bot_ids of the app's retired integrations (an old webhook or bot), whose leftover
+# messages `cluster-bot tidy` may delete; its dry run's survey names each bot_id.
+#cluster_bot_retired_bot_ids: []
+#cluster_bot_retired_bot_ids: [B0123ABCDEF]  # example
 # What a newcomer needs before the first login (the join reply and the account notice),
 # each derived from the setting that holds it (cluster_info, open_ondemand_*).
 #cluster_bot_connect:

@@ -69,6 +69,11 @@ _cluster_bot_cfg:
     channel: "{{ slack_channels.announce }}"
     seen: "{{ _cluster_bot_home }}/notices-posted.json"
     pinned: "{{ _cluster_bot_home }}/notices-pinned.json"
+  # The owner's tidy of these channels (cluster_bot.tidy, `cluster-bot tidy`): who
+  # posted what, and the messages no round of today's code manages, deleted when the app's.
+  tidy:
+    channels: "{{ slack_channels }}"
+    retired: "{{ cluster_bot_retired_bot_ids }}"
   # Each channel's guide (cluster_bot.channels): purpose, topic, canvas and bookmarks,
   # from the docs site's channels.json, for the channels slack_channels names.
   guides:

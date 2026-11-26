@@ -136,6 +136,25 @@ the same vars. The dry run prints each `update`, `delete` (with the replies it t
 neither. The second command does it; from then on those posts carry
 metadata. A post the app may not change (`cant_update_message`) is said and left.
 
+Messages no round of today's code manages (an alert the app's old incoming webhook
+posted and never edited when it resolved, a ban notice of the old format whose list was
+cut, a notice of a retired integration) stay until you tidy the channels
+(`cluster_bot.tidy`), after reading what it would do:
+
+    sudo cluster-bot tidy --dry-run
+    sudo cluster-bot tidy
+
+The dry run surveys each channel `slack_channels` names first: its messages grouped by
+who posted them (`bot_id`, `app_id`, user, name, subtype), how many, from when to when,
+and whether they are the app's. Then it lists each message it would delete and why, one
+rule each (`RULES` in `cluster_bot.tidy`: the channel's role, what the message is, how
+it is recognized). Only the app's messages go: its bot's, or those of a bot_id you name in
+`cluster_bot_retired_bot_ids` once the survey shows it was the app's own old integration.
+A person's message or another app's is listed and left. The app's replies go after their
+message; someone else's reply stays. A delete Slack refuses (`cant_delete_message`) is
+said and left, to delete by hand. A notice post the notices round has no record of stays,
+since the round would post it again.
+
 The channels' guides: each channel `slack_channels` names gets its purpose, topic, a
 canvas (the channel's README tab) and bookmarks from `<docs_url>/channels.json` (the docs
 site's build writes it, keyed by the channel's purpose, the keys of `slack_channels`),

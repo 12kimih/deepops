@@ -6,11 +6,14 @@
 #   cluster-bot notices --dry-run   say what a notices round would do to the announcement
 #                                   channel (edit, delete, post, pin); change nothing
 #   cluster-bot notices             do it, the posts from before metadata too
+#   cluster-bot tidy --dry-run      who posted what in the bot's channels, and each message
+#                                   of the app no round manages any more, to delete; nothing changed
+#   cluster-bot tidy                delete them (cluster_bot.tidy)
 set -eu
-usage() { echo "usage: cluster-bot notices [--dry-run]" >&2; exit 2; }
+usage() { echo "usage: cluster-bot notices|tidy [--dry-run]" >&2; exit 2; }
 [ "$#" -ge 1 ] || usage
 case "$1" in
-  notices) shift ;;
+  notices|tidy) module="cluster_bot.$1"; shift ;;
   *) usage ;;
 esac
 if [ "$(id -u)" -ne 0 ]; then
@@ -18,4 +21,4 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 exec runuser -u {{ cluster_bot_user | quote }} -- env PYTHONPATH={{ _cluster_bot_pythonpath | quote }} \
-  {{ _cluster_bot_python | quote }} -m cluster_bot.notices {{ _cluster_bot_config | quote }} "$@"
+  {{ _cluster_bot_python | quote }} -m "$module" {{ _cluster_bot_config | quote }} "$@"

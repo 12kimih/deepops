@@ -25,6 +25,11 @@ cluster_bot_app_name: cluster-bot
 # posts through the app's webhook, so an import never drops it.
 cluster_bot_extra_scopes: []
 
+# The bot_ids of the app's retired integrations (an incoming webhook, an older bot): the
+# owner's tidy (`cluster-bot tidy`, cluster_bot.tidy) may delete the messages they left
+# that today's code no longer manages. Its dry run's survey names each poster's bot_id.
+cluster_bot_retired_bot_ids: []
+
 # Slack's Python SDK and Bolt, installed with pip --require-hashes into the bot's venv
 # (the wheels' sha256 from PyPI, per version).
 # upstream: pypi slack-bolt 3.9
