@@ -256,7 +256,7 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(
             disk_report.dm_text(rows[1]),
             "login:/의 디스크 사용량이 18G입니다. 경고 수준(15G)을 넘었습니다 (한도 20G). 아직 막힌 것은"
-            " 없습니다. 한도에 닿기 전에 공간을 비워 주세요. 내 사용량은 그 호스트에서 `quota -s`로 보실 수 있습니다.",
+            " 없습니다. 한도에 닿기 전에 공간을 비워 주세요. 내 사용량은 `disk-usage`로 보실 수 있습니다.",
         )
         self.assertIn(
             "지금은 그곳에 쓸 수 없습니다. 공간을 비우시면 다시 쓰실 수 있습니다.",

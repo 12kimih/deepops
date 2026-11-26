@@ -42,6 +42,8 @@ CONFIG_OPTIONAL = {"max_age": int}
 # How an ends hold's reason begins: what a run that could not read the disk metrics
 # tells apart from the disk holds it keeps.
 ENDED = "Your membership ended on"
+# How a disk hold's reason begins (the user docs quote both, scripts/docs/site_facts.py).
+DISK_HELD = "Your disk use on"
 
 
 def load_config(path):
@@ -67,9 +69,9 @@ def disk_holds(data):
         figure = disk_report.size if what == "space" else (lambda n: f"{n:,.0f} files")
         if kind == "hard" and row[2] not in out:
             out[row[2]] = (
-                f"Your disk use on {place} is {figure(used)}, at the hard limit {figure(level)}: writes"
-                f" there fail now. New jobs are held until you free space there (`quota -s` on"
-                f" {row[0]} shows it); running jobs go on."
+                f"{DISK_HELD} {place} is {figure(used)}, at the hard limit {figure(level)}: writes"
+                f" there fail now. New jobs are held until you free space there"
+                f" (`{disk_report.USAGE}` shows it); running jobs go on."
             )
     return out
 

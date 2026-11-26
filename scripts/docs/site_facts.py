@@ -15,8 +15,15 @@ Facts:
   commands  the people's cluster commands (cluster_tools_builtin) and their options,
             read from each command's one definition (cluster_tools.cli Command)
   policy    the cluster-wide rules the pages state, each field from the setting POLICY
-            names (periods, fractions, the idle-GPU rules, how people are told, login
-            grace, session QoS, submit holds); the pattern of a QoS stays private
+            names (periods, fractions, the rules on jobs leaving their GPUs idle, how
+            people are told, login grace, session QoS, submit holds); the pattern of a
+            QoS stays private; max_submit_jobs, the cap on a job's queued and running jobs
+            every account of slurm_accounting_file sets alike (None when they differ or
+            none sets one)
+  messages  how the submit holds' refusals begin (cluster_tools.submit_holds): hold_ended
+            (past the membership's end), hold_disk (at a disk hard limit)
+  storage   each measured filesystem's speeds (io_fairness_models, its model): read_bps
+            and write_bps (sequential, bytes a second), read_iops and write_iops (random)
   services  what the cluster runs that the pages describe, so none says a service is coming
             or missing: portal (slurm_install_open_ondemand), its overview page's menu title
             (open_ondemand_overview_title, "" without one), the menu titles of the services
@@ -91,6 +98,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "scripts/deepops"))
 import cli  # noqa: E402
+from cluster_tools import submit_holds  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 
@@ -125,7 +133,9 @@ PUBLIC = {
         "idle_notify",
         "leave_grace_days",
         "interactive_team_qos",
+        "submit_holds",
         "submit_holds_disk",
+        "max_submit_jobs",
         "gpus_per_node",
         "gpu_type_defaulted",
         *SUBMIT_RULES,
@@ -152,6 +162,14 @@ PUBLIC = {
     "bot": {"command", "subcommands"},
     "reports": {"usage", "weekly", "disk"},
     "schedules": {"scratch_purge"},
+    "messages": {"hold_ended", "hold_disk"},
+    "storage": None,  # each measured mount, its fields STORAGE_FIELDS
+}
+STORAGE_FIELDS = {
+    "read_bps": "rbps",
+    "write_bps": "wbps",
+    "read_iops": "rrandiops",
+    "write_iops": "wrandiops",
 }
 REPORTS = {
     "usage": "slurm_usage_report_schedule",
@@ -166,7 +184,7 @@ POLICY = {
     "stale_days": "cluster_user_stale_days",
     "grace_days": "cluster_user_grace_days",
     "warn_fraction": "cluster_user_warn_fraction",
-    # The idle-GPU rules (roles/slurm_usage_report): idle after idle_hours, a job cancelled
+    # The rules on jobs leaving their GPUs idle (roles/slurm_usage_report): after idle_hours, a job cancelled
     # after cancel_after_hours (0: never, the docs say not active), warned cancel_warn_hours
     # before.
     "idle_hours": "slurm_usage_report_idle_hours",
@@ -174,6 +192,7 @@ POLICY = {
     "cancel_warn_hours": "slurm_usage_report_cancel_warn_hours",
     "idle_notify": "slurm_usage_report_notify",  # mention (in the report thread), dm; [] none
     "leave_grace_days": "people_leave_grace_days",
+    "submit_holds": "slurm_enable_submit_holds",  # past a membership's end, no submitting
     "submit_holds_disk": "submit_holds_disk",  # a person at a disk hard limit cannot submit
 }
 _SIZE_GIB = {"K": 1 / 1024**2, "M": 1 / 1024, "G": 1, "T": 1024}
@@ -539,6 +558,50 @@ def submit_policy(p):
     }
 
 
+def max_submit_jobs(config):
+    """The cap on each person's queued and running jobs (max_submit_jobs) of the site's
+    accounting file, as Slurm applies it: an account's own or the nearest parent's, a
+    member's own over its account's. One number when every account under root and every
+    member gets the same; None when they differ or one gets none. The file's setting
+    names it under inventory_dir, the config itself."""
+    raw = {}
+    for name in ("all.yml", "slurm-cluster.yml") if config else ():
+        raw.update(_yaml(Path(config) / "group_vars" / name))
+    path = re.sub(r"\{\{\s*inventory_dir\s*\}\}", str(config), str(raw.get("slurm_accounting_file") or ""))
+    if not path or "{{" in path:
+        return None
+    accounts = {n: a or {} for n, a in (_yaml(path).get("accounts") or {}).items()}
+
+    def cap(name, seen=()):
+        a = accounts.get(name) or {}
+        if "max_submit_jobs" in a or not a.get("parent") or name in seen:
+            return a.get("max_submit_jobs")
+        return cap(a["parent"], (*seen, name))
+
+    values = set()
+    for name, a in accounts.items():
+        if not a.get("parent"):
+            continue  # root: Slurm's own, never a person's account
+        values.add(cap(name))
+        values |= {
+            m["max_submit_jobs"]
+            for m in a.get("members") or []
+            if isinstance(m, dict) and "max_submit_jobs" in m
+        }
+    return values.pop() if len(values) == 1 else None
+
+
+def storage(settings_):
+    """{mount: {read_bps, write_bps, read_iops, write_iops}} of each measured filesystem
+    (io_fairness_models): what the user pages say about how fast each one is."""
+    out = {}
+    for mount, entry in (settings_.get("io_fairness_models") or {}).items():
+        model = (entry or {}).get("model") or {}
+        if all(isinstance(model.get(k), (int, float)) for k in STORAGE_FIELDS.values()):
+            out[mount] = {field: model[k] for field, k in STORAGE_FIELDS.items()}
+    return out
+
+
 def facts(config):
     s = settings(config)
     every = {
@@ -546,7 +609,10 @@ def facts(config):
         "policy": {
             **{field: s.get(key) for field, key in POLICY.items()},
             **submit_policy(s.get("slurm_job_submit_policy") or {}),
+            "max_submit_jobs": max_submit_jobs(config),
         },
+        "messages": {"hold_ended": submit_holds.ENDED, "hold_disk": submit_holds.DISK_HELD},
+        "storage": storage(s),
         "slurm": slurm_values(config),
         "dates": schedule(config),
         "quota": quota_limits(config, s),
@@ -578,6 +644,10 @@ def public(every):
                 for e in value or []
                 if _path_or_url(e["login"]) and _path_or_url(e["job"])
             ]
+        elif key == "storage":
+            out[key] = {
+                m: {f: v for f, v in d.items() if f in STORAGE_FIELDS} for m, d in (value or {}).items()
+            }
         elif key == "quota":
             out[key] = {
                 m: {f: v for f, v in d.items() if f in QUOTA_FIELDS} for m, d in (value or {}).items()
