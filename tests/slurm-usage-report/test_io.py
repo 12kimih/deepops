@@ -37,7 +37,7 @@ class Prom:
             )
         if expr.startswith("min_over_time("):
             return []
-        if expr.startswith("topk(") and "io_usage_job_written_bytes_total" in expr and 'host="n1"' in expr:
+        if expr.startswith("topk(") and "job:nfs_write_bytes:rate5m" in expr and 'host="n1"' in expr:
             return [{"metric": {"job_id": "11", "user": "bob"}, "value": [NOW, str(50 * M)]},
                     {"metric": {"job_id": "10", "user": "alice"}, "value": [NOW, str(300 * M)]},
                     {"metric": {"job_id": "12", "user": "root"}, "value": [NOW, str(1 * M)]}]  # fmt: skip
@@ -55,7 +55,7 @@ class Collect(unittest.TestCase):
         self.assertIn(
             'min_over_time(host_mount:nfs_write_bytes:rate5m{mountpoint="/home"}[15m]) > ', prom.asked[1]
         )
-        self.assertIn('topk(3, sum by (job_id, user) (rate(io_usage_job_written_bytes_total{host="n1"}[15m])))',
+        self.assertIn('topk(3, sum by (job_id, user) (avg_over_time(job:nfs_write_bytes:rate5m{host="n1"}[15m])))',
                       prom.asked[2])  # fmt: skip
 
     def test_a_hot_node_with_no_job_counted_says_the_count_is_broken(self):
@@ -78,7 +78,10 @@ class Collect(unittest.TestCase):
             dm,
         )
         self.assertIn("그 노드에서 가장 많이 쓴 잡이 `10`입니다 (300M/s", dm)
-        self.assertIn("디스크에서 차지한 몫이 아니라 그 노드 안의 순위", dm)
+        self.assertIn(
+            "그 노드가 공유 스토리지와 주고받은 양을 노드 안 잡들의 읽기, 쓰기 호출 양에 비례해 나눈 추정치",
+            dm,
+        )
         self.assertTrue(dm.endswith("Use /scratch."))
         self.assertIn("2번째로 많이 쓴 잡이 `11`", io_report.dm_text(item, 1, ""))
         self.assertEqual(

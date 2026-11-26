@@ -8,28 +8,29 @@ MOUNTS ({mountpoint: {"read_bps", "write_bps"}}) is what the disk behind each ex
 serves, measured (roles/io_fairness' models). A node is hot for a mount and a direction
 when what it read from (or wrote to) that export over the wire stayed above SHARE of it
 for the whole of the last MINUTES minutes (host_mount:nfs_*_bytes:rate5m at its lowest
-over the window, node_exporter's mountstats). For each hot node, its TOP jobs by the
-same direction's syscall I/O over the window (roles/io_usage: io_usage_job_*_bytes_total):
-a ranking within the node, page cache and pipes included, never a job's NFS bytes, and
-the notices say so. It reads Prometheus and changes nothing; cluster_tools.usage_report
---io tells the people and the administrators. Python 3.9 or newer, standard library only.
+over the window, node_exporter's mountstats). For each hot node, its TOP jobs by their
+estimated share of the node's NFS traffic in that direction over the window
+(job:nfs_*_bytes:rate5m, roles/prometheus rules io-usage.yml: the node's NFS bytes split
+by its jobs' syscall I/O, roles/io_usage), and the notices say it is an estimate. It
+reads Prometheus and changes nothing; cluster_tools.usage_report --io tells the people
+and the administrators. Python 3.9 or newer, standard library only.
 """
 
 from .render import size
 
 DIRECTIONS = {
-    # direction: (recorded node rate, capacity key, job counter, verb, preposition)
+    # direction: (recorded node rate, capacity key, recorded job rate, verb, preposition)
     "read": (
         "host_mount:nfs_read_bytes:rate5m",
         "read_bps",
-        "io_usage_job_read_bytes_total",
+        "job:nfs_read_bytes:rate5m",
         "reading",
         "from",
     ),
     "write": (
         "host_mount:nfs_write_bytes:rate5m",
         "write_bps",
-        "io_usage_job_written_bytes_total",
+        "job:nfs_write_bytes:rate5m",
         "writing",
         "to",
     ),
@@ -46,13 +47,13 @@ def collect(prom, mounts, share, minutes, top):
     hottest first."""
     items = []
     for mount, capacity in sorted(mounts.items()):
-        for direction, (recorded, cap_key, counter, _, _) in DIRECTIONS.items():
+        for direction, (recorded, cap_key, job_rate, _, _) in DIRECTIONS.items():
             limit = share * capacity[cap_key]
             hot = prom.query(f"min_over_time({recorded}{{mountpoint={quoted(mount)}}}[{minutes}m]) > {limit}")
             for row in hot:
                 host = row["metric"].get("host", "")
                 ranked = prom.query(
-                    f"topk({top}, sum by (job_id, user) (rate({counter}{{host={quoted(host)}}}[{minutes}m])))"
+                    f"topk({top}, sum by (job_id, user) (avg_over_time({job_rate}{{host={quoted(host)}}}[{minutes}m])))"
                 )
                 jobs = sorted(
                     (
@@ -95,8 +96,8 @@ def dm_text(item, rank, advice):
         f"지난 {item['minutes']}분 동안 `{item['host']}` 노드가 `{item['mount']}`{did} 있습니다. "
         f"{rate(item['rate'])}로, 그 뒤의 디스크가 클러스터 전체에 내주는 양의 {share_of(item)}%라 "
         f"모두의 `{item['mount']}` 작업이 느려집니다. 그 노드에서 {lead} {what} 잡이 `{job}`입니다 "
-        f"({rate(job_rate)}: 잡의 읽기, 쓰기 호출로 잰 값이라 캐시와 파이프도 들어 있어, 디스크에서 차지한 몫이 "
-        f"아니라 그 노드 안의 순위입니다).\n{advice}"
+        f"({rate(job_rate)}: 그 노드가 공유 스토리지와 주고받은 양을 노드 안 잡들의 읽기, 쓰기 호출 양에 비례해 나눈 추정치입니다)."
+        f"\n{advice}"
     )
 
 

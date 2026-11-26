@@ -456,8 +456,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Top jobs by I/O",
-      "description": "Each job's reads and writes through system calls (rchar and wchar, roles/io_usage): page cache and pipes included, so a ranking, not disk or NFS bytes.",
+      "title": "Top jobs by NFS traffic (estimated)",
+      "description": "Each job's share of its node's NFS reads and writes (job:nfs_*_bytes:rate5m): the node's wire bytes split by its jobs' system-call I/O (roles/io_usage), so an estimate.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -517,7 +517,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (host, job_id, user) (rate(io_usage_job_read_bytes_total[5m]) + rate(io_usage_job_written_bytes_total[5m])))",
+          "expr": "topk(10, sum by (host, job_id, user) (job:nfs_read_bytes:rate5m + job:nfs_write_bytes:rate5m))",
           "legendFormat": "{{host}} {{job_id}} {{user}}",
           "datasource": {
             "type": "prometheus",
