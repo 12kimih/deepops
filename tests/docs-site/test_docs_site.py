@@ -54,6 +54,7 @@ class DocsSite(unittest.TestCase):
                 f"<!-- BEGIN GENERATED: options:{n} -->x<!-- END GENERATED: options:{n} -->\n"
                 for n in ("sq", "disk-usage")
             )
+            + "<!-- BEGIN GENERATED: commands:table -->x<!-- END GENERATED: commands:table -->\n"
             + "".join(f"`{command} {s['name']}`\n" for s in subs),
         }
         for rel, text in files.items():
@@ -98,13 +99,30 @@ class DocsSite(unittest.TestCase):
             "cluster_tools_commands: [sq, disk-usage, gpu-usage]\ncluster_tools_motd_commands: [sq]\n"
         )
         found = self.found()
-        self.assertIn("commands: gpu-usage has no options:gpu-usage table on a page at main", found)
+        self.assertIn(
+            "commands: gpu-usage has no options table on a page at main (options:gpu-usage or options:all)",
+            found,
+        )
         self.assertIn("commands: disk-usage is not in the login banner (cluster_tools_motd_commands)", found)
+
+    def test_blocks_that_list_every_command_cover_each(self):
+        (self.config / "group_vars" / "slurm-cluster.yml").write_text(
+            "cluster_tools_commands: [sq, disk-usage, gpu-usage]\n"
+        )
+        self.commit(
+            "docs/reference.md",
+            (self.docs / "docs/reference.md").read_text()
+            + "<!-- BEGIN GENERATED: options:all -->x<!-- END GENERATED: options:all -->\n"
+            + "<!-- BEGIN GENERATED: commands:table -->x<!-- END GENERATED: commands:table -->\n",
+        )
+        self.assertEqual([p for p in self.found() if "gpu-usage" in p], [])
 
     def test_a_bot_subcommand_no_page_names_fails(self):
         self.commit("docs/reference.md", "<!-- BEGIN GENERATED: options:sq -->x<!-- END GENERATED: options:sq -->\n"
                     "<!-- BEGIN GENERATED: options:disk-usage -->x<!-- END GENERATED: options:disk-usage -->\n")  # fmt: skip
-        self.assertTrue(any(p.startswith("commands: no page at main names") for p in self.found()))
+        found = self.found()
+        self.assertTrue(any(p.startswith("commands: no page at main names /cluster ") for p in found))
+        self.assertIn("commands: no page at main names sq (or lists them all: commands:table)", found)
 
     def test_no_docs_checkout_is_nothing_to_compare(self):
         self.assertEqual(

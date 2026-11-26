@@ -17,10 +17,11 @@ checked out there must not change what this sees), and fails on any of:
             banner, the bot and the agent rules send people)
   agents    the AGENTS.md the docs' exporter (scripts/agent_rules.py) writes at REF does
             not hash to ai_agent_rules_sha256, the copy the cluster installs
-  commands  a published command (cluster_tools_commands) without an options:<name>
-            table on a page, missing from the login banner (cluster_tools_motd_commands)
-            or from the help canvas ([[commands]] in slack/help.md); a bot subcommand
-            no page names (/cluster <name>, or a bot:<name> block)
+  commands  a published command (cluster_tools_commands) without an options table
+            (options:<name>, or options:all for every command of the data file), not on a
+            commands table (commands:table, or named on a page), missing from the login
+            banner (cluster_tools_motd_commands) or from the help canvas ([[commands]] in
+            slack/help.md); a bot subcommand no page names (/cluster <name>, bot:<name>)
 
 DIR is the docs checkout, by default cluster-docs beside the main checkout of this
 repository (a worktree's too); none there (CI), nothing to compare.
@@ -128,9 +129,17 @@ def problems(docs, config):
     commands = names(s.get("cluster_tools_commands"))
     banner = names(s.get("cluster_tools_motd_commands", commands))
     canvas = docs.show("slack/help.md")
+    # The data file holds every command (data, above), so a block that lists them all from
+    # it (options:all, commands:table) covers each; else each needs its own.
+    every_option = bool(docs.grep("BEGIN GENERATED: options:all "))
+    table = bool(docs.grep("BEGIN GENERATED: commands:table "))
     for name in commands:
-        if not docs.grep(f"BEGIN GENERATED: options:{name} "):
-            out.append(f"commands: {name} has no options:{name} table on a page at {docs.ref}")
+        if not every_option and not docs.grep(f"BEGIN GENERATED: options:{name} "):
+            out.append(
+                f"commands: {name} has no options table on a page at {docs.ref} (options:{name} or options:all)"
+            )
+        if not table and not docs.grep(f"`{name}`"):
+            out.append(f"commands: no page at {docs.ref} names {name} (or lists them all: commands:table)")
         if name not in banner:
             out.append(f"commands: {name} is not in the login banner (cluster_tools_motd_commands)")
     if commands and canvas is not None and "[[commands]]" not in canvas:
