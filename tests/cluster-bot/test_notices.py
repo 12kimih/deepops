@@ -307,6 +307,7 @@ class OldPosts(Base):
         self.assertEqual(self.slack.log, [], "no call that changes Slack")
         self.assertEqual(Path(self.seen).read_text(), before, "nor the record")
         self.assertTrue(any(line.startswith("delete 3.0") for line in self.said), self.said)
+        self.assertTrue(all("''" not in line for line in self.said), "each line names its notice")
 
     def test_the_owners_run_brings_them_to_the_notices(self):
         self.run_round("2026-02-01", adopt=True)

@@ -225,7 +225,7 @@ def plan(messages, notes, seen, mine, today, adopt):
                 if adopt or p["how"] in EXACT:
                     out.append({"do": "unpin", "id": nid, "ts": p["ts"], "title": p["title"]})
     if newest is not None:
-        pin = {"do": "pin", "id": newest}
+        pin = {"do": "pin", "id": newest, "title": _header(notes[newest]["blocks"])}
         target = next((p for p in found.get(newest, []) if p["ts"] == kept.get(newest)), None)
         if target is not None and messages:
             pin["pinned"] = target["pinned"]
