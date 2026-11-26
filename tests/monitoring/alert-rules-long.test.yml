@@ -562,3 +562,20 @@ tests:
             exp_annotations:
               summary: "The weekly DCGM diagnostics have not run for 8 days on m1"
               description: "`systemctl list-timers gpu-diag-idle*` and `journalctl -u gpu-diag-idle` on m1."
+
+  - name: the bot's scopes unread for two days warn
+    interval: 1h
+    input_series:
+      - series: 'cluster_bot_scopes_last_success_timestamp_seconds{host="ctl", instance="ctl:9100"}'
+        values: '0x60'
+    alert_rule_test:
+      - eval_time: 47h
+        alertname: ClusterBotScopesUnchecked
+        exp_alerts: []
+      - eval_time: 49h
+        alertname: ClusterBotScopesUnchecked
+        exp_alerts:
+          - exp_labels: {severity: warning, host: ctl, instance: "ctl:9100"}
+            exp_annotations:
+              summary: "The cluster bot's Slack scopes on ctl have not been read"
+              description: "A missing scope would go unseen: `journalctl -u cluster-bot-scopes` and `systemctl list-timers cluster-bot-scopes.timer` on the host (the token, or Slack unreachable)."

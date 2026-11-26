@@ -222,6 +222,32 @@
     state: "{{ 'started' if _cluster_bot_ready else 'stopped' }}"
     daemon_reload: true
 
+# Whether Slack granted the token every scope the bot needs (cluster_bot.scopes): daily,
+# and now, so a scope a new feature needs and the app lacks shows with this deploy.
+- name: Install the scopes check's units
+  ansible.builtin.template:
+    src: "cluster-bot-scopes.{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ _cluster_bot_scopes_unit }}.{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [service, timer]
+
+- name: Check the token's scopes daily, or not without a bot token
+  systemd_unit:
+    name: "{{ _cluster_bot_scopes_unit }}.timer"
+    enabled: "{{ _cluster_bot_ready }}"
+    state: "{{ 'started' if _cluster_bot_ready else 'stopped' }}"
+    daemon_reload: true
+
+- name: Check the token's scopes now
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: refresh
+  vars:
+    textfile_keep_producers: ["{{ _cluster_bot_scopes_unit }}.service"]
+  when: _cluster_bot_ready
+
 - name: Record the component as present
   ansible.builtin.include_role:
     name: component_record
