@@ -58,6 +58,15 @@ class Collect(unittest.TestCase):
         self.assertIn('topk(3, sum by (job_id, user) (rate(io_usage_job_written_bytes_total{host="n1"}[15m])))',
                       prom.asked[2])  # fmt: skip
 
+    def test_a_hot_node_with_no_job_counted_says_the_count_is_broken(self):
+        """Slurm 26.05's job cgroups carried no job_<id>, so io-usage counted no job for 8
+        days and the admins read only "no job counted" (2026-11-27)."""
+        item = {"host": "n1", "mount": "/home", "direction": "read", "rate": 9e8, "capacity": 1e9,
+                "minutes": 15, "jobs": []}  # fmt: skip
+        text = io_report.admin_text([item])
+        self.assertIn("nobody was told", text)
+        self.assertIn("IoUsageJobsMissing", text)
+
     def test_below_the_share_is_nothing(self):
         self.assertEqual(io_report.collect(Prom(), MOUNTS, 0.6, 15, 3), [])
 

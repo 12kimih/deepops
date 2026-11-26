@@ -83,6 +83,23 @@ groups:
             Which jobs and logins do I/O on the node is not known, so the I/O notices
             cannot name them: `journalctl -u io-usage` and `systemctl list-timers
             io-usage.timer` on the host.
+      # It counts, but no job: a node with jobs where io-usage succeeds yet exports no job
+      # series. Slurm 26.05 named job cgroups by an opaque id, not job_<id>, and the count
+      # found no job on any node for 8 days unnoticed (2026-11-27): the alert above only
+      # proves the count ran, not that it saw what it is for.
+      - alert: IoUsageJobsMissing
+        expr: |
+          label_replace(max by (node) (slurm_node_cpus_alloc) > 0, "host", "$1", "node", "(.*)")
+          and on (host) io_usage_last_success_timestamp_seconds
+          unless on (host) count by (host) (io_usage_job_read_bytes_total)
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "I/O usage on {{ $labels.host }} counts no job though jobs run there"
+          description: >-
+            The node runs jobs but io-usage found none of their processes, so the I/O
+            notices cannot name them: compare a job process's /proc/<pid>/cgroup on the host
+            with what roles/io_usage recognizes as a job's cgroup.
       # No timestamp at all where the unit is installed: the alert above has nothing to
       # compare, so the unit's presence stands in.
       - alert: IoUsageNeverReported

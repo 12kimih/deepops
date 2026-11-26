@@ -105,7 +105,11 @@ def admin_text(items):
     lines = []
     for item in items:
         _, _, _, verb, prep = DIRECTIONS[item["direction"]]
-        jobs = ", ".join(f"{job} ({user}, {rate(r)})" for job, user, r in item["jobs"]) or "no job counted"
+        # No job ranked on a hot node means the per-job count is broken there, not that
+        # nobody did it: no one could be told, so the line says what to look at.
+        jobs = ", ".join(f"{job} ({user}, {rate(r)})" for job, user, r in item["jobs"]) or (
+            "none counted, so nobody was told: io-usage counts no job there (alert IoUsageJobsMissing)"
+        )
         lines.append(
             f"I/O: `{item['host']}` {verb} {prep} `{item['mount']}` at {rate(item['rate'])} "
             f"({share_of(item)}% of the disk) for {item['minutes']} min; top jobs: {jobs}"
