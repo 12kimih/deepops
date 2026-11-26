@@ -199,7 +199,7 @@ def render_week(rows, who, threshold, days=WEEK_DAYS, top=WEEK_TOP):
         lines.append(f"{name}: {r['held']:,.0f} GPU시간 중 {r['idle']:,.0f} GPU시간 쉼 ({part:.0%})")
     body = "\n".join(lines) or "GPU 잡이 없었습니다."
     note = (
-        f"쉼: 잡이 잡아 둔 GPU의 사용률이 그 1분 동안 {threshold:g}% 이하였다는 뜻입니다. "
+        f"쉼: 잡이 할당받은 GPU의 사용률이 그 1분 동안 {threshold:g}% 이하였다는 뜻입니다. "
         "쓰지 않는 GPU는 `scancel <JOBID>`로 반납해 주세요."
     )
     return head, [{"type": "header", "text": {"type": "plain_text", "text": head[:150]}}] + sections(body) + [
@@ -315,7 +315,7 @@ def summary_card(report):
         f"**할당된 GPU**\n{alloc} / {total}장 ({100 * alloc / total:.0f}%)",
         f"**평균 사용률**\n{avg}",
         f"**{IDLE_JOB}**\n{len(idle)}개" + (" :zzz:" if idle else ""),
-        f"**기다리는 잡**\n{pend_jobs}개, GPU {pend_gpus}장",
+        f"**대기 중인 잡**\n{pend_jobs}개, GPU {pend_gpus}장",
         f"**쓸 수 없는 노드 (drain, down)**\n{len(report['reasons'])}대"
         + (" :warning:" if report["reasons"] else ""),
     ]
@@ -375,7 +375,7 @@ def pending_section(pending):
         for u, p in sorted(pending.items(), key=lambda kv: -kv[1]["gpus"])
     ]
     return sections(
-        ":hourglass_flowing_sand: **기다리는 잡**\n"
+        ":hourglass_flowing_sand: **대기 중인 잡**\n"
         + table(("사용자", "잡", "GPU", "가장 오래", "사유"), rows)
     )
 
@@ -413,7 +413,7 @@ def people_section(jobs, total):
             )
         head = f"**{user}**  GPU {n}장 ({100 * n / total:.1f}%)  |  잡 {len(ujobs)}개"
         blocks.extend(
-            sections(f"{head}\n{table(('잡', 'GPU', '노드', '시간', 'QOS', '사용률', '메모리', ''), rows)}")
+            sections(f"{head}\n{table(('잡', 'GPU', '노드', '시간', 'QoS', '사용률', '메모리', ''), rows)}")
         )
     return blocks
 

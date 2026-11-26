@@ -236,13 +236,13 @@ class RenderTests(unittest.TestCase):
         data = disk_report.collect(site(), NOW)
         (_, card), _ = disk_report.render(data, who, hold=NOW + 2 * disk_report.DAY)
         self.assertIn("한도(20G)에 닿았습니다. 2027-01-17부터는 ", text_of(card))
-        self.assertIn("한도에 닿아 있는 동안 새 Slurm 잡이 제출되지 않습니다", text_of(card))
+        self.assertIn("한도에 닿아 있는 동안 새 Slurm 잡을 제출할 수 없습니다", text_of(card))
         (_, card), _ = disk_report.render(data, who, hold=0)
-        self.assertIn(". 공간을 비우실 때까지 새 Slurm 잡은 제출되지 않습니다", text_of(card))
+        self.assertIn(". 공간을 비우실 때까지 새 Slurm 잡을 제출할 수 없습니다", text_of(card))
         (_, card), _ = disk_report.render(data, who)
         self.assertNotIn("Slurm", text_of(card), "no holds: nothing said")
         bob = disk_report.over_warn(data)[0]
-        self.assertIn("지금은 그곳에 쓸 수 없습니다. 공간을 비우실 때까지 새 Slurm 잡은 제출되지 않습니다.",
+        self.assertIn("지금은 그곳에 쓸 수 없습니다. 공간을 비우실 때까지 새 Slurm 잡을 제출할 수 없습니다.",
                       disk_report.dm_text(bob, disk_report.hold_note(0, NOW)))  # fmt: skip
 
     def test_change(self):

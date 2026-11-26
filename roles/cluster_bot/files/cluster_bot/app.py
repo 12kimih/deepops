@@ -223,7 +223,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
 
     def unban_command(body, client):
         if unban is None or not user_of(body["user_id"]):
-            text = ("사람 명부에 이 Slack 계정이 없습니다. 관리자에게 알려 주세요." if unban
+            text = ("명부에 이 Slack 계정이 없습니다. 관리자에게 알려 주세요." if unban
                     else "이 클러스터는 Slack으로 차단 해제 신청을 받지 않습니다.")  # fmt: skip
             client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], **rich.message(text))
             return
@@ -353,7 +353,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         ack()
         view = projects_blocks.join_form(projects, user_of(body["user"]["id"]))
         if view is None:
-            dm(body["user"]["id"], "참여를 요청할 프로젝트가 없습니다.", kind="project", log=False)
+            dm(body["user"]["id"], "참여를 요청할 공동작업 폴더가 없습니다.", kind="project", log=False)
             return
         client.views_open(trigger_id=body["trigger_id"], view=view)
 

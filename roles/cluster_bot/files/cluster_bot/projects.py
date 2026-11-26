@@ -27,7 +27,7 @@ import secrets
 from .accounts import RosterFeature
 from .requests import Refused
 
-ROLE_NAMES = {"owners": "관리자", "members": "멤버", "viewers": "열람자"}
+ROLE_NAMES = {"owners": "소유자", "members": "멤버", "viewers": "열람자"}
 
 
 def role_name(role):
@@ -38,7 +38,7 @@ class ProjectFeature(RosterFeature):
     def _project(self, name):
         proj = (self._document().get("projects") or {}).get(name)
         if proj is None:
-            raise Refused(f"{name} 프로젝트가 없습니다")
+            raise Refused(f"{name} 공동작업 폴더가 없습니다")
         return proj
 
     def _role(self, proj, login):
@@ -53,8 +53,8 @@ class ProjectFeature(RosterFeature):
             if not self.people.PROJECT_NAME.match(name):
                 raise Refused("이름은 영문 소문자로 시작하고 영문 소문자, 숫자, - 만 쓸 수 있습니다 (2~27자)")
             if name in (self._document().get("projects") or {}):
-                raise Refused(f"{name} 프로젝트가 이미 있습니다")
-            return "admin", "새 프로젝트는 관리자가 승인합니다"
+                raise Refused(f"{name} 공동작업 폴더가 이미 있습니다")
+            return "admin", "새 공동작업 폴더는 관리자가 승인합니다"
         proj = self._project(name)
         mine = self._role(proj, who)
         if op == "join":
@@ -62,15 +62,15 @@ class ProjectFeature(RosterFeature):
                 raise Refused(f"이미 {name}의 {role_name(mine)}입니다")
             if req["role"] not in ("members", "viewers"):
                 raise Refused("멤버나 열람자로 참여를 요청할 수 있습니다")
-            return ("people", list(proj["owners"])), "프로젝트 관리자가 승인합니다"
+            return ("people", list(proj["owners"])), "공동작업 폴더 소유자가 승인합니다"
         if op == "leave":
             if not mine:
                 raise Refused(f"{name}에 속해 있지 않습니다")
             return "auto", ""
         if mine != "owners":
-            raise Refused(f"{name}의 관리자만 할 수 있습니다")
+            raise Refused(f"{name}의 소유자만 할 수 있습니다")
         if op == "close":
-            return "admin", "프로젝트 닫기는 관리자가 승인합니다"
+            return "admin", "공동작업 폴더 닫기는 관리자가 승인합니다"
         if op not in ("set", "purpose"):
             raise Refused(f"알 수 없는 요청입니다: {op}")
         return "auto", ""
@@ -120,7 +120,7 @@ class ProjectFeature(RosterFeature):
     def describe(self, req):
         op, name = req["op"], req["project"]
         return {
-            "new": f"새 프로젝트 {name} ({'/scratch' if req.get('place') == 'scratch' else '/home'})",
+            "new": f"새 공동작업 폴더 {name} ({'/scratch' if req.get('place') == 'scratch' else '/home'})",
             "set": f"{name}: {req.get('login')}을(를) {role_name(req.get('role'))}(으)로",
             "join": f"{name} 참여 ({role_name(req.get('role'))})",
             "leave": f"{name}에서 나가기",

@@ -77,7 +77,7 @@ class Requests(unittest.TestCase):
     def test_only_an_owner_manages(self):
         out = self.ask("bob", "set", login="dave", role="members")
         self.assertEqual(out.status, "refused")
-        self.assertIn("관리자만", out.text)
+        self.assertIn("소유자만", out.text)
 
     def test_joining_waits_for_an_owner(self):
         out = self.ask("dave", "join", role="members")
@@ -162,7 +162,7 @@ class Deployed(unittest.TestCase):
             )
             self.assertEqual([w for w, _ in sent], ["UBOB", "UDAVE"], "carol has no Slack member: not told")
             self.assertEqual(post.dms, [("project", "bob", True), ("project", "dave", True)], "logged")
-            self.assertIn("멤버에서 관리자(으)로 바뀌었습니다", sent[0][1])
+            self.assertIn("멤버에서 소유자(으)로 바뀌었습니다", sent[0][1])
             self.assertIn("`/home/shared/projects/vision` (읽기만)", sent[1][1])
             self.assertEqual(json.loads(Path(seen).read_text()), self.AFTER)
 

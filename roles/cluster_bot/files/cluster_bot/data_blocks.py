@@ -43,7 +43,7 @@ def ended(state, path, entry):
     if state == "done":
         return f"{path}에 받아 두었습니다 ({entry.get('file')}, {entry.get('bytes', 0)} bytes). 모두 읽을 수 있습니다."
     return (
-        f"{path}을(를) 받지 못했습니다: {entry.get('error') or '알 수 없는 이유'}. 도움 채널에 알려 주세요."
+        f"{path}을(를) 받지 못했습니다: {entry.get('error') or '알 수 없는 이유'}. 질문 채널에 알려 주세요."
     )
 
 

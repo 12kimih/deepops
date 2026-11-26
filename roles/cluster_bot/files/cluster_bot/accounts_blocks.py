@@ -48,7 +48,7 @@ def leave_reminder(person, days_left):
     when = "내일이" if days_left <= 1 else f"{days_left}일 뒤가"
     text = (
         f"{when} 클러스터 사용 마지막 날입니다 ({person['ends']}). 다음 날부터 새 잡은 낼 수 없고, "
-        f"{person['login_expires']}부터는 로그인이 막힙니다. 홈 디렉터리와 공유 저장소에서 필요한 파일은 "
+        f"{person['login_expires']}부터는 로그인이 막힙니다. 홈 디렉터리와 공유 스토리지에서 필요한 파일은 "
         "그 전에 옮겨 주세요."
     )
     note = "날짜가 바뀌었다면 관리자에게 알려 주세요."

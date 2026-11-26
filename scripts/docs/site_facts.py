@@ -22,6 +22,9 @@ Facts:
             none sets one)
   messages  how the submit holds' refusals begin (cluster_tools.submit_holds): hold_ended
             (past the membership's end), hold_disk (at a disk hard limit)
+  terms     the Korean glossary (scripts/deepops/terms_ko.yml, scripts/deepops/terms.py):
+            each entry's word to use, the variants refused, why, and its scope, so the
+            user docs' own test refuses the same variants
   storage   each measured filesystem's speeds (io_fairness_models, its model): read_bps
             and write_bps (sequential, bytes a second), read_iops and write_iops (random)
   services  what the cluster runs that the pages describe, so none says a service is coming
@@ -98,6 +101,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "scripts/deepops"))
 import cli  # noqa: E402
+import terms  # noqa: E402
 from cluster_tools import submit_holds  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
@@ -164,6 +168,7 @@ PUBLIC = {
     "schedules": {"scratch_purge"},
     "messages": {"hold_ended", "hold_disk"},
     "storage": None,  # each measured mount, its fields STORAGE_FIELDS
+    "terms": {"use", "not", "why", "scope", "id"},  # every glossary entry
 }
 STORAGE_FIELDS = {
     "read_bps": "rbps",
@@ -613,6 +618,7 @@ def facts(config):
         },
         "messages": {"hold_ended": submit_holds.ENDED, "hold_disk": submit_holds.DISK_HELD},
         "storage": storage(s),
+        "terms": terms.public(terms.load()),
         "slurm": slurm_values(config),
         "dates": schedule(config),
         "quota": quota_limits(config, s),
@@ -644,6 +650,8 @@ def public(every):
                 for e in value or []
                 if _path_or_url(e["login"]) and _path_or_url(e["job"])
             ]
+        elif key == "terms":
+            out[key] = [{f: v for f, v in e.items() if f in fields} for e in value or []]
         elif key == "storage":
             out[key] = {
                 m: {f: v for f, v in d.items() if f in STORAGE_FIELDS} for m, d in (value or {}).items()
