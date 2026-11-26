@@ -4,12 +4,23 @@
 # Sourced by shared/bin/run-parts.sh and epilog.d/40-lastuserjob-processes.
 # Deployed only when the scope is "job".
 #
-# The question these answer is "whose is this process?", asked of the node
-# instead of the controller. squeue reports what the controller believes, which
-# can lag the node and cannot see a job placed here a moment ago. The kernel's
-# /proc/<pid>/cgroup cannot be out of date: Slurm puts every process of a job
-# in a cgroup named job_<jobid> (cgroup v1: /slurm/uid_N/job_M/..., cgroup v2:
-# .../slurmstepd.scope/job_M/...), so the job id is read straight off the path.
+# The question these answer is "is this process in a Slurm job?", asked of
+# the node instead of the controller. squeue reports what the controller
+# believes, which can lag the node and cannot see a job placed here a moment
+# ago. The kernel's /proc/<pid>/cgroup cannot be out of date: Slurm puts every
+# process of a job under one job directory, and that is read from the cgroup
+# STRUCTURE, never from a name: on cgroup v2 a child of slurmstepd.scope (or
+# <node>_slurmstepd.scope) other than "system", slurmstepd's waiting area; on
+# cgroup v1 a child of /slurm/uid_N. The directory's name is opaque: job_<id>
+# up to Slurm 25.11, the job's SLUID from 26.05 on (2026-11-27: the job_<id>
+# match found no job on any node). The same rules, on the same cases
+# (tests/lib/slurm_cgroups.json), are cluster_tools.job_cgroup's.
+#
+# No job id is needed. Before the epilog runs, Slurm's process tracking
+# (proctrack/cgroup) has killed the ending job's processes and removed its
+# cgroups, so a process of the user still in a job cgroup is another job's, or
+# one of the ending job's it could not kill. Either way it is spared and the
+# last-user-job cleanup waits for the next epilog.
 #
 # Everything here fails closed. "Could not tell" is reported as such and the
 # caller treats it as "another job may be here": cleanup is skipped and logged,
@@ -57,13 +68,64 @@ epilog_pid_owned_by() {
     return 1
 }
 
-# epilog_pid_jobs PID
-#   Prints the job id of every job_<id> cgroup component in
-#   /proc/<pid>/cgroup, one per line (none printed means the process is in no
-#   Slurm job cgroup).
-#   Returns 0 parsed, 1 the process is gone, 2 unreadable or not understood.
-epilog_pid_jobs() {
-    local pid="$1" file content line path
+# epilog_cgroup_classify
+#   Reads the contents of a /proc/<pid>/cgroup on stdin and prints its kind,
+#   then the job cgroup keys, space-separated: "job KEY...", "slurm" (in
+#   Slurm's hierarchy, in no job), "none" (outside it) or "bad" (not a cgroup
+#   file). Always returns 0.
+epilog_cgroup_classify() {
+    local line path rest part below kind_slurm=0 keys="" key lines=0 i
+    local -a parts
+    while IFS= read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] || continue
+        lines=1
+        # hierarchy-id:controllers:path, with an empty controller list on v2.
+        if [[ ! "$line" =~ ^[0-9]+:[^:]*:(/.*)$ ]]; then
+            printf 'bad\n'
+            return 0
+        fi
+        path="${BASH_REMATCH[1]}"
+        IFS=/ read -r -a parts <<<"${path#/}"
+        key=""
+        rest=slurm_none
+        for i in "${!parts[@]}"; do
+            part="${parts[i]}"
+            if [[ "$part" =~ ^(.+_)?slurmstepd(_.+)?\.scope$ ]]; then
+                below="${parts[i + 1]:-system}"
+                if [ "$below" = system ]; then rest=slurm; else key="$below"; fi
+                break
+            fi
+        done
+        if [ -z "$key" ] && [ "$rest" = slurm_none ] \
+            && [[ "${parts[0]-}" =~ ^slurm(_.+)?$ ]]; then
+            if [ -n "${parts[2]-}" ] && [[ "${parts[1]}" =~ ^uid_[0-9]+$ ]]; then
+                key="${parts[2]}"
+            else
+                rest=slurm
+            fi
+        fi
+        [ "$rest" != slurm ] || kind_slurm=1
+        if [ -n "$key" ] && [[ " $keys " != *" $key "* ]]; then
+            keys="${keys:+$keys }$key"
+        fi
+    done
+    if [ "$lines" = 0 ]; then
+        printf 'bad\n'
+    elif [ -n "$keys" ]; then
+        printf 'job %s\n' "$keys"
+    elif [ "$kind_slurm" = 1 ]; then
+        printf 'slurm\n'
+    else
+        printf 'none\n'
+    fi
+}
+
+# epilog_pid_kind PID
+#   Prints the kind of PID (epilog_cgroup_classify): job, slurm, none or bad.
+#   Returns 0 classified, 1 the process is gone, 2 unreadable or not a cgroup
+#   file (printed nothing).
+epilog_pid_kind() {
+    local pid="$1" file content kind
     file="$epilog_proc_root/$pid/cgroup"
     # The redirect has to wrap the whole command: bash reports a failed read of
     # $(<file) itself, and a process that exits mid-scan is routine.
@@ -71,18 +133,10 @@ epilog_pid_jobs() {
         [ -e "$file" ] || return 1
         return 2
     fi
-    [ -n "$content" ] || return 2
-    while IFS= read -r line; do
-        [ -n "$line" ] || continue
-        # hierarchy-id:controllers:path, with an empty controller list on v2.
-        if [[ ! "$line" =~ ^[0-9]+:[^:]*:/ ]]; then
-            return 2
-        fi
-        path="${line#*:*:}"
-        if [[ "$path" =~ (^|/)job_([0-9]+)(/|$) ]]; then
-            printf '%s\n' "${BASH_REMATCH[2]}"
-        fi
-    done <<<"$content"
+    kind=$(epilog_cgroup_classify <<<"$content")
+    kind="${kind%% *}"
+    [ "$kind" != bad ] || return 2
+    printf '%s\n' "$kind"
     return 0
 }
 
@@ -105,30 +159,32 @@ epilog_user_pids() {
     return 0
 }
 
-# epilog_other_job_present UID ENDING_JOBID
-#   Is any process of UID inside the cgroup of a job other than ENDING_JOBID?
-#   Returns 0 yes, 1 no, 2 cannot tell (unreadable or unrecognised cgroup
-#   data, or no process table).
+# epilog_other_job_present UID
+#   Is any process of UID in a job cgroup? The ending job's are gone by now
+#   (see the header), so one there is another job's, or a stuck one of the
+#   ending job: either way not the time for the last-user-job cleanup.
+#   Returns 0 yes, 1 no, 2 cannot tell (an unreadable cgroup file or one not
+#   understood, a process of the user in Slurm's hierarchy but in no job, or
+#   no process table).
 epilog_other_job_present() {
-    local uid="$1" ending="$2" pid pids jobs job rc unsure=0
+    local uid="$1" pid pids kind rc unsure=0
     if ! pids=$(epilog_user_pids "$uid"); then
         return 2
     fi
     for pid in $pids; do
         rc=0
-        jobs=$(epilog_pid_jobs "$pid") || rc=$?
+        kind=$(epilog_pid_kind "$pid") || rc=$?
         case "$rc" in
             0) ;;
             1) continue ;;
             *) unsure=1; continue ;;
         esac
-        for job in $jobs; do
-            if [ "$job" != "$ending" ]; then
-                return 0
-            fi
-        done
+        case "$kind" in
+            job) return 0 ;;
+            none) ;;
+            *) unsure=1 ;;
+        esac
     done
     [ "$unsure" = 0 ] || return 2
     return 1
 }
-

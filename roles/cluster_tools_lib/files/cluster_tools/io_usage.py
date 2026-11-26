@@ -4,10 +4,13 @@
 
 Three sets of node_exporter textfile counters:
 
-  io_usage_job_read_bytes_total, io_usage_job_written_bytes_total {job_id, user}
+  io_usage_job_read_bytes_total, io_usage_job_written_bytes_total {job_id, cgroup, user}
       Each running job's syscall I/O: rchar and wchar of /proc/<pid>/io summed over
-      the processes whose cgroup path names job_<id> (Slurm puts every process of a
-      job there, whatever the cgroup layout). A reaped child's counts move into its
+      the processes under its job cgroup (cluster_tools.job_cgroup, from the cgroup
+      structure: Slurm 26.05 names the directory by the job's SLUID, older Slurm
+      job_<id>). cgroup is that directory; job_id is what Slurm says the processes'
+      job is (scontrol listpids: node-local, from the slurmstepds), kept once known,
+      and "" while it is not. A reaped child's counts move into its
       parent's (the kernel adds them at wait()), so tasks that already exited still
       count; a process that leaves taking its counts with it (its parent is not in
       the job: a step ending) is kept as counted, so the counter never goes back. rchar and wchar
@@ -20,10 +23,12 @@ Three sets of node_exporter textfile counters:
   io_usage_slice_pressure_seconds_total {slice, kind}
       How long tasks of each slice waited for I/O (io.pressure: some, full).
 
-and io_usage_last_success_timestamp_seconds. The state file keeps each job's counter
-across runs. CONFIG: proc_root, cgroup_root, sys_root, slices (cgroups, relative to
-cgroup_root, whose pressure is reported), textfile, state_file. Python 3.9 or newer,
-standard library only.
+and io_usage_job_unmapped (the job cgroups counted with no job id: listpids failed or
+did not list them) and io_usage_last_success_timestamp_seconds. The state file keeps
+each job's counter and id across runs. CONFIG: proc_root, cgroup_root, sys_root, slices
+(cgroups, relative to cgroup_root, whose pressure is reported), textfile, state_file;
+scontrol (the command, the Slurm install's; default: scontrol on PATH). Python 3.9 or
+newer, standard library only.
 """
 
 import json
@@ -34,18 +39,21 @@ import sys
 import time
 from collections import Counter
 
-from . import config
+from . import config, job_cgroup, proc
 from .blockdev import device_name
 from .files import write_atomic, write_textfile
 
 CONFIG_KEYS = {"proc_root": str, "cgroup_root": str, "sys_root": str, "slices": list, "textfile": str,
                "state_file": str}  # fmt: skip
-JOB = re.compile(r"/job_(\d+)(?:/|$)")
+CONFIG_OPTIONAL = {"scontrol": str}
+# listpids asks each slurmstepd on the node over its socket; one that hangs must not
+# take the run (TimeoutStartSec=50s) with it.
+LISTPIDS_TIMEOUT = 15
 USER_SLICE = re.compile(r"^user-(\d+)\.slice$")
 
 
 def load_config(path):
-    cfg = config.require(path, CONFIG_KEYS)
+    cfg = config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
     if not all(isinstance(s, str) and s for s in cfg["slices"]):
         raise config.ConfigError(f"{path}: slices must be cgroup paths")
     return cfg
@@ -67,11 +75,10 @@ def name_of(uid):
 
 
 def process(proc_root, pid):
-    """(job id, key, ppid key, uid, rchar, wchar) of PID, or None when it is in no job or
+    """(job cgroup, key, ppid, uid, rchar, wchar) of PID, or None when it is in no job or
     gone. A key is "pid:start time", so a reused pid is another process."""
-    cgroup = read(os.path.join(proc_root, pid, "cgroup"))
-    match = JOB.search(cgroup or "")
-    if not match:
+    kind, cgroups = job_cgroup.classify(read(os.path.join(proc_root, pid, "cgroup")))
+    if kind != "job":
         return None
     io, status = read(os.path.join(proc_root, pid, "io")), read(os.path.join(proc_root, pid, "status"))
     stat = read(os.path.join(proc_root, pid, "stat"))
@@ -82,12 +89,13 @@ def process(proc_root, pid):
     uid = int(status_fields.get("Uid", "0").split()[0])
     ppid = status_fields.get("PPid", "0").strip()
     start = stat.rsplit(")", 1)[-1].split()[19]  # field 22, after the command's parentheses
-    return match[1], f"{pid}:{start}", ppid, uid, int(fields.get("rchar", 0)), int(fields.get("wchar", 0))
+    return cgroups[0], f"{pid}:{start}", ppid, uid, int(fields.get("rchar", 0)), int(fields.get("wchar", 0))
 
 
 def jobs(proc_root):
-    """{job id: {"procs": {key: [rchar, wchar, ppid]}, "uid"}}: the job's live processes,
-    and its user, the most common uid among them other than root (root's: slurmstepd)."""
+    """{job cgroup: {"procs": {key: [rchar, wchar, ppid]}, "uid"}}: the job's live
+    processes, and its user, the most common uid among them other than root (root's:
+    slurmstepd)."""
     out, uids = {}, {}
     for pid in os.listdir(proc_root):
         if not pid.isdigit():
@@ -101,6 +109,37 @@ def jobs(proc_root):
     for job, counts in uids.items():
         people = [uid for uid, _ in counts.most_common() if uid != 0]
         out[job]["uid"] = people[0] if people else 0
+    return out
+
+
+def listpids(scontrol):
+    """{pid: job id} of every process Slurm tracks on this node (scontrol listpids, its
+    PID and JOBID columns), or None when scontrol fails: said on stderr."""
+    rc, out, err = proc.outcome([scontrol, "listpids"], timeout=LISTPIDS_TIMEOUT)
+    lines = out.splitlines()
+    header = lines[0].split() if lines else []
+    if rc != 0 or "PID" not in header or "JOBID" not in header:
+        why = (err.splitlines() or [f"exit {rc}, no PID JOBID header"])[-1]
+        print(f"io-usage: {scontrol} listpids: {why}; job ids unknown", file=sys.stderr)
+        return None
+    pid_at, job_at = header.index("PID"), header.index("JOBID")
+    out = {}
+    for line in lines[1:]:
+        cols = line.split()
+        if len(cols) == len(header) and cols[pid_at].isdigit() and cols[job_at] not in ("", "-"):
+            out[cols[pid_at]] = cols[job_at]
+    return out
+
+
+def job_ids(now, pids, state):
+    """{job cgroup: job id}: the id Slurm gives most of its processes (PIDS, listpids),
+    else the one STATE kept for it, else ""."""
+    out = {}
+    for cgroup, seen in now.items():
+        ids = Counter(pids.get(key.split(":")[0]) for key in seen["procs"]) if pids else Counter()
+        ids.pop(None, None)
+        known = ids.most_common(1)[0][0] if ids else state.get(cgroup, {}).get("job_id", "")
+        out[cgroup] = known
     return out
 
 
@@ -158,8 +197,8 @@ def label(value):
     return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
-def textfile(job_rows, login_rows, pressure_rows, now):
-    out = []
+def textfile(job_rows, login_rows, pressure_rows, now, ids=None):
+    out, ids = [], ids or {}
 
     def family(name, kind, text, rows):
         out.extend([f"# HELP {name} {text}", f"# TYPE {name} {kind}"])
@@ -170,7 +209,10 @@ def textfile(job_rows, login_rows, pressure_rows, now):
     for side, verb in (("read", "read"), ("written", "written")):
         family(f"io_usage_job_{side}_bytes_total", "counter",
                f"Bytes the job's processes {verb} through system calls (rchar/wchar; page cache and pipes included).",
-               [({"job_id": job, "user": name_of(v["uid"])}, v[side]) for job, v in sorted(job_rows.items())])  # fmt: skip
+               [({"job_id": ids.get(job, ""), "cgroup": job, "user": name_of(v["uid"])}, v[side])
+                for job, v in sorted(job_rows.items())])  # fmt: skip
+    family("io_usage_job_unmapped", "gauge", "Job cgroups counted whose job id Slurm did not give (scontrol listpids).",
+           [({}, sum(1 for job in job_rows if not ids.get(job)))])  # fmt: skip
     family("io_usage_login_read_bytes_total", "counter", "Bytes the login's processes read from the disk (io.stat).",
            [({"user": u, "device": d}, r) for u, d, r, _ in login_rows])  # fmt: skip
     family("io_usage_login_written_bytes_total", "counter", "Bytes the login's processes wrote to the disk (io.stat).",
@@ -190,9 +232,14 @@ def run(cfg, now=None):
             state = json.load(f)
     except (OSError, ValueError):
         state = {}
-    counted = carry(jobs(cfg["proc_root"]), state)
+    live = jobs(cfg["proc_root"])
+    pids = listpids(cfg.get("scontrol", "scontrol")) if live else {}  # no job here: no Slurm to ask
+    ids = job_ids(live, pids, state)
+    counted = carry(live, state)
+    for cgroup, job_id in ids.items():
+        state[cgroup]["job_id"] = job_id
     text = textfile(counted, logins(cfg["cgroup_root"], cfg["sys_root"]), pressure(cfg["cgroup_root"], cfg["slices"]),
-                    now)  # fmt: skip
+                    now, ids)  # fmt: skip
     os.makedirs(os.path.dirname(os.path.abspath(cfg["state_file"])), exist_ok=True)
     write_atomic(cfg["state_file"], json.dumps(state), mode=0o600)
     write_textfile(cfg["textfile"], text)

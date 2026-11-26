@@ -18,3 +18,5 @@ _io_usage_cfg:
   slices: "{{ io_usage_slices }}"
   textfile: "{{ _io_usage_textfile }}"
   state_file: "{{ _io_usage_state_file }}"
+  # Which job each job cgroup is (scontrol listpids): the Slurm install's command.
+  scontrol: "{{ slurm_install_prefix }}/bin/scontrol"

@@ -108,9 +108,11 @@ fake_proc() {
 
 # cgroup lines as Slurm lays them out. v1 has one line per controller
 # hierarchy under /slurm/uid_N/job_M; v2 has one unified line under the
-# slurmstepd scope.
+# slurmstepd scope, the job's directory named job_<id> up to Slurm 25.11 and by
+# its SLUID from 26.05 on. The full spec is tests/lib/slurm_cgroups.json.
 cg_v1_job() { printf '4:cpuset:/slurm/uid_%s/job_%s/step_0/task_0\n3:memory:/slurm/uid_%s/job_%s/step_0\n1:name=systemd:/system.slice/slurmd.service' "$1" "$2" "$1" "$2"; }
 cg_v2_job() { printf '0::/system.slice/slurmstepd.scope/job_%s/step_0/user/task_0' "$1"; }
+cg_v2_sluid() { printf '0::/system.slice/slurmstepd.scope/%s/step_batch/user/task_0' "$1"; }
 cg_none()   { printf '0::/user.slice/user-%s.slice/session-3.scope' "$1"; }
 
 # ---------------------------------------------------------------------------
@@ -707,7 +709,9 @@ fi  # identity and /proc/self/mountinfo
 # Fake process tables for the dispatcher cases.
 proc_other_job_v1() { fake_proc "$1" 2001 1001 "$(cg_v1_job 1001 1002)"; }
 proc_other_job_v2() { fake_proc "$1" 2001 1001 "$(cg_v2_job 1002)"; }
+proc_other_job_sluid() { fake_proc "$1" 2001 1001 "$(cg_v2_sluid s5K1KKYAYG5D00)"; }
 proc_own_job_only() { fake_proc "$1" 2001 1001 "$(cg_v2_job 1000)"; }
+proc_waiting_area() { fake_proc "$1" 2001 1001 '0::/system.slice/slurmstepd.scope/system'; }
 proc_other_job_other_user() { fake_proc "$1" 2001 1555 "$(cg_v2_job 1002)"; }
 proc_unrecognised() { fake_proc "$1" 2001 1001 'this is not a cgroup file'; }
 proc_unreadable() { fake_proc "$1" 2001 1001 ''; }
@@ -719,7 +723,11 @@ echo "run-parts.sh -- job-scoped guard (scope=job)"
 RENDER_SCOPE=job
 runparts_case "node scan: another job's process (cgroup v1) blocks though squeue is clear" skipped "" 0 proc_other_job_v1
 runparts_case "node scan: another job's process (cgroup v2) blocks though squeue is clear" skipped "" 0 proc_other_job_v2
-runparts_case "node scan: only the ending job's processes do not block"                    ran     "" 0 proc_own_job_only
+runparts_case "node scan: another job's process (cgroup v2, SLUID) blocks though squeue is clear" skipped "" 0 proc_other_job_sluid
+# Slurm kills the ending job's processes before the epilog: one still in a job
+# cgroup is one it could not kill, and the cleanup waits for the next epilog.
+runparts_case "node scan: a process left in any job cgroup blocks"                         skipped "" 0 proc_own_job_only
+runparts_case "node scan: a process in slurmstepd's waiting area fails closed"             skipped "" 0 proc_waiting_area
 runparts_case "node scan: another user's job does not block"                               ran     "" 0 proc_other_job_other_user
 runparts_case "node scan: an orphan alone does not block"                                  ran     "" 0 proc_orphan_only
 runparts_case "node scan: own and other job together block"                                skipped "" 0 proc_own_and_other
@@ -771,6 +779,41 @@ echo "run-parts.sh -- scope=user ignores the node scan"
 RENDER_SCOPE=user
 runparts_case "user scope: another job's cgroup does not block (squeue only)" ran "" 0 proc_other_job_v2
 RENDER_SCOPE=job
+
+# --- the cgroup spec ------------------------------------------------------------
+# tests/lib/slurm_cgroups.json is the one spec of whose a process is by its
+# /proc/<pid>/cgroup; cluster_tools.job_cgroup is tested on the same cases.
+echo
+echo "shared/lib/epilog-job-scope.sh -- every case of tests/lib/slurm_cgroups.json"
+spec="$work/spec"
+rm -rf "$spec"; mkdir -p "$spec/cases"
+if render "shared/lib/epilog-job-scope.sh" "$spec/lib.sh" \
+   && python3 - "$repo/tests/lib/slurm_cgroups.json" "$spec/cases" <<'PY'
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[2])
+for i, case in enumerate(json.loads(pathlib.Path(sys.argv[1]).read_text())["cases"]):
+    (out / f"{i:03d}.cgroup").write_text(case["cgroup"])
+    (out / f"{i:03d}.want").write_text(" ".join([case["kind"], *case["keys"]]))
+    (out / f"{i:03d}.name").write_text(case["name"])
+PY
+then
+    cases=0
+    for f in "$spec"/cases/*.cgroup; do
+        [ -e "$f" ] || continue
+        cases=$((cases + 1))
+        base="${f%.cgroup}"
+        got=$(epilog_proc_root=/nonexistent bash -c '. "$1" && epilog_cgroup_classify <"$2"' _ "$spec/lib.sh" "$f" 2>&1)
+        want=$(<"$base.want")
+        if [ "$got" = "$want" ]; then
+            ok "spec: $(<"$base.name")"
+        else
+            no "spec: $(<"$base.name")" "got '$got', wanted '$want'"
+        fi
+    done
+    [ "$cases" -gt 0 ] || no "spec: the cases are read" "no case in tests/lib/slurm_cgroups.json"
+else
+    no "spec: the cases are read" "harness setup failed"
+fi
 
 # --- 40-lastuserjob-processes ------------------------------------------------
 echo
@@ -824,23 +867,24 @@ procs_case() {
     fi
 }
 
-# One PID per row of the classification table in the design note, on both
-# layouts. 3001 is the ending job's, 3002 another job's, 3003 an orphan, 3004
-# unparsable; 3005 belongs to someone else's job and is never ours to touch.
+# One PID per row of the classification table in 40's header, on each layout.
+# 3001 sits in the ending job's cgroup (one Slurm could not kill), 3002 in
+# another job's, 3003 is an orphan, 3004 unparsable; 3005 belongs to someone
+# else's job and is never ours to touch. Only the orphan is ever killed.
 mixed_v1() { fake_proc "$1" 3001 1001 "$(cg_v1_job 1001 1000)"; fake_proc "$1" 3002 1001 "$(cg_v1_job 1001 1002)"
              fake_proc "$1" 3003 1001 "$(cg_none 1001)"; fake_proc "$1" 3004 1001 'garbage'
              fake_proc "$1" 3005 1777 "$(cg_v1_job 1777 1050)"; }
 mixed_v2() { fake_proc "$1" 3001 1001 "$(cg_v2_job 1000)"; fake_proc "$1" 3002 1001 "$(cg_v2_job 1002)"
              fake_proc "$1" 3003 1001 "$(cg_none 1001)"; fake_proc "$1" 3004 1001 'garbage'
              fake_proc "$1" 3005 1777 "$(cg_v2_job 1050)"; }
+mixed_sluid() { fake_proc "$1" 3001 1001 "$(cg_v2_sluid s5K1KKYAYG5D00)"; fake_proc "$1" 3002 1001 "$(cg_v2_sluid sEKNKTV3WPV500)"
+                fake_proc "$1" 3003 1001 "$(cg_none 1001)"; fake_proc "$1" 3004 1001 'garbage'
+                fake_proc "$1" 3005 1777 "$(cg_v2_sluid s0000000000000)"; }
 
-procs_case "cgroup v1: ending job killed, other job spared, orphan spared while another job exists" mixed_v1 "3001" 0
-procs_case "cgroup v2: ending job killed, other job spared, orphan spared while another job exists" mixed_v2 "3001" 0
-procs_case "cgroup v1: orphan killed only when the user has no other job" mixed_v1 "3001 3003" 1
-procs_case "cgroup v2: orphan killed only when the user has no other job" mixed_v2 "3001 3003" 1
-# Even when the dispatcher says "last job", a process in another job's cgroup
-# is never killed: that is the race squeue cannot see.
-procs_case "another job's process is spared even when the dispatcher says last job" mixed_v2 "3001 3003" 1
+for layout in v1 v2 sluid; do
+    procs_case "$layout: every process in a job cgroup is spared, the orphan too while another job may exist" "mixed_$layout" "" 0
+    procs_case "$layout: the orphan is killed when the user has no other job, nothing in a job cgroup" "mixed_$layout" "3003" 1
+done
 
 exited_between() { fake_proc "$1" 3010 1001 "$(cg_v2_job 1000)"; rm -f "$1/3010/cgroup"; }
 procs_case "a process that exits between listing and classifying is skipped" exited_between "" 1
@@ -864,13 +908,13 @@ fi
 unparsable_only() { fake_proc "$1" 3011 1001 'x:y'; }
 procs_case "an unparsable cgroup line is skipped, not killed" unparsable_only "" 1
 
-# Nested job paths (a step cgroup under the job) classify by the job_ component.
-nested_step() { fake_proc "$1" 3020 1001 '0::/system.slice/slurmstepd.scope/job_1000/step_batch/user/task_0'; }
-procs_case "a step cgroup under the ending job is the ending job's" nested_step "3020" 0
+# A process in Slurm's hierarchy but in no job is not an orphan: left alone.
+waiting_area() { fake_proc "$1" 3020 1001 '0::/system.slice/slurmstepd.scope/system'; }
+procs_case "a process in slurmstepd's waiting area is left alone" waiting_area "" 1
 
-# A job id that is only a prefix of the ending job's must not match.
-prefix_job() { fake_proc "$1" 3021 1001 "$(cg_v2_job 10001)"; }
-procs_case "job 10001 is not job 1000" prefix_job "" 1
+# A user's own cgroup named like a job is no job: an orphan.
+lookalike() { fake_proc "$1" 3021 1001 '0::/user.slice/user-1001.slice/user@1001.service/app.slice/job_5'; }
+procs_case "a user's cgroup named job_5 is an orphan" lookalike "3021" 1
 
 # --- exemptions and edge users -------------------------------------------------
 exempt_dir="$(setup_procs)" || exempt_dir=""
@@ -926,7 +970,7 @@ else
     PATH="$standalone_dir/bin:$PATH" SLURM_JOB_USER=alice SLURM_JOB_UID=1001 SLURM_JOB_ID=1000 \
         "$standalone_dir/40-processes" >/dev/null 2>&1; rc=$?
     got=$(sed -e 's/^-9 -- //' "$standalone_dir/kill.log" | tr '\n' ' ' | sed 's/ $//')
-    if [ "$rc" = 0 ] && [ "$got" = 3001 ]; then
+    if [ "$rc" = 0 ] && [ -z "$got" ]; then
         ok "run without the dispatcher, orphans are spared"
     else
         no "run without the dispatcher, orphans are spared" "rc=$rc killed='$got'"

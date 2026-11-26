@@ -1,0 +1,27 @@
+{
+  "_comment": "The one spec of whose a process is by its /proc/<pid>/cgroup: read by the bash tests (tests/slurm-epilog, shared/lib/epilog-job-scope.sh) and the Python tests (cluster_tools.job_cgroup). kind: job (KEYS: its job cgroup, the directory under slurmstepd.scope or /slurm/uid_N), slurm (under Slurm's hierarchy but in no job: slurmstepd's waiting area), none (outside Slurm's) or bad (not a cgroup file). Slurm 26.05 names the job directory by its SLUID, older Slurm (or CgroupJobIdPaths=yes) job_<id>.",
+  "cases": [
+    {"name": "v2 SLUID: a batch task", "cgroup": "0::/system.slice/slurmstepd.scope/s5K1KKYAYG5D00/step_batch/user/task_0", "kind": "job", "keys": ["s5K1KKYAYG5D00"]},
+    {"name": "v2 SLUID: a step's slurmstepd", "cgroup": "0::/system.slice/slurmstepd.scope/s5K1KKYAYG5D00/step_0/slurm", "kind": "job", "keys": ["s5K1KKYAYG5D00"]},
+    {"name": "v2 SLUID: an adopted login (the extern step)", "cgroup": "0::/system.slice/slurmstepd.scope/s5K1KKYAYG5D00/step_extern/user/task_0", "kind": "job", "keys": ["s5K1KKYAYG5D00"]},
+    {"name": "v2 SLUID: an interactive step", "cgroup": "0::/system.slice/slurmstepd.scope/sEKNKTV3WPV500/step_interactive/user/task_0", "kind": "job", "keys": ["sEKNKTV3WPV500"]},
+    {"name": "v2 SLUID: a node-named scope", "cgroup": "0::/system.slice/n1_slurmstepd.scope/s5K1KKYAYG5D00/step_0/user/task_0", "kind": "job", "keys": ["s5K1KKYAYG5D00"]},
+    {"name": "v2 job_<id>: a step task", "cgroup": "0::/system.slice/slurmstepd.scope/job_1000/step_0/user/task_0", "kind": "job", "keys": ["job_1000"]},
+    {"name": "v2 job_<id>: a batch task", "cgroup": "0::/system.slice/slurmstepd.scope/job_10001/step_batch/user/task_0", "kind": "job", "keys": ["job_10001"]},
+    {"name": "v2: slurmstepd's waiting area", "cgroup": "0::/system.slice/slurmstepd.scope/system", "kind": "slurm", "keys": []},
+    {"name": "v2: the scope itself", "cgroup": "0::/system.slice/slurmstepd.scope", "kind": "slurm", "keys": []},
+    {"name": "v1: a step task, one line per hierarchy", "cgroup": "4:cpuset:/slurm/uid_1001/job_1000/step_0/task_0\n3:memory:/slurm/uid_1001/job_1000/step_0\n1:name=systemd:/system.slice/slurmd.service", "kind": "job", "keys": ["job_1000"]},
+    {"name": "v1: a node-named hierarchy", "cgroup": "4:freezer:/slurm_n1/uid_1001/job_1002/step_batch", "kind": "job", "keys": ["job_1002"]},
+    {"name": "v1: the user's directory, no job", "cgroup": "4:freezer:/slurm/uid_1001", "kind": "slurm", "keys": []},
+    {"name": "v1: outside Slurm", "cgroup": "4:cpuset:/\n1:name=systemd:/user.slice/user-1001.slice/session-3.scope", "kind": "none", "keys": []},
+    {"name": "a login session", "cgroup": "0::/user.slice/user-1001.slice/session-3.scope", "kind": "none", "keys": []},
+    {"name": "a user's own cgroup named like a job", "cgroup": "0::/user.slice/user-1001.slice/user@1001.service/app.slice/job_5", "kind": "none", "keys": []},
+    {"name": "a scope named like Slurm's", "cgroup": "0::/system.slice/notslurmstepd.scope/s5K1KKYAYG5D00", "kind": "none", "keys": []},
+    {"name": "slurmd itself", "cgroup": "0::/system.slice/slurmd.service", "kind": "none", "keys": []},
+    {"name": "a container", "cgroup": "0::/system.slice/docker-abc.scope", "kind": "none", "keys": []},
+    {"name": "the root cgroup", "cgroup": "0::/", "kind": "none", "keys": []},
+    {"name": "an empty file", "cgroup": "", "kind": "bad", "keys": []},
+    {"name": "not a cgroup file", "cgroup": "this is not a cgroup file", "kind": "bad", "keys": []},
+    {"name": "a line without a path", "cgroup": "x:y", "kind": "bad", "keys": []}
+  ]
+}

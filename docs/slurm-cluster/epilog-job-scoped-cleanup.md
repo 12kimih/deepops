@@ -23,16 +23,20 @@ in `/tmp` and `/dev/shm`. Two things could go wrong:
   the job's cgroup.
 
 With `slurm_epilog_cleanup_scope: job` (the new default) the epilog also looks
-at the node itself. Every process of a Slurm job lives in a `job_<id>` cgroup, so
-the epilog reads `/proc/<pid>/cgroup` (cgroup v1 and v2 are both understood) and
-decides per process:
+at the node itself. Every process of a Slurm job lives under the job's cgroup,
+and the epilog reads `/proc/<pid>/cgroup` to tell whether a process is in one.
+It reads the cgroup structure, not a name: on cgroup v2 a job's directory is a
+child of `slurmstepd.scope` other than `system` (named `job_<id>` up to Slurm
+25.11, by the job's SLUID from 26.05 on), on cgroup v1 a child of
+`/slurm/uid_<uid>`. It needs no job id: before the epilog runs, Slurm has killed
+the ending job's processes, so a process still in a job cgroup is another job's,
+or one of the ending job's that Slurm could not kill. Per process:
 
 | Process is in… | Epilog does |
 |---|---|
-| the ending job's cgroup | kills it (Slurm does too; this is a backstop) |
-| another job's cgroup | never touches it, whatever `squeue` said |
+| a job cgroup | never touches it, whatever `squeue` said, and defers the per-user cleanup |
 | no job cgroup (an orphan, for example a leftover daemon) | kills it only when the user has no other job on the node |
-| a cgroup entry it cannot read or recognise | leaves it alone and logs it |
+| Slurm's hierarchy but in no job, or a cgroup entry it cannot read or recognise | leaves it alone, logs it and defers the per-user cleanup |
 
 The file cleanup (`/tmp`, `/dev/shm`), enroot directory removal, and SSH access
 removal still happen per user, because files carry a user id and not a job id.

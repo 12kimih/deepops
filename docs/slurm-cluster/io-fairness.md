@@ -24,7 +24,7 @@ Two sources, on every node, with the monitoring stack:
   `host_mount:nfs_read_bytes:rate5m` and `host_mount:nfs_write_bytes:rate5m`.
 - `roles/io_usage` counts, every minute, each Slurm job's reads and writes through
   system calls (`io_usage_job_read_bytes_total`, `io_usage_job_written_bytes_total`,
-  `{job_id, user}`), each login's disk I/O (`io_usage_login_*_bytes_total`,
+  `{job_id, cgroup, user}`), each login's disk I/O (`io_usage_login_*_bytes_total`,
   `{user, device}`) and how long each slice waited for I/O
   (`io_usage_slice_pressure_seconds_total`).
 
@@ -42,8 +42,11 @@ reads and writes, the top jobs and logins by I/O, and for the disks under iocost
 it is on, how busy they are, their latency and how long each slice waited for I/O. Set
 the time range across the moment iocost turned on to compare before and after.
 
-The job counters are `rchar` and `wchar` of `/proc/<pid>/io` summed over the job's
-processes (the cgroup path names `job_<id>`): page cache, pipes and sockets are in them,
+The job counters are `rchar` and `wchar` of `/proc/<pid>/io` summed over the processes
+under the job's cgroup (found by the cgroup structure, since Slurm 26.05 names the
+directory by the job's SLUID; the `cgroup` label), with the job id Slurm gives them
+(`scontrol listpids`, the `job_id` label; empty while Slurm does not say, counted by
+`io_usage_job_unmapped`): page cache, pipes and sockets are in them,
 so they rank the jobs on a busy node, they are not NFS bytes. A task that already exited
 still counts: the kernel adds a reaped child's counts to its parent, and counts a
 process takes with it when it leaves the job are kept.
