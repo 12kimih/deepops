@@ -2,6 +2,7 @@
 dependencies:
   - role: cluster_tools_lib  # cluster_tools.io_usage
   - role: prometheus_paths  # node_exporter_prom_dir
+  - role: slurm_paths  # slurm_install_prefix (scontrol)
 
 galaxy_info:
   namespace: deepops

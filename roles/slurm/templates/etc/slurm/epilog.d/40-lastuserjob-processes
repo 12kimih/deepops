@@ -20,16 +20,18 @@ fi
 # Job-scoped cleanup (slurm_epilog_cleanup_scope: job).
 #
 # `killall -9 -u` reaps every process the user owns on the node, whichever job
-# it belongs to. Here each process is classified by the job cgroup it sits in
-# (/proc/<pid>/cgroup, see shared/lib/epilog-job-scope.sh) and only the ones
-# that are this job's, or that belong to no job and the user has no job left,
-# are killed:
+# it belongs to. Here each process is classified by whether it sits in a job
+# cgroup (/proc/<pid>/cgroup, see shared/lib/epilog-job-scope.sh), and only the
+# ones in no job are killed, and only when the user has no job left here:
 #
-#   in the ending job's cgroup   kill (Slurm does this too; belt and braces)
-#   in any other job's cgroup    never kill, whatever squeue said
+#   in a job cgroup              never kill: Slurm has already killed the
+#                                ending job's, so this is another job's (or
+#                                one Slurm could not kill)
 #   in no job cgroup (orphan)    kill only when the dispatcher found no other
 #                                job of this user, by squeue and by cgroup
-#   cgroup line not understood   skip and log
+#   in Slurm's hierarchy but in  skip and log
+#   no job, or the cgroup file
+#   not understood
 #
 # Anything that cannot be established is a skip, never a kill, and the script
 # never fails the epilog: a failing epilog drains the node.
@@ -70,34 +72,28 @@ for pid in $pids; do
     [ "$pid" != "$$" ] || continue
 
     rc=0
-    jobs=$(epilog_pid_jobs "$pid") || rc=$?
+    kind=$(epilog_pid_kind "$pid") || rc=$?
     case "$rc" in
         0) ;;
         1) continue ;;  # exited since the listing
+        *) kind=bad ;;
+    esac
+
+    case "$kind" in
+        job)
+            spared=$((spared + 1))
+            continue
+            ;;
+        none) ;;
         *)
             part_log slurm-epilog \
-                "cannot classify pid ${pid} (unreadable or unrecognised cgroup data); leaving it alone"
+                "cannot classify pid ${pid} (${kind} cgroup data); leaving it alone"
             unsure=$((unsure + 1))
             continue
             ;;
     esac
 
-    in_ending=0
-    in_other=0
-    for job in $jobs; do
-        if [ "$job" = "$SLURM_JOB_ID" ]; then
-            in_ending=1
-        else
-            in_other=1
-        fi
-    done
-
-    if [ "$in_other" = 1 ]; then
-        spared=$((spared + 1))
-        continue
-    fi
-
-    if [ "$in_ending" = 0 ] && [ "$last_user_job" != 1 ]; then
+    if [ "$last_user_job" != 1 ]; then
         # An orphan, but the user may still be running here.
         spared=$((spared + 1))
         continue
