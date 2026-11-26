@@ -37,7 +37,7 @@ from datetime import date
 from pathlib import Path
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
-from cluster_tools.slack import DmLog, Slack  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+from cluster_tools.slack import DmLog, Slack, mentioning  # the cluster's library (PYTHONPATH)
 
 from . import (
     accounts_blocks,
@@ -130,7 +130,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             for place in places:
                 text, blocks = outcome.text, shared.held(f"<@{slack_id}>", outcome.text, outcome.key)
                 if place == channels["admin"]:
-                    text, blocks = shared.mentioning(cfg["admin_mention"], text, blocks)
+                    text, blocks = mentioning(cfg["admin_mention"], text, blocks)
                     client.chat_postMessage(channel=place, **rich.message(text, blocks))
                 else:
                     dm(place, text, blocks, kind="approval", log=True)
@@ -477,40 +477,6 @@ def every(seconds, name, round_):
     threading.Thread(target=loop, name=name, daemon=True).start()
 
 
-def admin_messages(client, channel, mention=""):
-    """(post, update) for messages the bot keeps in CHANNEL (cluster_bot.bans.watch): post
-    returns the message as {channel ID, ts} and pins it on request (a pin Slack refuses
-    leaves it unpinned, never unrecorded); a message not pinned (a notice to act on)
-    starts with MENTION. update says False when the message is gone (deleted), and raises
-    on any other refusal."""
-    from slack_sdk.errors import SlackApiError
-
-    def post(text, blocks, pin=False):
-        if not pin:  # a notice to act on mentions the administrators; a pinned list does not
-            text, blocks = shared.mentioning(mention, text, blocks)
-        sent = client.chat_postMessage(channel=channel, **rich.message(text, blocks))
-        message = {"channel": sent["channel"], "ts": sent["ts"]}
-        if pin:
-            try:
-                client.pins_add(channel=message["channel"], timestamp=message["ts"])
-            except SlackApiError as e:  # the message stands unpinned (the bot is not in the channel)
-                print(
-                    f"cluster-bot: pin in {channel}: {e.response.get('error')}", file=sys.stderr, flush=True
-                )
-        return message
-
-    def update(message, text, blocks):
-        try:
-            client.chat_update(channel=message["channel"], ts=message["ts"], **rich.message(text, blocks))
-        except SlackApiError as e:
-            if e.response.get("error") in ("message_not_found", "cant_update_message"):
-                return False
-            raise
-        return True
-
-    return post, update
-
-
 def data_rounds(client, dms, data, cfg, slack_of):
     """The shared data's round (cluster_bot.data.watch), its channel messages sent through
     CLIENT and its DMs, logged, through DMS (cluster_tools.slack.Slack)."""
@@ -534,9 +500,7 @@ def data_rounds(client, dms, data, cfg, slack_of):
                 dms.dm(who, text, kind="data-removed", login=login)
             client.chat_postMessage(channel=channels["admin"], **rich.message(text))
         elif event == "failed_removal":
-            text, blocks = shared.mentioning(
-                cfg["admin_mention"], f"{path}을(를) 지우지 못했습니다: {error}", []
-            )
+            text, blocks = mentioning(cfg["admin_mention"], f"{path}을(를) 지우지 못했습니다: {error}", [])
             client.chat_postMessage(channel=channels["admin"], **rich.message(text, blocks or None))
 
     def round_():
@@ -614,11 +578,10 @@ def main(argv=None):
         p = cfg["projects"]
         notify_deployed(p["deployed"], p["seen"], p["root"], slack_of, dms, projects_blocks.notice)
     if unban is not None:
-        post, update = admin_messages(app.client, channels["admin"], cfg["admin_mention"])
 
         def watch_round():
             with state.locked(cfg["bans"]["seen"], {}) as seen:
-                watch(unban, post, update, seen)
+                watch(unban, dms, channels["admin"], cfg["admin_mention"], seen)
 
         every(BAN_WATCH_EVERY, "ban watch", watch_round)
     if data is not None:

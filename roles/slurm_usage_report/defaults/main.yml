@@ -23,10 +23,9 @@ slurm_usage_report_repeat_idle_share: 0.5
 slurm_usage_report_repeat_weeks: 2
 # The daily disk usage report (systemd OnCalendar), from the disk quota metrics
 # (roles/disk_quota; without them it posts nothing): each counted filesystem's disk, its
-# disk_top largest people with their day's growth and levels, the projects, and
-# everyone past a warn level, told as disk_notify says (mention, dm, both or []).
+# people (every one, in the thread) with their day's growth and levels, the projects,
+# and everyone past a warn level, told as disk_notify says (mention, dm, both or []).
 slurm_usage_report_disk_schedule: "*-*-* 09:00:00"
-slurm_usage_report_disk_top: 10
 slurm_usage_report_disk_notify: [mention]
 # A person is told when they first pass a level, every day at a hard limit (their writes
 # fail), and again every repeat_days while past the same warn level (0: every day). The

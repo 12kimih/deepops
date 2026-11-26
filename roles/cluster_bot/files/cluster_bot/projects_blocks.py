@@ -90,14 +90,30 @@ def new_form(places):
     ])  # fmt: skip
 
 
+# A select's options, and its option groups' options (Slack's limits); 100 groups.
+OPTIONS_MAX = 100
+
+
+def choices(options):
+    """OPTIONS for a static select, every one: as they are up to OPTIONS_MAX, else in
+    groups of OPTIONS_MAX named by their first and last values."""
+    if len(options) <= OPTIONS_MAX:
+        return {"options": options}
+    groups = [options[i : i + OPTIONS_MAX] for i in range(0, len(options), OPTIONS_MAX)]
+    return {"option_groups": [
+        {"label": {"type": "plain_text", "text": f"{g[0]['value']} ~ {g[-1]['value']}"[:75]}, "options": g}
+        for g in groups
+    ]}  # fmt: skip
+
+
 def join_form(projects, login):
     """Ask to join a project LOGIN is not in, as a member or a viewer."""
     options = [_option(f"{n} - {p.get('purpose', '')}".rstrip(" -"), n)
-               for n, p in sorted(projects.items()) if not role_of(p, login)][:100]  # fmt: skip
+               for n, p in sorted(projects.items()) if not role_of(p, login)]  # fmt: skip
     if not options:
         return None
     return _modal("project.join.submit", "프로젝트 참여 요청", [
-        field("project", "프로젝트", {"type": "static_select", "options": options}),
+        field("project", "프로젝트", {"type": "static_select", **choices(options)}),
         field("role", "역할", {"type": "radio_buttons", "initial_option": _option(ROLE_NAMES["members"], "members"),
                                "options": [_option(ROLE_NAMES[r], r) for r in ("members", "viewers")]}),
         rich.context("프로젝트 관리자 중 한 명이 승인하면 반영됩니다."),

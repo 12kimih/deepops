@@ -281,6 +281,15 @@ class RenderTests(unittest.TestCase):
                 self.assertLessEqual(len(rich.read([b])), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
 
+    def test_every_pending_reason_is_shown(self):
+        """The waiting jobs' reasons were cut to the two most common."""
+        reasons = report.Counter({"Priority": 3, "Resources": 2, "QOSMaxGRESPerUser": 1})
+        rows = rich.read(
+            report.pending_section({"alice": {"jobs": 6, "gpus": 6, "reasons": reasons, "wait": 60}})
+        )
+        for reason in reasons:
+            self.assertIn(reason, rows)
+
     def test_an_idle_job_leaves_everyone_in_the_per_person_table(self):
         """The per-person table lists every running GPU job, not the idle section's last
         owner's jobs (owner 2026-11-26: with one idle job, the thread showed only it)."""
@@ -330,7 +339,7 @@ class RunTests(unittest.TestCase):
                    "dm_text": "{jobs}", "admin_channel": "#admin", "admin_mention": "",
                    "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
                    "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
-                   "disk_top": 10, "disk_notify": ["mention"], "disk_repeat_days": 7,
+                   "disk_notify": ["mention"], "disk_repeat_days": 7,
                    "people": [], "holds_on": False, "holds_from": 0, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
             "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
             "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
@@ -373,7 +382,7 @@ class ConfigTests(unittest.TestCase):
             "email_domain": "", "state_file": "/nonexistent", "admin_channel": "#admin", "admin_mention": "",
             "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
             "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
-            "disk_top": 10, "disk_notify": ["mention", "dm"], "disk_repeat_days": 7,
+            "disk_notify": ["mention", "dm"], "disk_repeat_days": 7,
             "people": ["alice"], "holds_on": False, "holds_from": 0, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
             "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
             "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
@@ -403,7 +412,6 @@ class ConfigTests(unittest.TestCase):
                              ({"cancel_after_hours": 12, "cancel_warn_text": "{user}"}, "cancel_warn_text"),
                              ({"cancel_after_hours": 24, "notify": []}, "notify"),
                              ({"channel": None}, "channel"), ({"disk_notify": ["email"]}, "disk_notify"),
-                             ({"disk_top": 0}, "disk_top"),
                              ({"disk_repeat_days": -1}, "disk_repeat_days"), ({"people": "alice"}, "people"),
                              ({"io_share": 1.5}, "io_share"), ({"io_minutes": 2}, "io_minutes"),
                              ({"io_mounts": {"/home": {"read_bps": 0, "write_bps": 1}}}, "io_mounts /home")):  # fmt: skip

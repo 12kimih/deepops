@@ -151,7 +151,7 @@ class LevelTests(unittest.TestCase):
 class RenderTests(unittest.TestCase):
     def test_card_and_thread(self):
         data = disk_report.collect(site(), NOW)
-        (text, card), thread = disk_report.render(data, who, top=2)
+        (text, card), thread = disk_report.render(data, who)
         self.assertIn("login:/ 75%", text)
         self.assertIn("경고 수준을 넘은 사용량 2건", text)
         body = text_of(card)
@@ -162,8 +162,9 @@ class RenderTests(unittest.TestCase):
         self.assertIn("nfs (마지막", body, "a host not reported lately is named")
         self.assertNotIn("login (last", body)
         details = text_of(thread[0][1])
-        self.assertIn("3개 계정 중 많이 쓰는 순", details)
-        self.assertIn("외 1개 계정, 모두 2G", details)
+        self.assertIn("3개 계정, 많이 쓰는 순", details)
+        self.assertIn("carol", details, "every person, none cut")
+        self.assertNotIn("외 ", details)
         self.assertIn("alice   18G     +3G", details)
         self.assertIn("/home/shared/datasets  nfs:/home  7G      0", details)
         for blocks in [card] + [b for _, b in thread]:
@@ -177,10 +178,10 @@ class RenderTests(unittest.TestCase):
             [(k, u) for k, _, u in fill], [(("login", "/"), [("bob", 21 * G), ("alice", 18 * G)])]
         )
         (_, card), _ = disk_report.render(
-            data, who, 2, fill=fill, fill_mention={disk_report.fill_key(("login", "/"))}
+            data, who, fill=fill, fill_mention={disk_report.fill_key(("login", "/"))}
         )
         self.assertIn(":large_orange_circle: login:/ 75% 사용 중: @bob 21G, @alice 18G", text_of(card))
-        (_, card), _ = disk_report.render(data, who, 2, fill=fill, fill_mention=set())
+        (_, card), _ = disk_report.render(data, who, fill=fill, fill_mention=set())
         self.assertIn("75% 사용 중: bob 21G, alice 18G", text_of(card), "named every day, mentioned when due")
 
     def test_a_project_past_its_warn_level_is_on_the_card(self):
@@ -193,7 +194,7 @@ class RenderTests(unittest.TestCase):
             row(20 * G, host="nfs", filesystem="/home", project="shared-data", kind="hard"),
             row(18 * G, host="nfs", filesystem="/home", project="shared-data", kind="warn"),
         ]
-        (_, card), _ = disk_report.render(disk_report.collect(prom, NOW), who, 2)
+        (_, card), _ = disk_report.render(disk_report.collect(prom, NOW), who)
         body = text_of(card)
         self.assertIn("경고 수준을 넘은 프로젝트", body)
         self.assertIn(
@@ -210,35 +211,35 @@ class RenderTests(unittest.TestCase):
             row(120, host="nfs", filesystem="/home", path="/home/alice/old", user="alice")
         ]
         data = disk_report.collect(prom, NOW)
-        _, thread = disk_report.render(data, who, 2, stale_days=60)
+        _, thread = disk_report.render(data, who, stale_days=60)
         details = text_of(thread[0][1])
         self.assertIn("nfs:/home: 정리하면 좋을 폴더 (60일 넘게 쓰지 않은 것", details)
         self.assertIn("/home/alice/old  alice  300G  120일", details)
         self.assertNotIn("@alice", details.split("정리하면 좋을 폴더")[1])
 
-    def test_people_ranked_everyone_else_on_one_line(self):
+    def test_people_ranked_everyone_else_in_a_table_of_their_own(self):
         data = disk_report.collect(site(), NOW)
         data["users"][("login", "/", "root")] = dict(data["users"][("login", "/", "carol")], used=160 * G)
         data["users"][("login", "/", "mysql")] = dict(data["users"][("login", "/", "carol")], used=16 * G)
-        _, thread = disk_report.render(data, who, top=10, people={"alice", "bob", "carol"})
+        _, thread = disk_report.render(data, who, people={"alice", "bob", "carol"})
         details = text_of(thread[0][1])
-        self.assertIn("3명 중 많이 쓰는 순", details)
-        self.assertNotIn("root  ", details, "root is not ranked with the people")
-        self.assertIn(
-            "명부에 없는 계정 (root, 서비스, 떠난 분): root 160G, mysql 16G, 모두 176G",
-            details,
-        )
-        _, thread = disk_report.render(data, who, top=10)
-        self.assertIn("5개 계정 중 많이 쓰는 순", text_of(thread[0][1]), "no roster: everyone is ranked")
+        self.assertIn("3명, 많이 쓰는 순", details)
+        people, others = details.split("명부에 없는 계정")
+        self.assertNotIn("root", people, "root is not ranked with the people")
+        self.assertIn(" (root, 서비스, 떠난 분) 2개, 모두 176G", others)
+        self.assertIn("root   160G", others)
+        self.assertIn("mysql  16G", others)
+        _, thread = disk_report.render(data, who)
+        self.assertIn("5개 계정, 많이 쓰는 순", text_of(thread[0][1]), "no roster: everyone is ranked")
 
     def test_a_hard_limit_says_what_it_means_for_slurm(self):
         data = disk_report.collect(site(), NOW)
-        (_, card), _ = disk_report.render(data, who, top=10, hold=NOW + 2 * disk_report.DAY)
+        (_, card), _ = disk_report.render(data, who, hold=NOW + 2 * disk_report.DAY)
         self.assertIn("한도(20G)에 닿았습니다. 2027-01-17부터는 ", text_of(card))
         self.assertIn("한도에 닿아 있는 동안 새 Slurm 잡이 제출되지 않습니다", text_of(card))
-        (_, card), _ = disk_report.render(data, who, top=10, hold=0)
+        (_, card), _ = disk_report.render(data, who, hold=0)
         self.assertIn(". 공간을 비우실 때까지 새 Slurm 잡은 제출되지 않습니다", text_of(card))
-        (_, card), _ = disk_report.render(data, who, top=10)
+        (_, card), _ = disk_report.render(data, who)
         self.assertNotIn("Slurm", text_of(card), "no holds: nothing said")
         bob = disk_report.over_warn(data)[0]
         self.assertIn("지금은 그곳에 쓸 수 없습니다. 공간을 비우실 때까지 새 Slurm 잡은 제출되지 않습니다.",
@@ -268,7 +269,7 @@ class RunTests(unittest.TestCase):
     and posts nothing when no disk usage is counted."""
 
     CFG = dict(channel="#status", dm_log_channel="", prometheus_url="", slack_token="t", email_domain="",
-               user_map={"alice": "UALICE", "bob": "UBOB"}, disk_top=10, disk_notify=["mention", "dm"],
+               user_map={"alice": "UALICE", "bob": "UBOB"}, disk_notify=["mention", "dm"],
                disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0, disk_fill=0.8, disk_fill_mentions=5, stale_days=60,
                admin_channel="#admins", admin_mention="<!subteam^SADMINS>")  # fmt: skip
 

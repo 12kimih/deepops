@@ -1,7 +1,7 @@
 """disk_report: the daily disk usage report, from the disk quota metrics.
 
     data = collect(prometheus, now)        -> what every counted filesystem holds, or None
-    (text, blocks), thread = render(data, who, top, people, mention, fill=...)
+    (text, blocks), thread = render(data, who, people=..., mention=..., fill=...)
     fill_rows(data, fraction, people, n)   -> [(disk key, fill, [(user, used)])] of the
                                               filesystems at least FRACTION full
     fill_key(disk key)                     -> the key of a filesystem's fill notice
@@ -12,8 +12,9 @@
 
 For each filesystem whose users' space is counted (roles/disk_quota, its textfile
 metrics), the disk: how full, how much is free and how that changed in a day; its
-largest users among PEOPLE (the roster's active logins), with their day's growth and
-their levels, and everyone else (root, the services, people who left) on one line; the
+users among PEOPLE (the roster's active logins), every one, largest first, with their
+day's growth and their levels, and everyone else (root, the services, people who left)
+in a table of their own; the
 projects (directory trees with one limit). Everyone past a warn level is named: the
 warn level only notifies, and the hard limit is the one the kernel enforces, at once.
 A person is told (mentioned, or sent a DM) when they first pass a level, every day at
@@ -32,7 +33,7 @@ from datetime import datetime
 
 from . import rich
 from .render import size
-from .slack import MAX_BLOCKS, bar, sections, table
+from .slack import bar, pages, sections, table
 
 DAY = 86400
 # When a host's usage is older than this, the report says so (the alert fires at an hour).
@@ -277,16 +278,9 @@ def past_line(row, who, mention=True, note=""):
     return f"{':no_entry:' if hard else ':warning:'} {who(row[2], mention)} {place}에서: {amount}, {state}"
 
 
-def others_line(rest, shown=3):
-    """Everyone not in the roster, on one line: the largest SHOWN by name, then the rest."""
-    names = ", ".join(f"{u} {size(e['used'])}" for u, e in rest[:shown])
-    more = f", 외 {len(rest) - shown}개" if len(rest) > shown else ""
-    return f"명부에 없는 계정 (root, 서비스, 떠난 분): {names}{more}, 모두 {size(sum(e['used'] for _, e in rest))}"
-
-
-def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_mention=(), stale_days=0):
+def render(data, who, *, people=(), mention=None, hold=None, fill=None, fill_mention=(), stale_days=0):
     """The summary card (text, blocks) and the thread [(text, blocks)]: every disk and
-    everyone past a level on the card; each filesystem's TOP people, everyone else, the
+    everyone past a level on the card; each filesystem's people, every one, everyone else, the
     projects and the folders worth cleaning in the thread. With no PEOPLE (no roster)
     every user is ranked. Of those past a level, the keys in MENTION (row_key) are
     mentioned; None mentions them all. HOLD (hold_note) says what a hard limit means for
@@ -343,19 +337,21 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
             continue
         mine = [r for r in everyone if not people or r[0] in people]
         others = [r for r in everyone if people and r[0] not in people]
-        shown = mine[:top]
-        body = [
-            (u, size(e["used"]), change(e["used"], e["before"]), _level(e, "warn"), _level(e, "hard"))
-            for u, e in shown
-        ]
-        tail = ""
-        if len(mine) > len(shown):
-            rest = mine[len(shown) :]
-            tail = f"\n외 {len(rest)}{'명' if people else '개 계정'}, 모두 {size(sum(e['used'] for _, e in rest))}"
+        unit = "명" if people else "개 계정"
+        if mine:
+            body = [
+                (u, size(e["used"]), change(e["used"], e["before"]), _level(e, "warn"), _level(e, "hard"))
+                for u, e in mine
+            ]
+            head = f":file_cabinet: **{where(*key)}**: {len(mine)}{unit}, 많이 쓰는 순"
+            detail += sections(f"{head}\n{table(('사용자', '사용량', '하루', '경고', '한도'), body)}")
         if others:
-            tail += "\n" + others_line(others)
-        head = f":file_cabinet: **{where(*key)}**: {len(mine)}{'명' if people else '개 계정'} 중 많이 쓰는 순"
-        detail += sections(f"{head}\n{table(('사용자', '사용량', '하루', '경고', '한도'), body)}{tail}")
+            body = [(u, size(e["used"]), change(e["used"], e["before"])) for u, e in others]
+            total = size(sum(e["used"] for _, e in others))
+            head = (
+                f"**{where(*key)}**: 명부에 없는 계정 (root, 서비스, 떠난 분) {len(others)}개, 모두 {total}"
+            )
+            detail += sections(f"{head}\n{table(('계정', '사용량', '하루'), body)}")
     if data["projects"]:
         body = [
             (
@@ -374,7 +370,7 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
         body = [(c["path"], c["user"], size(c["bytes"]), f"{c['unused_days']}일") for c in rows]
         head = f":broom: **{where(*key)}**: 정리하면 좋을 폴더 ({stale_days}일 넘게 쓰지 않은 것, 크고 오래된 순)"
         detail += sections(f"{head}\n{table(('폴더', '주인', '크기', '안 쓴 기간'), body)}")
-    thread = [("디스크 사용량 자세히", detail[i : i + MAX_BLOCKS]) for i in range(0, len(detail), MAX_BLOCKS)]
+    thread = pages("디스크 사용량 자세히", detail)
     return (text, card), thread
 
 

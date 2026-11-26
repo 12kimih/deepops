@@ -4,19 +4,24 @@ person always looks), and the ban is lifted on every host that holds it.
 
     feature = UnbanFeature({host: Remote(..., SERVICE)})
     feature.where(ip) -> {host: [ban, ...]} where IP is banned now
-    watch(feature, post, update, seen)   one round of the administrators' ban watch
+    watch(feature, slack, channel, mention, seen)   one round of the administrators' ban watch
 
 Each host runs cluster_tools.bans for SERVICE: list, unban IP.
 req: user, ip (as address() writes it), reason.
 """
 
 import ipaddress
+import sys
+
+from cluster_tools.slack import Error, keep, mentioning  # the cluster's library (PYTHONPATH)
 
 from . import bans_blocks
 from .requests import Failed, Feature, Refused
 
 # Each banning host's service for the bot (roles/fail2ban offers it by this name).
 SERVICE = "bans"
+# The ban list's key among the messages the bot keeps (cluster_tools.slack.keep).
+LIST = "bans"
 
 
 def address(text):
@@ -79,14 +84,22 @@ class UnbanFeature(Feature):
         return f"IP {req['ip']} 차단 해제 ({req.get('reason') or '사유 없음'})"
 
 
-def watch(feature, post, update, seen):
-    """One round of the ban watch: each ban that is new since the last round is told in
-    one message (POST(text, blocks, pin=False) -> the message, {channel, ts}), and the
-    list of the bans now is one message edited in place (UPDATE(message, text, blocks) ->
-    False when it is gone; a new one is posted and pinned). SEEN ({"bans": {key: ban},
-    "list": message}, the caller keeps it) is updated. The first round only learns what
-    is banned already: nothing is new then. A host that cannot be read keeps the bans it
-    had, on the list as last seen, and the list names it."""
+def _old_list(message):
+    """A ban list from before the lists were marked (cluster_tools.slack.keep)."""
+    text = message.get("text") or ""
+    return text.startswith("현재 차단된 주소") or text == "차단 목록을 읽지 못했습니다"
+
+
+def watch(feature, slack, channel, mention, seen, log=None):
+    """One round of the ban watch in CHANNEL through SLACK (cluster_tools.slack.Slack).
+    Each ban new since the last round is told in one notice that starts with MENTION,
+    every one of them in its thread. The bans now are one message kept up to date
+    (cluster_tools.slack.keep: found in the channel, never posted twice, pinned): a
+    summary, and every ban in its thread. SEEN ({"bans": {key: ban}, "list": the kept
+    record}, the caller keeps it) is updated. The first round only learns what is banned
+    already: nothing is new then. A host that cannot be read keeps the bans it had, on
+    the list as last seen, and the list names it."""
+    log = log or (lambda line: print(f"cluster-bot: ban watch: {line}", file=sys.stderr, flush=True))
     found, errors = feature.survey()
     first = "bans" not in seen
     before = seen.get("bans", {})
@@ -94,13 +107,17 @@ def watch(feature, post, update, seen):
     now.update({k: b for k, b in before.items() if b["host"] in errors})
     new = sorted(set(now) - set(before), key=lambda k: now[k]["since"])
     if new and not first:
-        post(*bans_blocks.new_bans([now[k] for k in new]))
+        (text, blocks), thread = bans_blocks.new_bans([now[k] for k in new])
+        ts = slack.post(channel, *mentioning(mention, text, blocks))
+        for reply in thread:
+            slack.post(channel, *reply, thread_ts=ts)
     seen["bans"] = now
-    text, blocks = bans_blocks.ban_list(
-        sorted(now.values(), key=lambda b: b["since"], reverse=True),
-        errors,
-        getattr(feature, "command", "/cluster"),
-        read=bool(found),
+    card, thread = bans_blocks.ban_list(
+        list(now.values()), errors, getattr(feature, "command", "/cluster"), read=bool(found)
     )
-    if not (seen.get("list") and update(seen["list"], text, blocks)):
-        seen["list"] = post(text, blocks, pin=True)
+    try:
+        seen["list"] = keep(
+            slack, channel, LIST, card, thread, seen.get("list"), legacy=_old_list, pin=True, log=log
+        )
+    except Error as e:  # the bans seen are kept: the next round tells nothing twice
+        log(f"the list was not brought up to date: {e}")

@@ -37,6 +37,10 @@ class FakeSlack:
         if method in self.refuse:
             raise Refused(f"Slack {method} failed: not_allowed")
         c = self.chan.get(p.get("channel") or p.get("channel_id"))
+        if method == "auth.test":
+            return {"ok": True, "bot_id": "B1", "user_id": "UBOT"}
+        if method == "bots.info":
+            return {"ok": True, "bot": {"app_id": "A1"}}
         if method == "conversations.list":
             return {"channels": [{"id": i, "name": c["name"]} for i, c in self.chan.items()]}
         if method == "conversations.info":
@@ -67,7 +71,8 @@ class FakeSlack:
             return {"bookmarks": list(c["bookmarks"].values())}
         elif method == "bookmarks.add":
             bid = self._id("Bk")
-            c["bookmarks"][bid] = {"id": bid, "title": p["title"], "link": p["link"], "emoji": p["emoji"]}
+            c["bookmarks"][bid] = {"id": bid, "title": p["title"], "link": p["link"], "emoji": p["emoji"],
+                                   "app_id": None, "last_updated_by_user_id": "UBOT"}  # fmt: skip
             return {"bookmark": c["bookmarks"][bid]}
         elif method == "bookmarks.edit":
             c["bookmarks"][p["bookmark_id"]].update(link=p["link"], emoji=p["emoji"])
@@ -192,6 +197,18 @@ class Guides(unittest.TestCase):
         self.doc["channels"]["announce"] = guide(bookmarks=[])
         self.run_round(slack)
         self.assertEqual([b["title"] for b in slack.chan["C1"]["bookmarks"].values()], ["Mine"])
+
+    def test_a_lost_state_adds_no_second_bookmark_and_removes_copies(self):
+        """A state file lost re-added every bookmark beside the ones there."""
+        slack = FakeSlack()
+        self.run_round(slack)
+        news = slack.chan["C1"]["bookmarks"]
+        copy = dict(next(iter(news.values())), id="Bk99")
+        news["Bk99"] = copy  # a copy an earlier lost state made
+        os.unlink(self.state)
+        self.run_round(slack)
+        self.assertEqual([b["title"] for b in news.values()], ["Docs"])
+        self.assertEqual(slack.made("bookmarks.add")[1:], [], "nothing added again")
 
     def test_an_unreadable_site_changes_nothing(self):
         slack = FakeSlack()
