@@ -57,6 +57,8 @@ retired_settings:
   spack_default_packages: nothing (Spack is retired, 2026-11; build shared software with EasyBuild, roles/easy-build, or in a container)
   volume_snapshot_CRD_manifest_URLs: csi_snapshot_controller_enabled (Kubespray deploys the snapshot CRDs and controller) in group_vars/k8s_cluster
   snapshot_controller_manifest_URLs: csi_snapshot_controller_enabled (Kubespray deploys the snapshot CRDs and controller) in group_vars/k8s_cluster
+  alertmanager_slack_critical_mention: slack_admin_group_id in roles/slack_defaults (every notice to the administrators mentions their one group, slack_admin_mention)
+  slurm_usage_report_admin_mention: slack_admin_group_id in roles/slack_defaults (every notice to the administrators mentions their one group, slack_admin_mention)
   trident_helm_repo_name: trident_helm_repo_url (installed with helm --repo, no named repository) in roles/netapp-trident
   slurm_cluster_group: the inventory group names are fixed (slurm-cluster; config.example/inventory)
   slurm_controller_group: the inventory group names are fixed (slurm-master; config.example/inventory)

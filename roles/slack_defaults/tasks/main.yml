@@ -7,6 +7,14 @@
 # slack_admin_group_id always wins; not found, or Slack not answering, mentions no one.
 # Decided before the block: a block's condition is every task's in it, and the lookup
 # sets both of the names it would test, which skipped the ID's report (task rule 32).
+- name: Refuse an administrators' group ID that is not one
+  ansible.builtin.assert:
+    that: slack_admin_group_id is match('^(S[A-Z0-9]+)?$')
+    fail_msg: >-
+      slack_admin_group_id is the user group's S... ID (the web client shows it), not its
+      @handle (slack_admin_group) or a mention.
+    quiet: true
+
 - name: Decide whether to look the group up
   ansible.builtin.set_fact:
     _slack_admin_group_lookup: >-

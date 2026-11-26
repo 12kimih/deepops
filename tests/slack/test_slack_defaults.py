@@ -2,6 +2,7 @@
 when the site gives none (a configured ID wins), read by every role that mentions the
 administrators through slack_admin_mention, which run this role first."""
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -11,11 +12,15 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/lib"))
 import in_tree  # noqa: E402
-from ansible_yaml import condition, load, render, role_defaults  # noqa: E402
+from repo_scan import role_var_files, tracked  # noqa: E402
+from ansible_yaml import condition, load, render, role_variables  # noqa: E402
 
 slack = in_tree.load("plugins/filter/slack.py")
 TASKS = load("roles/slack_defaults/tasks/main.yml")
 LOOKUP = next(t for t in TASKS if "block" in t)
+ID_CHECK = next(t for t in TASKS if "assert" in t)
+# A Slack mention of everyone in a channel.
+BROADCAST = re.compile(r"<!(?:channel|here|everyone)\b")
 GROUPS = {"ok": True, "usergroups": [{"id": "S1", "handle": "gpu"}, {"id": "S2", "handle": "sysadmin"}]}
 
 
@@ -77,7 +82,7 @@ class Lookup(unittest.TestCase):
         values = {"_slack_usergroups": {"json": GROUPS}, "slack_admin_group": "@sysadmin"}
         found = render(use["set_fact"]["slack_admin_group_id"], values)
         self.assertEqual(found, "S2")
-        defaults = role_defaults("slack_defaults")
+        defaults = role_variables("slack_defaults")
         mention = render(defaults["slack_admin_mention"], {"slack_admin_group_id": found})
         self.assertEqual(mention, "<!subteam^S2>")
         self.assertEqual(
@@ -93,9 +98,40 @@ class Order(unittest.TestCase):
             deps = yaml.safe_load((ROOT / "roles" / role / "meta/main.yml").read_text())["dependencies"]
             names = [d["role"] if isinstance(d, dict) else d for d in deps]
             self.assertIn("slack_defaults", names, role)
-        for path in ("roles/alertmanager/defaults/main.yml", "roles/slurm_usage_report/defaults/main.yml",
-                     "roles/cluster_bot/vars/main.yml"):  # fmt: skip
+        for path in ("roles/alertmanager/templates/alertmanager.yml.j2",
+                     "roles/slurm_usage_report/templates/config.json.j2", "roles/cluster_bot/vars/main.yml"):  # fmt: skip
             self.assertIn("slack_admin_mention", (ROOT / path).read_text(), path)
+
+
+class OneMention(unittest.TestCase):
+    """2026-11-26: critical alerts still said @channel after the group was found, from a
+    site value of alertmanager_slack_critical_mention, one of two per-role copies of the
+    mention. Now there is one, derived from the ID, and a site cannot set it."""
+
+    def test_the_mention_is_derived_in_role_vars_and_set_nowhere_else(self):
+        self.assertIn("slack_admin_mention", load("roles/slack_defaults/vars/main.yml"))
+        files = [p for p in role_var_files() if p.parts[-2] == "defaults"] + tracked("config.example")
+        self.assertTrue(files)
+        for path in files:
+            for line in path.read_text().splitlines():
+                self.assertFalse(re.match(r"#?\w*_mention:", line), f"{path.relative_to(ROOT)}: {line}")
+
+    def test_no_role_play_or_example_mentions_a_whole_channel(self):
+        files = [
+            p
+            for p in tracked("roles", "playbooks", "config.example")
+            if p.suffix in (".yml", ".yaml", ".j2", ".json")
+        ]
+        self.assertTrue(files)
+        for path in files:
+            self.assertIsNone(BROADCAST.search(path.read_text()), path.relative_to(ROOT))
+
+    def test_the_id_is_an_id_or_empty(self):
+        that = ID_CHECK["assert"]["that"]
+        for good in ("", "S0ABC123"):
+            self.assertTrue(condition(that, {"slack_admin_group_id": good}), good)
+        for bad in ("@sysadmin", "<!channel>", "<!subteam^S1>", "s0abc"):
+            self.assertFalse(condition(that, {"slack_admin_group_id": bad}), bad)
 
 
 if __name__ == "__main__":

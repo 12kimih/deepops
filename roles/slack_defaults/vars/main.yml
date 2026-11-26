@@ -1,4 +1,7 @@
 ---
+# The one mention of the administrators (roles/slack_defaults' defaults say who carries
+# it): their group by its ID, or no one. Role vars, so a site cannot replace it.
+slack_admin_mention: "{{ '<!subteam^' ~ slack_admin_group_id ~ '>' if slack_admin_group_id | length > 0 else '' }}"
 # The bot's way in on a host it acts on (roles/cluster_bot_access): its key's one forced
 # command runs the dispatcher as root through one sudo rule, and the dispatcher runs
 # only the services roles list in the directory, a file each (cluster_tools.bot_serve).

@@ -37,23 +37,36 @@ def role_defaults(role):
     a defaults-only role (slurm_paths, prometheus_paths), so a test that read only the
     role's own file would not see it."""
     found = {}
-    meta = ROOT / "roles" / role / "meta" / "main.yml"
-    for dep in ((yaml.safe_load(meta.read_text()) or {}).get("dependencies") or []) if meta.is_file() else []:
-        found.update(role_defaults(dep["role"] if isinstance(dep, dict) else dep))
+    for dep in _dependencies(role):
+        found.update(role_defaults(dep))
     own = ROOT / "roles" / role / "defaults" / "main.yml"
     if own.is_file():
         found.update(yaml.safe_load(own.read_text(encoding="utf-8")) or {})
     return found
 
 
-def role_variables(role):
-    """What a role's templates see of it: role_defaults, then its vars/main.yml (role vars
-    win over defaults, as in a play)."""
-    found = role_defaults(role)
+def _dependencies(role):
+    meta = ROOT / "roles" / role / "meta" / "main.yml"
+    deps = ((yaml.safe_load(meta.read_text()) or {}).get("dependencies") or []) if meta.is_file() else []
+    return [d["role"] if isinstance(d, dict) else d for d in deps]
+
+
+def role_vars(role):
+    """A role's vars/main.yml over its meta dependencies' (recursively, in order): a
+    play's roles see their dependencies' vars too (private_role_vars is unset)."""
+    found = {}
+    for dep in _dependencies(role):
+        found.update(role_vars(dep))
     own = ROOT / "roles" / role / "vars" / "main.yml"
     if own.is_file():
         found.update(yaml.safe_load(own.read_text(encoding="utf-8")) or {})
     return found
+
+
+def role_variables(role):
+    """What a role's templates see of it: role_defaults, then role_vars (role vars win
+    over every default, as in a play)."""
+    return {**role_defaults(role), **role_vars(role)}
 
 
 def same_name(actual, expected):

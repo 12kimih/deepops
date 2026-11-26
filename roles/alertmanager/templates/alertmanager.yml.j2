@@ -52,7 +52,7 @@ receivers:
       - url: '{{ alertmanager_heartbeat_url }}'
         send_resolved: false
 {% endif %}
-{% for name, mention in [('slack', ''), ('slack-critical', alertmanager_slack_critical_mention)] %}
+{% for name, mention in [('slack', ''), ('slack-critical', slack_admin_mention)] %}
   - name: {{ name }}
 {% if alertmanager_slack_api_url or alertmanager_slack_bot | bool %}
     slack_configs:

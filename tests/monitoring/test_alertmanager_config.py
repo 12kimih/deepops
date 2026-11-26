@@ -15,13 +15,13 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from ansible_yaml import condition, load, render, role_defaults, same_name  # noqa: E402
+from ansible_yaml import condition, load, render, role_variables, same_name  # noqa: E402
 
 TEMPLATE = (ROOT / "roles/alertmanager/templates/alertmanager.yml.j2").read_text()
 
 
 def config(**overrides):
-    values = {**role_defaults("alertmanager"), "ansible_managed": "", "grafana_root_url": "", **overrides}
+    values = {**role_variables("alertmanager"), "ansible_managed": "", "grafana_root_url": "", **overrides}
     return yaml.safe_load(render(TEMPLATE, values))
 
 

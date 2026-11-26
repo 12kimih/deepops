@@ -15,9 +15,9 @@ alertmanager_slack_api_url: ""
 # update_message, post_updates_to_thread). The bot must be a member of the channel, or
 # Slack refuses its posts: invite it, then turn this on.
 alertmanager_slack_bot: false
-# The administrators' channel and mention (roles/slack_defaults), the critical alerts' too.
+# The administrators' channel (roles/slack_defaults); critical alerts mention them
+# (slack_admin_mention there).
 alertmanager_slack_channel: "{{ slack_channels.admin }}"
-alertmanager_slack_critical_mention: "{{ slack_admin_mention }}"
 # External dead man's switch (e.g. a healthchecks.io ping URL) fed by the Watchdog
 # alert. Empty drops Watchdog.
 alertmanager_heartbeat_url: ""

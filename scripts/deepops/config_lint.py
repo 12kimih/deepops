@@ -4,7 +4,7 @@
     config_lint.py [--fix]              run every check
     config_lint.py [--fix] CHECK ...    run some: commented, redundant, dead, doc-paths,
                                         doc-vars, doc-limits, doc-anchors, doc-repeats, doc-gpu,
-                                        duplicates, shadow,
+                                        duplicates, shadow, broadcast,
                                         copies
 
 A role's defaults own each setting's default and a config states only what differs
@@ -45,6 +45,9 @@ removals   deepops_component_removals names only components with removal: explic
            in the registry (any other name fails every deploy).
 duplicates no variable file sets a key twice in one mapping: Ansible keeps the last and
            only warns, so the first value is lost without a failure.
+broadcast  no config value mentions a whole channel (<!channel>, <!here>, <!everyone>):
+           what the administrators must act on mentions their group
+           (slack_admin_group_id, roles/slack_defaults), everyone else is told by DM.
 shadow     no group or host has its variables in two places (all.yml beside all/, or
            all.yml beside all.yaml): Ansible reads one and drops the other without a
            word, so a whole file of settings can vanish when a directory appears.
@@ -755,6 +758,31 @@ def check_proxy_credentials():
     return problems
 
 
+# A Slack mention of everyone in a channel, as a message's text writes it.
+BROADCAST = re.compile(r"<!(?:channel|here|everyone)\b")
+
+
+def check_broadcast():
+    problems = []
+    for label, tree, private in configs():
+        for rel in tree.files():
+            if rel.split("/", 1)[0] not in ("group_vars", "host_vars"):
+                continue
+            for number, line in enumerate((tree.text(rel) or "").splitlines(), 1):
+                if not line.lstrip().startswith("#") and BROADCAST.search(line):
+                    problems.append(
+                        found(
+                            "broadcast",
+                            f"{label}/{rel}",
+                            number,
+                            "a value mentions a whole channel; notices to the administrators "
+                            "mention their group (slack_admin_group_id, roles/slack_defaults)",
+                            private,
+                        )
+                    )
+    return problems
+
+
 # A config value naming a key of a mapping setting (`{{ cluster_info.dashboard_url }}`)
 # the setting does not have: Ansible fails the task that renders it, on the hosts, at
 # deploy time (a login banner that named a key moved elsewhere failed every node).
@@ -839,6 +867,7 @@ CHECKS = {
     "doc-gpu": check_doc_gpu,
     "duplicates": check_duplicates,
     "proxy-credentials": check_proxy_credentials,
+    "broadcast": check_broadcast,
     "mapping-keys": check_mapping_keys,
     "shadow": check_shadow,
     "copies": check_copies,

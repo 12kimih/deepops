@@ -1,5 +1,6 @@
 ---
 dependencies:
+  - role: retired_settings  # slurm_usage_report_admin_mention
   - role: deploy_defaults  # slurm_enable_submit_holds, submit_holds_from_time (the disk report says them)
   - role: slack_defaults  # slack_bot_token, slack_channels
   - role: io_defaults  # io_fairness_models (the I/O notices' thresholds)
