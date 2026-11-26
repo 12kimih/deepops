@@ -25,10 +25,11 @@ CHANNEL = "C1"
 SITE = "https://docs.example.org/news/"
 
 
-def notice(nid, day):
+def notice(nid, day, pin_until="2099-12-31"):
     return {"id": f"{SITE}{nid}/", "date": day, "text": nid, "blocks": [
         {"type": "header", "text": {"type": "plain_text", "text": f":mega: {nid}"}},
-        {"type": "actions", "elements": [{"type": "button", "url": f"{SITE}{nid}/"}]}]}  # fmt: skip
+        {"type": "actions", "elements": [{"type": "button", "url": f"{SITE}{nid}/"}]}],
+        **({"pin_until": pin_until} if pin_until else {})}  # fmt: skip
 
 
 class FakeSlack:
@@ -94,8 +95,8 @@ class Base(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.seen = os.path.join(self.dir.name, "notices-posted.json")
         self.pinned = os.path.join(self.dir.name, "notices-pinned.json")
-        self.doc = {"notices": [notice("old", "2026-01-01"), notice("today", "2026-02-01"),
-                                notice("later", "2026-03-01")]}  # fmt: skip
+        self.doc = {"pins_max": 1, "notices": [notice("old", "2026-01-01"), notice("today", "2026-02-01"),
+                                               notice("later", "2026-03-01")]}  # fmt: skip
         self.slack, self.said = FakeSlack(), []
 
     def tearDown(self):
@@ -165,7 +166,7 @@ class Round(Base):
         os.unlink(self.pinned)
         self.run_round("2026-02-01")
         self.assertEqual(self.slack.pins, {first})
-        self.assertEqual(json.loads(Path(self.pinned).read_text())["ts"], first)
+        self.assertEqual(json.loads(Path(self.pinned).read_text())["pins"], [first])
 
     def test_the_newest_unpinned_by_hand_is_pinned_again(self):
         self.run_round("2026-01-01")
@@ -379,19 +380,78 @@ class Markdown(unittest.TestCase):
         self.assertEqual(notices.check({"nope": []}), ['notices.json: no "notices" list'])
 
 
-class PinLatest(unittest.TestCase):
-    def test_the_channel_keeps_one_pinned_notice_the_newest(self):
-        slack = FakeSlack()
-        with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "notices-pinned.json")
-            notices.pin_latest(slack, CHANNEL, path, "1.0")
-            notices.pin_latest(slack, CHANNEL, path, "2.0")
-            self.assertEqual(slack.pins, {"2.0"})
-            slack.pins.clear()  # someone unpinned it by hand
-            notices.pin_latest(slack, CHANNEL, path, "3.0")
-            self.assertEqual(slack.pins, {"3.0"})
-            notices.pin_latest(slack, CHANNEL, path, "3.0")  # pinned already: no error
-            self.assertEqual(slack.pins, {"3.0"})
+class Pins(Base):
+    """The pins are what people must know now, as the docs say (pin_until, pins_max):
+    before, the newest notice alone was pinned, so a rule change came off the pins with the
+    next notice of any kind."""
+
+    def setUp(self):
+        super().setUp()
+        self.doc = {"pins_max": 2, "notices": [
+            notice("rule", "2026-01-01", "2026-03-01"), notice("plain", "2026-01-10", None),
+            notice("downtime", "2026-01-20", "2026-01-25")]}  # fmt: skip
+        self.run_round("2025-12-01")  # the first round: nothing due yet, nothing posted
+
+    def pinned_ids(self):
+        ids = {e["ts"]: nid.rstrip("/").rsplit("/", 1)[-1] for nid, e in self.record().items() if e.get("ts")}
+        return sorted(ids[ts] for ts in self.slack.pins)
+
+    def test_each_notice_stands_pinned_until_its_day(self):
+        self.run_round("2026-01-01")
+        self.assertEqual(self.pinned_ids(), ["rule"])
+        self.run_round("2026-01-10")
+        self.assertEqual(
+            self.pinned_ids(), ["rule"], "a plain notice is not pinned, nor does it unpin the rule"
+        )
+        self.run_round("2026-01-20")
+        self.assertEqual(self.pinned_ids(), ["downtime", "rule"])
+        self.run_round("2026-01-26")
+        self.assertEqual(self.pinned_ids(), ["rule"], "the downtime is over")
+        self.run_round("2026-03-02")
+        self.assertEqual(self.pinned_ids(), [], "the rule's days are over")
+        self.assertEqual(json.loads(Path(self.pinned).read_text()), {"pins": []})
+
+    def test_at_most_pins_max_the_newest(self):
+        self.doc["pins_max"] = 1
+        self.run_round("2026-01-20")
+        self.assertEqual(self.pinned_ids(), ["downtime"])
+
+    def test_an_export_that_sets_no_pins_max_pins_nothing(self):
+        self.run_round("2026-01-01")
+        del self.doc["pins_max"]
+        self.run_round("2026-01-02")
+        self.assertEqual(self.slack.pins, set())
+
+    def test_an_unread_history_unpins_what_the_record_says(self):
+        self.run_round("2026-01-20")
+        history = self.slack.call
+
+        def no_history(method, **p):
+            if method == "conversations.history":
+                raise Error("Slack conversations.history failed: missing_scope")
+            return history(method, **p)
+
+        self.slack.call = no_history
+        self.run_round("2026-01-26")
+        self.assertEqual(self.pinned_ids(), ["rule"])
+
+    def test_a_record_of_one_pin_from_before_is_read(self):
+        self.run_round("2026-01-01")
+        [ts] = self.slack.pins
+        Path(self.pinned).write_text(json.dumps({"ts": ts}))
+        self.assertEqual(notices.pins(self.pinned), {ts})
+        self.run_round("2026-01-20")
+        self.assertEqual(self.pinned_ids(), ["downtime", "rule"])
+        self.assertEqual(set(json.loads(Path(self.pinned).read_text())["pins"]), set(self.slack.pins))
+
+
+class PinCheck(unittest.TestCase):
+    def test_a_pin_the_bot_cannot_read_is_said(self):
+        doc = {"pins_max": 0, "notices": [notice("x", "2026-01-01", "soon")]}
+        said = "\n".join(notices.check(doc))
+        self.assertIn("pins_max 0", said)
+        self.assertIn("pin_until 'soon'", said)
+        self.assertEqual(notices.check({"pins_max": 3, "notices": [notice("x", "2026-01-01")]}), [])
 
 
 class Main(Base):
