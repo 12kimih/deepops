@@ -1266,6 +1266,55 @@ tests:
               summary: "I/O usage on n2 has reported no success for 30 minutes"
               description: "`journalctl -u io-usage` and `systemctl list-timers io-usage.timer` on the host."
 
+  - name: a node whose jobs hold GPUs with no job utilisation warns, a short gap does not
+    interval: 1m
+    input_series:
+      - series: 'slurm_node_gpus_alloc{node="n1", host="master"}'
+        values: '2x40'
+      - series: 'slurm_node_gpus_alloc{node="n2", host="master"}'
+        values: '1x40'
+      - series: 'job_device:dcgm_gpu_util_ratio:max{host="n1", device="nvidia0", job_id="7", user="alice"}'
+        values: '0.5x40'
+      - series: 'job_device:dcgm_gpu_util_ratio:max{host="n2", device="nvidia0", job_id="8", user="bob"}'
+        values: '_x3 0.5x37'
+    alert_rule_test:
+      - eval_time: 31m
+        alertname: JobGpusNotWatched
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1}
+            exp_annotations:
+              summary: "2 GPUs allocated on n1, fewer watched for idleness"
+              description: "Jobs there hold GPUs that have no job utilisation (job_device:dcgm_gpu_util_ratio:max), so their idleness is neither noticed nor cancelled: check the Slurm GPU metrics and host_gpu:dcgm_slurm_device:info for the host."
+
+  - name: a node with jobs whose I/O count finds none of them warns
+    interval: 1m
+    input_series:
+      - series: 'slurm_node_cpus_alloc{node="n1", host="master"}'
+        values: '8x40'
+      - series: 'slurm_node_cpus_alloc{node="n2", host="master"}'
+        values: '8x40'
+      - series: 'slurm_node_cpus_alloc{node="n3", host="master"}'
+        values: '0x40'
+      - series: 'io_usage_last_success_timestamp_seconds{host="n1", instance="n1:9100"}'
+        values: '60+60x40'
+      - series: 'io_usage_last_success_timestamp_seconds{host="n2", instance="n2:9100"}'
+        values: '60+60x40'
+      - series: 'io_usage_last_success_timestamp_seconds{host="n3", instance="n3:9100"}'
+        values: '60+60x40'
+      - series: 'io_usage_job_read_bytes_total{host="n2", instance="n2:9100", job_id="7", user="alice"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 29m
+        alertname: IoUsageJobsMissing
+        exp_alerts: []
+      - eval_time: 31m
+        alertname: IoUsageJobsMissing
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, node: n1}
+            exp_annotations:
+              summary: "I/O usage on n1 counts no job though jobs run there"
+              description: "The node runs jobs but io-usage found none of their processes, so the I/O notices cannot name them: compare a job process's /proc/<pid>/cgroup on the host with what roles/io_usage recognizes as a job's cgroup."
+
   - name: a node's NFS traffic is recorded by the mountpoint the host gives the export
     interval: 1m
     input_series:

@@ -155,3 +155,22 @@ groups:
           description: >-
             Its metrics file lacks DCGM_FI_DEV_GPU_MINOR_NUMBER. `ansible-playbook -K -l {{ $labels.host }}
             playbooks/slurm-cluster/nvidia-dcgm-exporter.yml` installs the current one.
+      # The same in part: a node whose jobs hold more GPUs than have a job's utilisation
+      # (job_device:*), whatever breaks the join (the mapping, the job metrics). Those GPUs'
+      # idleness is not watched, so no notice or cancel reaches their jobs, silently.
+      # A job starting or ending leaves a gap for a minute or two; none held 30 minutes.
+      - alert: JobGpusNotWatched
+        expr: |
+          label_replace(max by (node) (slurm_node_gpus_alloc), "host", "$1", "node", "(.*)")
+          > on (host) (
+            count by (host) (job_device:dcgm_gpu_util_ratio:max)
+            or on (host) 0 * label_replace(max by (node) (slurm_node_gpus_alloc), "host", "$1", "node", "(.*)")
+          )
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $value }} GPUs allocated on {{ $labels.host }}, fewer watched for idleness"
+          description: >-
+            Jobs there hold GPUs that have no job utilisation (job_device:dcgm_gpu_util_ratio:max),
+            so their idleness is neither noticed nor cancelled: check the Slurm GPU metrics and
+            host_gpu:dcgm_slurm_device:info for the host.
