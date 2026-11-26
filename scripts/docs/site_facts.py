@@ -176,6 +176,9 @@ PUBLIC = {
     # {old: new} of the retired commands (cluster_tools_retired_builtin), for the docs' and
     # the site config's checks that refuse an old name (scripts/deepops/retired_names.py)
     "commands_retired": None,
+    # retired_names.pattern() as text, so a check outside deepops (cluster-docs CI)
+    # compiles exactly that rule and maps each match through commands_retired
+    "commands_retired_pattern": None,
 }
 STORAGE_FIELDS = {
     "read_bps": "rbps",
@@ -341,6 +344,17 @@ def environment(config):
 
 def _path_or_url(value):
     return value == "" or value.startswith(("/", "~/")) or "://" in value
+
+
+def _retired_pattern(retired):
+    """The regex text of a retired command as a word (scripts/deepops/retired_names.py),
+    or "" with none retired."""
+    if not retired:
+        return ""
+    sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+    import retired_names
+
+    return retired_names.pattern(retired).pattern
 
 
 def rules_table(settings_):
@@ -642,6 +656,7 @@ def facts(config):
         "commands": commands(s.get("cluster_tools_builtin") or []),
         "rules": rules_table(s),
         "commands_retired": dict(s.get("cluster_tools_retired_builtin") or {}),
+        "commands_retired_pattern": _retired_pattern(s.get("cluster_tools_retired_builtin") or {}),
         "policy": {
             **{field: s.get(key) for field, key in POLICY.items()},
             **submit_policy(s.get("slurm_job_submit_policy") or {}),
@@ -692,6 +707,8 @@ def public(every):
             out[key] = {
                 m: {f: v for f, v in d.items() if f in QUOTA_FIELDS} for m, d in (value or {}).items()
             }
+        elif key == "commands_retired_pattern":
+            out[key] = value if isinstance(value, str) else ""
         elif key == "commands_retired":
             out[key] = {old: new for old, new in (value or {}).items() if isinstance(new, str)}
         elif fields is None:  # names the site chooses; the values are checked by kind

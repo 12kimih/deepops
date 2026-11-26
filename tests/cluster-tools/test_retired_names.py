@@ -15,7 +15,12 @@ from repo_scan import tracked  # noqa: E402
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 import retired_names  # noqa: E402
 
-SELF = {"tests/cluster-tools/test_retired_names.py", "scripts/deepops/retired_names.py"}
+# The rule itself and the tests of it, whose cases are the names.
+SELF = {
+    "tests/cluster-tools/test_retired_names.py",
+    "scripts/deepops/retired_names.py",
+    "tests/site-facts/test_site_facts.py",
+}
 # (file, a pattern of the line) -> why it is not the command.
 ALLOWED = {
     ("roles/cluster_tools_defaults/defaults/main.yml", r"^  [a-z-]+: usage"): "the list itself",

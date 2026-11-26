@@ -63,6 +63,31 @@ class Facts(unittest.TestCase):
         )
 
 
+class RetiredCommands(unittest.TestCase):
+    """The docs check old command names with exactly deepops' rule (retired_names), from
+    site.json alone: cluster-docs CI has no deepops checkout (2026-11-27)."""
+
+    def test_the_pattern_compiled_from_site_json_finds_what_retired_names_finds(self):
+        import re
+        import sys
+
+        sys.path.insert(0, str(ROOT / "scripts/deepops"))
+        import retired_names
+
+        data = sf.public(sf.facts(None))
+        word = re.compile(data["commands_retired_pattern"])
+        for line in (
+            "run `disk-usage`",
+            "gpu-usage JOB",
+            "#gpu-usage",
+            "scratch-space.yml",
+            "scratch-space-purge",
+        ):
+            with self.subTest(line=line):
+                found = [(m.group(1), data["commands_retired"][m.group(1)]) for m in word.finditer(line)]
+                self.assertEqual(found, [(n, new) for _, n, new in retired_names.mentions(line)])
+
+
 class DocsUrl(unittest.TestCase):
     """The docs site's site_url and the config's cluster_info.docs_url were never
     compared (2026-11-27): the banner, the bot and the agent rules send people to one."""
