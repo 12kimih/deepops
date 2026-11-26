@@ -261,7 +261,7 @@ class RenderTests(unittest.TestCase):
             "total_gpus": 1000,
             "reasons": [],
             "now": 0,
-            # Every section over Slack's limit: pending users, drained nodes, idle jobs.
+            # Every section over Slack's limit: pending users, drained nodes, jobs leaving their GPUs idle.
             "pending": {
                 f"user{u}": {"jobs": 1, "gpus": 1, "reasons": report.Counter({"Priority": 1}), "wait": 60}
                 for u in range(200)
@@ -280,6 +280,9 @@ class RenderTests(unittest.TestCase):
             for b in blocks:
                 self.assertLessEqual(len(rich.read([b])), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
+        # One name for these jobs, saying the GPUs were allocated (owner, 2026-11-27).
+        for shown in (text, rich.read(summary), rich.read(thread[0][1])):
+            self.assertIn(report.IDLE_JOB, shown)
 
     def test_every_pending_reason_is_shown(self):
         """The waiting jobs' reasons were cut to the two most common."""
@@ -292,7 +295,7 @@ class RenderTests(unittest.TestCase):
 
     def test_an_idle_job_leaves_everyone_in_the_per_person_table(self):
         """The per-person table lists every running GPU job, not the idle section's last
-        owner's jobs (owner 2026-11-26: with one idle job, the thread showed only it)."""
+        owner's jobs (owner 2026-11-26: with one job leaving its GPUs idle, the thread showed only it)."""
 
         def gpu_job(jid, user, idle):
             return {"id": jid, "label": jid, "user": user, "runtime": 7200, "gpus": [("gpu1", int(jid))],

@@ -264,18 +264,19 @@ pass with `sudo gpu-diag-idle run /etc/gpu-diag-idle.json --dry-run`; run one wi
 `playbooks/slurm-cluster/slurm-usage-report.yml` installs a systemd timer on the
 monitoring host that posts a GPU usage report to Slack every hour
 (`slurm_usage_report_schedule`). The top-level message is a summary card (GPUs allocated,
-average utilisation, idle jobs, pending jobs, drained nodes, and a link to
-`grafana_root_url`); the thread lists idle jobs, drain/down nodes with
+average utilisation, jobs leaving their GPUs idle, pending jobs, drained nodes, and a
+link to `grafana_root_url`); the thread lists those jobs, drain/down nodes with
 reasons, pending jobs per user, and every running GPU job per user as a table with a
 utilisation bar and GPU memory.
 
-A job counts as idle when it has run for `slurm_usage_report_idle_hours` and every GPU it
-holds stayed at or under `slurm_usage_report_idle_util_threshold` percent the whole time
+A job leaves its GPUs idle (named in Slack by `IDLE_JOB` in `cluster_tools.usage_report`)
+when it has run for `slurm_usage_report_idle_hours` and every GPU it holds stayed at or
+under `slurm_usage_report_idle_util_threshold` percent the whole time
 (DCGM `DCGM_FI_DEV_GPU_UTIL_RATIO`, shown in percent). `slurm_usage_report_notify` lists how its owner hears about
 it: `mention` in the report thread, `dm`, both, or `[]` for neither. Each person is told
-once for all their idle jobs (one line in the thread, one mention, one DM), when a job of
+once for all such jobs (one line in the thread, one mention, one DM), when a job of
 theirs first turns idle and then every `slurm_usage_report_notify_repeat_hours` while any
-stays idle (0, the default: on every report); the thread lists idle jobs either way.
+stays idle (0, the default: on every report); the thread lists those jobs either way.
 `slurm_usage_report_cancel_after_hours` cancels any job, batch or interactive, whose GPUs
 sat idle that long (0 = never) and says so in the report thread. A job is cancelled only
 after its owner was told of it in an earlier report and warned

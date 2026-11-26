@@ -1,11 +1,12 @@
-"""Post a Slurm GPU usage report to Slack and notify owners of idle GPU jobs.
+"""Post a Slurm GPU usage report to Slack and notify the owners of jobs
+leaving their GPUs idle.
 
 Reads jobs and node state from Slurm's JSON output, per-GPU utilisation from
 Prometheus (dcgm-exporter). Posts a summary card with the detail in its thread, and
 tells each person whose jobs' GPUs all stayed idle for the whole window, once for all
-their idle jobs (mentioned, or sent a DM), again every notify_repeat_hours while any
-stays idle (cluster_tools.notices). Can optionally cancel jobs idle for longer, any job,
-each only after its owner was told and warned in earlier runs.
+such jobs (mentioned, or sent a DM), again every notify_repeat_hours while any stays
+idle (cluster_tools.notices). Can optionally cancel such jobs once idle for longer,
+any job, each only after its owner was told and warned in earlier runs.
 
 With --weekly it posts the week instead: for each person, the GPU-hours their jobs held
 and how many of them sat idle, the people who idled most mentioned, from the per-job
@@ -58,6 +59,10 @@ from .slurm import (
 )
 from .vocab import job_holds, node_unavailable
 
+# The one name, in every text this tool sends, for a job whose allocated GPUs all sat
+# idle the whole window (the rule is in the text beside it). Without "allocated" it
+# reads as a CPU-only job (owner, 2026-11-27); tests/slack-text/test_terms.py guards it.
+IDLE_JOB = "할당받은 GPU를 쓰지 않는 잡"
 NOTIFY = {"mention", "dm"}
 # The fields a DM text may use: the person's jobs, one line each, how many, the hours.
 DM_FIELDS = {"jobs": "- `1234_5` (GPU 8장, 1:00:00 실행 중)", "count": 1, "hours": "2"}
@@ -303,13 +308,13 @@ def summary_card(report):
 
     text = (
         f"GPU 사용 현황 {stamp}: GPU {alloc}/{total}장 할당 ({100 * alloc / total:.0f}%), "
-        f"평균 사용률 {avg}, GPU를 쓰지 않는 잡 {len(idle)}개"
+        f"평균 사용률 {avg}, {IDLE_JOB} {len(idle)}개"
     )
     status = ":large_green_circle:" if not idle and not report["reasons"] else ":large_yellow_circle:"
     fields = [
         f"**할당된 GPU**\n{alloc} / {total}장 ({100 * alloc / total:.0f}%)",
         f"**평균 사용률**\n{avg}",
-        f"**GPU를 쓰지 않는 잡**\n{len(idle)}개" + (" :zzz:" if idle else ""),
+        f"**{IDLE_JOB}**\n{len(idle)}개" + (" :zzz:" if idle else ""),
         f"**기다리는 잡**\n{pend_jobs}개, GPU {pend_gpus}장",
         f"**쓸 수 없는 노드 (drain, down)**\n{len(report['reasons'])}대"
         + (" :warning:" if report["reasons"] else ""),
@@ -325,11 +330,11 @@ def summary_card(report):
 
 
 def idle_section(idle, cfg, due, who):
-    """The idle jobs per owner, each owner mentioned when told this run (DUE)."""
+    """The jobs leaving their GPUs idle, per owner, each owner mentioned when told this run (DUE)."""
     if not idle:
         return []
     rule = f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게"
-    lines = [f":zzz: **GPU를 쓰지 않는 잡**  _{rule}_"]
+    lines = [f":zzz: **{IDLE_JOB}**  _{rule}_"]
     owners = by_owner(idle)
     for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
         told = "mention" in cfg["notify"] and user in due
@@ -884,14 +889,14 @@ def purge_notices(cfg, slack, cache, state, now, preview):
 
 
 def cancelled_note(cancelled, cfg, who):
-    """The report thread's (text, blocks) on the jobs CANCELLED for idle GPUs."""
+    """The report thread's (text, blocks) on the jobs CANCELLED for leaving their GPUs idle."""
     lines = [
         f":no_entry: {who(user, bool(cfg['notify']))}  "
         + ", ".join(f"`{j['label']}`" for j in jobs)
-        + f": GPU를 {cfg['cancel_after_hours']:g}시간 동안 쓰지 않아 취소했습니다"
+        + f": 할당받은 GPU를 {cfg['cancel_after_hours']:g}시간 동안 쓰지 않아 취소했습니다"
         for user, jobs in by_owner(cancelled).items()
     ]
-    return "GPU를 쓰지 않는 잡을 취소했습니다", sections("\n".join(lines))
+    return f"{IDLE_JOB}을 취소했습니다", sections("\n".join(lines))
 
 
 def post_report(report, cfg, who, slack, to):
@@ -920,7 +925,10 @@ def act(report, cfg, who, slack, cache, now):
             failures.append(f"looking up {user}: {e}")
             continue
         if not member:
-            print(f"slurm-usage-report: {user} has no Slack member; not told of idle jobs", file=sys.stderr)
+            print(
+                f"slurm-usage-report: {user} has no Slack member; not told of jobs leaving their GPUs idle",
+                file=sys.stderr,
+            )
             continue  # so never cancelled either
         delivered = "mention" in cfg["notify"]
         if "dm" in cfg["notify"]:
