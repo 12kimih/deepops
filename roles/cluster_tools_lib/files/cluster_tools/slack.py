@@ -16,8 +16,8 @@
 Every message to a person goes through dm(), never post(), which refuses a member ID: so
 each DM is in the journal (one "dm KIND LOGIN" line) and, unless sent with log=False,
 logged for the administrators (DmLog: one reply per DM in a daily thread of their
-channel, no mention, so the channel's alerts stay on top) and says so to its reader.
-They see what people were told and can help.
+channel, no mention, so the channel's alerts stay on top): they see what people were
+told and can help.
 
 Every failure is an Error naming the method and Slack's reason; Error is a RuntimeError.
 Each call is bounded by TIMEOUT seconds. A call Slack rate-limits (HTTP 429) is sent
@@ -52,8 +52,7 @@ MEMBER_TTL = 86400
 MAX_BLOCKS = 45  # Slack allows 50 blocks per message
 MAX_SECTION = 2900  # and 3000 characters per section text
 BAR_WIDTH = 10
-# What a logged DM tells its reader, and how much of its first line the log line keeps.
-DM_LOG_NOTE = "_The cluster administrators see a copy of this notice, so they can help._"
+# How much of a logged DM's first line the log line keeps.
 DM_LOG_FIRST = 200
 
 
@@ -163,14 +162,10 @@ class Slack:
 
     def dm(self, member, text, blocks=None, *, kind, login, log=True):
         """A direct message to MEMBER (a member ID) about KIND for LOGIN; (channel, ts).
-        With log and a dm_log (DmLog), its reader is told the administrators see it and
-        the log gets one line: the kind, the login, the message's first line and a link.
+        With log and a dm_log (DmLog), the log gets one line: the kind, the login, the
+        message's first line and a link.
         That line failing is said on stderr, never undoes or repeats the sent DM."""
         logged = log and self.dm_log is not None
-        if logged:
-            text = f"{text}\n{DM_LOG_NOTE}"
-            if blocks:
-                blocks = [*blocks, rich.context(DM_LOG_NOTE)]
         channel = self.dm_channel(member)
         ts = self.post(channel, text, blocks)
         print(f"dm {kind} {login} {channel} {ts}")

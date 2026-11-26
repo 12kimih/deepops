@@ -60,7 +60,7 @@ class SlackTests(unittest.TestCase):
         client.dm_log = slack.DmLog("#alerts", f"{d}/dm-log.json")
         return client
 
-    def test_a_dm_is_logged_under_the_days_message_and_says_so(self):
+    def test_a_dm_is_logged_under_the_days_message(self):
         with tempfile.TemporaryDirectory() as d:
             client = self.logged(d)
             with mock.patch("sys.stdout", io.StringIO()) as out:
@@ -74,7 +74,7 @@ class SlackTests(unittest.TestCase):
             ]
             day = time.strftime("%Y-%m-%d")
             self.assertEqual(posts[0][:2], ("chat.postMessage", "D9"))
-            self.assertIn(rich.plain(slack.DM_LOG_NOTE), posts[0][2])
+            self.assertEqual(posts[0][2], "Your disk use is high.\nMore.")  # the DM as written
             self.assertEqual(posts[1], ("chat.postMessage", "#alerts", slack.dm_log_title(day, 0), None))
             # Then by the ID Slack gave: chat.update takes no channel name.
             self.assertEqual(posts[2], ("chat.postMessage", "C42",
