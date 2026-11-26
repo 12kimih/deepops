@@ -26,6 +26,18 @@ prometheus_retention_size: 50GB
 prometheus_slurmctld_metrics: [jobs, nodes, partitions, scheduler]
 prometheus_slurmctld_targets: "{{ (groups['slurm-master'] | default([]))[:1] | map('regex_replace', '$', ':' ~ slurm_slurmctld_port) | list }}"
 
+# Each node's NFS client latency (node_exporter's mountstats): the operations whose
+# requests, response time, queue time and major timeouts the scrape keeps, by mount; the
+# other operations and every transport and event family are dropped. Each operation
+# costs 4 series per mount per host: a cluster of 9 hosts with 3 NFS mounts keeps
+# 9 x 3 x 6 x 4 = about 650 series with these six (rules io-usage.yml).
+prometheus_nfs_client_operations: [READ, WRITE, GETATTR, LOOKUP, ACCESS, COMMIT]
+# When a node's NFS mount is slow (NfsClientSlow): its mean READ or WRITE response
+# over 5 minutes, in milliseconds, past this for 15 minutes, by mountpoint. Exported on
+# the Prometheus host as deepops_nfs_client_slow_seconds{mountpoint} for the alert to
+# compare with; a mountpoint not named is not watched, {} watches none.
+prometheus_nfs_client_slow_ms: {/home: 100}
+
 # Extra rule files from the site config, e.g.
 # ["{{ inventory_dir }}/files/prometheus/rules/site.yml"]
 prometheus_extra_rule_files: []

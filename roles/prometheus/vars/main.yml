@@ -11,6 +11,9 @@ prometheus_items:
   - "dir:{{ prometheus_config_dir }}/rules"
   - "dir:{{ prometheus_config_dir }}"
   - "file:{{ component_expected_dir }}/{{ component_expected_file }}"
+  - "file:{{ node_exporter_prom_dir }}/nfs-client-slow.prom"
+  - "file:{{ node_exporter_prom_keep_dir }}/nfs-client-slow.prom"
+  - "file:/etc/tmpfiles.d/deepops-textfile-nfs-client-slow.conf"
   - "dir:{{ component_expected_dir }}"
   - package:python3-docker
 # The alert rule files this run installs.

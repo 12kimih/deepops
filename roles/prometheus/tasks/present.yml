@@ -52,6 +52,24 @@
     content: "{{ _prometheus_expected.stdout }}\n"
     mode: "0644"  # the owner as sync.py leaves it (the group of the directory)
 
+# The NFS client latency each watched mount may reach (prometheus_nfs_client_slow_ms),
+# as series NfsClientSlow compares with: a rule file holds no role default.
+- name: Name the NFS client latency thresholds
+  ansible.builtin.set_fact:
+    _prometheus_nfs_slow: |
+      # HELP deepops_nfs_client_slow_seconds The mean READ or WRITE response past which a node's NFS mount is slow (prometheus_nfs_client_slow_ms).
+      # TYPE deepops_nfs_client_slow_seconds gauge
+      {% for mountpoint, ms in prometheus_nfs_client_slow_ms | dictsort %}
+      deepops_nfs_client_slow_seconds{mountpoint="{{ mountpoint }}"} {{ ms | float / 1000 }}
+      {% endfor %}
+
+- name: Publish the NFS client latency thresholds
+  ansible.builtin.include_role:
+    name: textfile_keep
+  vars:
+    textfile_keep_name: nfs-client-slow
+    textfile_keep_content: "{{ _prometheus_nfs_slow }}"
+
 - name: Install python3 docker module
   ansible.builtin.package:
     name: python3-docker

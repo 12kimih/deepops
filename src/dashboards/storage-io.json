@@ -213,17 +213,246 @@
       "id": 3
     },
     {
+      "type": "timeseries",
+      "title": "NFS read and write response by node",
+      "description": "Each node's mean wait for the server to answer a READ or WRITE, per mount, over 5 minutes (node_exporter mountstats). All nodes slow at once: the server or its disks; one alone: its network or its own queue. NfsClientSlow fires past prometheus_nfs_client_slow_ms.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "links": [
+            {
+              "title": "GPU node",
+              "url": "/d/gpu-nodes?var-hostname=${__field.labels.host}&${__url_time_range}"
+            },
+            {
+              "title": "Host",
+              "url": "/d/node-exporter-hosts?var-nodename=${__field.labels.host}&${__url_time_range}"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "host_mount_operation:nfs_response_seconds:mean5m{operation=~\"READ|WRITE\"}",
+          "legendFormat": "{{host}} {{mountpoint}} {{operation}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 8
+      },
+      "id": 4
+    },
+    {
+      "type": "timeseries",
+      "title": "NFS metadata response by node",
+      "description": "The same for the lookups and attribute reads (GETATTR, LOOKUP, ACCESS, COMMIT: prometheus_nfs_client_operations): slow ones are what makes ls and imports hang.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "links": [
+            {
+              "title": "GPU node",
+              "url": "/d/gpu-nodes?var-hostname=${__field.labels.host}&${__url_time_range}"
+            },
+            {
+              "title": "Host",
+              "url": "/d/node-exporter-hosts?var-nodename=${__field.labels.host}&${__url_time_range}"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "host_mount_operation:nfs_response_seconds:mean5m{operation!~\"READ|WRITE\"}",
+          "legendFormat": "{{host}} {{mountpoint}} {{operation}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 8
+      },
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "NFS queue share by node",
+      "description": "The share of each request's time spent waiting in the node's own queue before it was sent: high means the node is the bottleneck (its RPC slots), not the server.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "max": 1,
+          "links": [
+            {
+              "title": "GPU node",
+              "url": "/d/gpu-nodes?var-hostname=${__field.labels.host}&${__url_time_range}"
+            },
+            {
+              "title": "Host",
+              "url": "/d/node-exporter-hosts?var-nodename=${__field.labels.host}&${__url_time_range}"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "host_mount_operation:nfs_queue_share:ratio5m",
+          "legendFormat": "{{host}} {{mountpoint}} {{operation}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 12,
+        "h": 8
+      },
+      "id": 6
+    },
+    {
       "type": "row",
       "title": "Jobs and logins",
       "collapsed": false,
       "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 25,
         "w": 24,
         "h": 1
       },
-      "id": 4
+      "id": 7
     },
     {
       "type": "timeseries",
@@ -299,11 +528,11 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 10,
+        "y": 26,
         "w": 12,
         "h": 8
       },
-      "id": 5
+      "id": 8
     },
     {
       "type": "timeseries",
@@ -365,11 +594,11 @@
       ],
       "gridPos": {
         "x": 12,
-        "y": 10,
+        "y": 26,
         "w": 12,
         "h": 8
       },
-      "id": 6
+      "id": 9
     },
     {
       "type": "row",
@@ -378,11 +607,11 @@
       "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 34,
         "w": 24,
         "h": 1
       },
-      "id": 7
+      "id": 10
     },
     {
       "type": "timeseries",
@@ -442,11 +671,11 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 19,
+        "y": 35,
         "w": 8,
         "h": 8
       },
-      "id": 8
+      "id": 11
     },
     {
       "type": "timeseries",
@@ -505,11 +734,11 @@
       ],
       "gridPos": {
         "x": 8,
-        "y": 19,
+        "y": 35,
         "w": 8,
         "h": 8
       },
-      "id": 9
+      "id": 12
     },
     {
       "type": "timeseries",
@@ -576,11 +805,11 @@
       ],
       "gridPos": {
         "x": 16,
-        "y": 19,
+        "y": 35,
         "w": 8,
         "h": 8
       },
-      "id": 10
+      "id": 13
     },
     {
       "type": "timeseries",
@@ -642,11 +871,11 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 27,
+        "y": 43,
         "w": 24,
         "h": 8
       },
-      "id": 11
+      "id": 14
     }
   ]
 }

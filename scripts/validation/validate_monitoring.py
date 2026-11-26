@@ -107,6 +107,9 @@ SOURCES = {
     # Each host's expected component versions and sources, the textfile written at each
     # prometheus.yml run and sync.py move (scripts/deepops/component_expected.py).
     "component_expected": r"deepops:component_(pin|source):info|deepops_component_expected_\w+",
+    # Each watched NFS mount's latency threshold, the textfile each prometheus.yml run
+    # writes (prometheus_nfs_client_slow_ms, rules io-usage.yml).
+    "nfs_client_slow": r"deepops_nfs_client_slow_seconds",
     "cluster_bot": r"cluster_bot_\w+",  # the bot token's Slack scopes (roles/cluster_bot, cluster_bot.scopes)
     "shared_data": r"shared_data_\w+",  # the shared data's export, the bot's rounds (roles/shared_space)
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)

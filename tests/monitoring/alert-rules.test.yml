@@ -1303,3 +1303,65 @@ tests:
             exp_annotations:
               summary: "The cluster bot's Slack token lacks the pins:write scope"
               description: "What needs it fails with missing_scope. Import the manifest the deploy writes (/etc/cluster-bot/slack-app-manifest.json on ctl) into the Slack app's App Manifest and reinstall the app; the next check (`systemctl start cluster-bot-scopes` there) clears this."
+
+  - name: a node's NFS writes slow on a watched mount warn; reads fast and an unwatched mount do not
+    interval: 1m
+    input_series:
+      - series: 'node_mountstats_nfs_mountpoint_info{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", mountpoint="/home"}'
+        values: '1x30'
+      - series: 'node_mountstats_nfs_mountpoint_info{host="n1", instance="n1:9100", export="srv:/scratch", mountaddr="10.0.0.1", protocol="tcp", mountpoint="/scratch"}'
+        values: '1x30'
+      - series: 'deepops_nfs_client_slow_seconds{host="prom", instance="prom:9100", mountpoint="/home"}'
+        values: '0.1x30'
+      # 1 request a second each; WRITE 200 ms, READ 20 ms, on /scratch WRITE 500 ms
+      - series: 'node_mountstats_nfs_operations_requests_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="WRITE"}'
+        values: '0+60x30'
+      - series: 'node_mountstats_nfs_operations_response_time_seconds_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="WRITE"}'
+        values: '0+12x30'
+      - series: 'node_mountstats_nfs_operations_requests_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="READ"}'
+        values: '0+60x30'
+      - series: 'node_mountstats_nfs_operations_response_time_seconds_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="READ"}'
+        values: '0+1.2x30'
+      - series: 'node_mountstats_nfs_operations_requests_total{host="n1", instance="n1:9100", export="srv:/scratch", mountaddr="10.0.0.1", protocol="tcp", operation="WRITE"}'
+        values: '0+60x30'
+      - series: 'node_mountstats_nfs_operations_response_time_seconds_total{host="n1", instance="n1:9100", export="srv:/scratch", mountaddr="10.0.0.1", protocol="tcp", operation="WRITE"}'
+        values: '0+30x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: NfsClientSlow
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: NfsClientSlow
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, mountpoint: /home, operation: WRITE}
+            exp_annotations:
+              summary: "NFS WRITE on /home answers n1 in 200ms on average"
+              description: "Past the threshold (prometheus_nfs_client_slow_ms) for 15 minutes, so every job on the node waits on its files. The dashboard Storage / NFS and disks shows which nodes and since when: all of them slow points at the server or its disks (Disk busy), one alone at its network or its own queue (NFS queue share)."
+
+  - name: NFS client latency per node, mount and operation, and its queue share
+    interval: 1m
+    input_series:
+      - series: 'node_mountstats_nfs_mountpoint_info{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", mountpoint="/home"}'
+        values: '1x10'
+      - series: 'node_mountstats_nfs_operations_requests_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="READ"}'
+        values: '0+60x10'
+      - series: 'node_mountstats_nfs_operations_response_time_seconds_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="READ"}'
+        values: '0+12x10'
+      - series: 'node_mountstats_nfs_operations_queue_time_seconds_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="READ"}'
+        values: '0+6x10'
+      # no requests in the window: no series
+      - series: 'node_mountstats_nfs_operations_requests_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="GETATTR"}'
+        values: '5x10'
+      - series: 'node_mountstats_nfs_operations_response_time_seconds_total{host="n1", instance="n1:9100", export="srv:/home", mountaddr="10.0.0.1", protocol="tcp", operation="GETATTR"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: host_mount_operation:nfs_response_seconds:mean5m
+        eval_time: 8m
+        exp_samples:
+          - labels: 'host_mount_operation:nfs_response_seconds:mean5m{host="n1", mountpoint="/home", operation="READ"}'
+            value: 0.2
+      - expr: host_mount_operation:nfs_queue_share:ratio5m
+        eval_time: 8m
+        exp_samples:
+          - labels: 'host_mount_operation:nfs_queue_share:ratio5m{host="n1", mountpoint="/home", operation="READ"}'
+            value: 0.3333333333333333

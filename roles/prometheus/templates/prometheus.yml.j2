@@ -41,11 +41,19 @@ scrape_configs:
         regex: '(.+):\d+'
         target_label: host
     metric_relabel_configs:
-      # node_exporter's mountstats: the per-mount byte and page counters stay; its 44
-      # per-operation, transport and event families per mount are dropped.
-      - source_labels: [__name__]
-        regex: 'node_mountstats_nfs_(operations|transport|event)_.+'
+      # node_exporter's mountstats: the per-mount byte and page counters stay; of its 44
+      # per-operation, transport and event families per mount, only the latency of the
+      # operations prometheus_nfs_client_operations names stays (4 series per operation,
+      # mount and host; the budget is there), marked, kept, and the mark dropped.
+      - source_labels: [__name__, operation]
+        regex: 'node_mountstats_nfs_operations_(requests|response_time_seconds|queue_time_seconds|major_timeouts)_total;({{ prometheus_nfs_client_operations | map('regex_escape') | join('|') }})'
+        target_label: __tmp_nfs_keep
+        replacement: keep
+      - source_labels: [__name__, __tmp_nfs_keep]
+        regex: 'node_mountstats_nfs_(operations|transport|event)_.+;'
         action: drop
+      - regex: __tmp_nfs_keep
+        action: labeldrop
       # Its mountpoint as the host names it: the exporter's container sees the host's
       # mounts under node_exporter_rootfs.
       - source_labels: [__name__, mountpoint]

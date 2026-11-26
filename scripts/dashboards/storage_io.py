@@ -38,6 +38,55 @@ def build():
             links=host_links("${__field.labels.host}"),
             description="Bytes each node wrote to each NFS export over the wire.",
         ),
+        timeseries(
+            "NFS read and write response by node",
+            [
+                query(
+                    'host_mount_operation:nfs_response_seconds:mean5m{operation=~"READ|WRITE"}',
+                    "{{host}} {{mountpoint}} {{operation}}",
+                )
+            ],  # fmt: skip
+            unit="s",
+            legend="table",
+            calcs=("lastNotNull", "max", "mean"),
+            links=host_links("${__field.labels.host}"),
+            description=(
+                "Each node's mean wait for the server to answer a READ or WRITE, per mount, over 5 "
+                "minutes (node_exporter mountstats). All nodes slow at once: the server or its disks; "
+                "one alone: its network or its own queue. NfsClientSlow fires past "
+                "prometheus_nfs_client_slow_ms."
+            ),
+        ),
+        timeseries(
+            "NFS metadata response by node",
+            [
+                query(
+                    'host_mount_operation:nfs_response_seconds:mean5m{operation!~"READ|WRITE"}',
+                    "{{host}} {{mountpoint}} {{operation}}",
+                )
+            ],  # fmt: skip
+            unit="s",
+            legend="table",
+            calcs=("lastNotNull", "max", "mean"),
+            links=host_links("${__field.labels.host}"),
+            description=(
+                "The same for the lookups and attribute reads (GETATTR, LOOKUP, ACCESS, COMMIT: "
+                "prometheus_nfs_client_operations): slow ones are what makes ls and imports hang."
+            ),
+        ),
+        timeseries(
+            "NFS queue share by node",
+            [query("host_mount_operation:nfs_queue_share:ratio5m", "{{host}} {{mountpoint}} {{operation}}")],
+            unit="percentunit",
+            max=1,
+            legend="table",
+            calcs=("lastNotNull", "max", "mean"),
+            links=host_links("${__field.labels.host}"),
+            description=(
+                "The share of each request's time spent waiting in the node's own queue before it was "
+                "sent: high means the node is the bottleneck (its RPC slots), not the server."
+            ),
+        ),
         row("Jobs and logins"),
         timeseries(
             "Top jobs by I/O",
