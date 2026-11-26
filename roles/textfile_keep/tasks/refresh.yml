@@ -1,0 +1,44 @@
+---
+# Run textfile producers (oneshot services) now, so what a deploy changed (the producer,
+# its configuration, what it reads) shows in Prometheus at once and not at the
+# producer's next timer run: os-updates-metrics runs daily, and the source digests a
+# deploy recorded showed a day late (2026-11-26). Each one waits for the run and fails
+# the deploy when the run fails, with its journal (plugins/action/systemd_unit). A
+# producer not installed on the host (its role is off there) is left; a measurement is
+# not a change to the host, so it is never reported as one.
+#   - ansible.builtin.include_role:
+#       name: textfile_keep
+#       tasks_from: refresh
+#     vars:
+#       textfile_keep_producers: [os-updates-metrics.service]
+- name: Look up the textfile producers
+  systemd_unit:
+    name: "{{ item }}"
+  loop: "{{ textfile_keep_producers }}"
+  register: _textfile_keep_producers
+  check_mode: true  # read-only: no state requested
+  failed_when: false
+
+# A producer that keeps running (or stays active after its run) would not run again on a
+# start: a timer's service is a oneshot that ends.
+- name: Check that each producer runs and ends
+  ansible.builtin.assert:
+    that:
+      - item.status.Type | default('') == 'oneshot'
+      - item.status.RemainAfterExit | default('no') == 'no'
+    fail_msg: "{{ item.item }} is not a oneshot that ends (Type={{ item.status.Type | default('') }}); a start would not run it again."
+    quiet: true
+  loop: "{{ _textfile_keep_producers.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.status.LoadState | default('not-found') == 'loaded'
+
+- name: Run the textfile producers now
+  systemd_unit:
+    name: "{{ item.item }}"
+    state: started
+  loop: "{{ _textfile_keep_producers.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  changed_when: false
+  when: item.status.LoadState | default('not-found') == 'loaded'

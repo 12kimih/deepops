@@ -185,6 +185,18 @@
 
             [Install]
             WantedBy=multi-user.target
+          # The component record's series alone, at once (component_record starts it after
+          # it writes the record: deepops_component_record_readers).
+          components.service: |
+            # Managed by roles/os_updates.
+            [Unit]
+            Description=Publish the component record as node_exporter metrics
+
+            [Service]
+            Type=oneshot
+            TimeoutStartSec=1min
+            Environment=OS_UPDATES_COMPONENT_RECORD={{ deepops_component_record }}
+            ExecStart=/usr/local/sbin/os-updates-metrics --components {{ node_exporter_prom_dir }}
           timer: |
             # Managed by roles/os_updates.
             [Unit]
@@ -225,6 +237,15 @@
         name: os-updates-metrics.timer
         state: started
 
+    # Now, not at the timer's next run (a day off): the command or the units this run
+    # changed, and the source digests this deploy's record holds, show at once.
+    - name: Measure the pending updates now
+      ansible.builtin.include_role:
+        name: textfile_keep
+        tasks_from: refresh
+      vars:
+        textfile_keep_producers: [os-updates-metrics.service]
+
 - name: Remove the pending-updates metrics when they are off
   when: not os_updates_metrics | bool
   block:
@@ -249,7 +270,9 @@
         - /usr/local/sbin/os-updates-metrics
         - /etc/systemd/system/os-updates-metrics.service
         - /etc/systemd/system/os-updates-metrics.publish.service
+        - /etc/systemd/system/os-updates-metrics.components.service
         - /etc/systemd/system/os-updates-metrics.timer
         - /etc/apt/apt.conf.d/54deepops-os-updates-metrics
         - /var/lib/os-updates
         - "{{ node_exporter_prom_dir }}/os-updates.prom"
+        - "{{ node_exporter_prom_dir }}/os-updates-components.prom"

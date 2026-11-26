@@ -152,6 +152,14 @@ class Settle(unittest.TestCase):
     def test_a_oneshot_is_not_watched(self):
         self.assertEqual(self.watch(Type="oneshot", ActiveState="failed"), (0, "oneshot\n"))
 
+    def test_a_failed_start_of_any_unit_brings_its_journal(self):
+        # a oneshot's failure fails its start (a textfile producer a deploy runs at once)
+        failed = self.su.start_failed
+        self.assertTrue(failed({"name": "x.service", "state": "started"}, {"failed": True}))
+        self.assertTrue(failed({"name": "x", "state": "restarted"}, {"failed": True}))
+        self.assertFalse(failed({"name": "x", "state": "started"}, {"changed": True}))
+        self.assertFalse(failed({"name": "x", "state": "stopped"}, {"failed": True}))
+
     def test_only_a_started_service_is_watched(self):
         watched = self.su.watched
         self.assertTrue(watched({"name": "bot", "state": "restarted"}, {"changed": True}))

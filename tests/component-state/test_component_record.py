@@ -347,6 +347,29 @@ class RunSources(unittest.TestCase):
         self.assertEqual(self.recorded(), self.expected())
         self.assertEqual(self.recorded("b"), self.expected("b"))
 
+    def readers(self, *units, ok=True):
+        """A run whose record is the host's own (deepops_component_record), with UNITS as
+        what exports it."""
+        extra = {"deepops_component_record": "{{ record }}-{{ inventory_hostname }}",
+                 "deepops_component_record_readers": list(units)}  # fmt: skip
+        return self.play("-e", json.dumps(extra), ok=ok)
+
+    def test_a_written_record_runs_what_exports_it_and_a_converged_rerun_does_not(self):
+        # 2026-11-26: the new digests showed a day late, at the daily measurement
+        self.set_upstream("ntp.example.invalid")
+        lookup = "textfile_keep : Look up the textfile producers"
+        absent = "deepops-test-not-installed.service"
+        self.assertIn(lookup, self.readers(absent).stdout, "written: run")
+        self.assertNotIn(lookup, self.readers(absent).stdout, "unchanged: left")
+        self.set_upstream("other.example.invalid")  # a new digest alone: written, no change
+        self.assertIn(lookup, self.readers(absent).stdout)
+
+    def test_a_reader_that_is_not_a_oneshot_fails_the_run(self):
+        self.set_upstream("ntp.example.invalid")
+        done = self.readers("systemd-journald.service", ok=False)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("systemd-journald.service is not a oneshot that ends", done.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

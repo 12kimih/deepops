@@ -111,17 +111,24 @@ class ComponentTests(unittest.TestCase):
         },
     }
 
-    def series(self, record_text=None, named=True):
+    def series(self, record_text=None, named=True, *args, **stubs):
         with tempfile.TemporaryDirectory() as d:
             bin_, state, textfile = Path(d, "bin"), Path(d, "state"), Path(d, "textfile")
-            env = environment(bin_, state)
+            env = environment(bin_, state, **stubs)
             record = Path(d, "deepops_components.fact")
             if record_text is not None:
                 record.write_text(record_text)
             if named:
                 env["OS_UPDATES_COMPONENT_RECORD"] = str(record)
-            subprocess.run(["sh", str(SCRIPT), str(textfile)], env=env, check=True, capture_output=True)
-            text = (textfile / "os-updates.prom").read_text()
+            subprocess.run(
+                ["sh", str(SCRIPT), *args, str(textfile)], env=env, check=True, capture_output=True
+            )
+            packages = textfile / "os-updates.prom"
+            if packages.exists():
+                self.assertNotIn(
+                    "component", packages.read_text(), "the record's series have a file of their own"
+                )
+            text = (textfile / "os-updates-components.prom").read_text()
             return [
                 line for line in text.splitlines() if "_component_info{" in line or "_source_info{" in line
             ]
@@ -149,6 +156,15 @@ class ComponentTests(unittest.TestCase):
                 'os_updates_component_source_info{component="component_record",source="rrrr"} 1',
                 'os_updates_component_source_info{component="enroot",source="aaaa"} 1',
             ],
+        )
+
+    def test_the_record_alone_is_published_at_once_without_measuring(self):
+        # what component_record runs after each write: no package tool is asked
+        never = "echo asked >&2; exit 1\n"
+        stubs = {"apt-get": never, "apt": never, "dpkg": never, "dpkg-query": never}
+        self.assertEqual(
+            self.series(json.dumps(self.RECORD), True, "--components", **stubs),
+            self.series(json.dumps(self.RECORD)),
         )
 
     def test_no_record_or_a_broken_one_is_no_series_and_no_failure(self):
@@ -182,10 +198,12 @@ class BootRepublishTests(unittest.TestCase):
             self.assertEqual(before["os_updates_reboot_required"], "1")
             flag.unlink()
             (run / "os-updates-reboot-required-since").unlink()  # /run is empty after a reboot
+            (textfile / "os-updates-components.prom").unlink()  # the textfile tmpfs is empty too
             after = published("--publish")
             self.assertEqual(
                 after, {"os_updates_reboot_required": "0", "os_updates_reboot_required_since_seconds": "0"}
             )
+            self.assertTrue((textfile / "os-updates-components.prom").exists(), "both files go back")
 
 
 if __name__ == "__main__":

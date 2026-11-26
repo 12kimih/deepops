@@ -51,7 +51,8 @@ os_updates_allowed_holds: []
 # per installed package for the fleet drift alert, and from the host's component record
 # os_updates_component_info (each component's version) and os_updates_package_component_info
 # (each package's component), so the drift alerts name the playbook that levels it),
-# measured daily, after every dpkg run
-# and at every boot (the kept state from /var/lib/os-updates first), so updates that wait for a maintenance
-# window cannot pile up unseen. Debian family. false removes the timer.
+# measured daily, after every dpkg run, at every boot (the kept state from
+# /var/lib/os-updates first) and at the end of each deploy of the role; the component
+# series (a file of their own) also each time a deploy writes the record. So updates
+# that wait for a maintenance window cannot pile up unseen. Debian family. false removes the timer.
 os_updates_metrics: true

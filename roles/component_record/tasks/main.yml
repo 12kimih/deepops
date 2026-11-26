@@ -214,3 +214,27 @@
     role: "{{ component_record_role }}"
     source: "{{ _digests.get(component_record_name, '') }}"
     record_source: "{{ _digests.get('component_record', '') }}"
+  register: component_record_recorded
+
+# What exports the record runs now (deepops_component_record_readers), so the deploy
+# shows in Prometheus at once, not at the next daily measurement. Only for the record
+# this role keeps: one at another path (a test's) has no readers.
+# Resolved here: deepops_paths is this role's dependency, not textfile_keep's.
+- name: Name what exports the record
+  ansible.builtin.set_fact:
+    _component_record_readers: "{{ deepops_component_record_readers }}"
+  when:
+    - component_record_action != 'begin'  # what is there until the deploy ends stays shown
+    - component_record_recorded.written | default(false)
+    - component_record_path == deepops_component_record
+
+- name: Export the record now
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: refresh
+  vars:
+    textfile_keep_producers: "{{ _component_record_readers }}"
+  when:
+    - component_record_action != 'begin'  # what is there until the deploy ends stays shown
+    - component_record_recorded.written | default(false)
+    - component_record_path == deepops_component_record
