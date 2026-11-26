@@ -97,6 +97,31 @@ class Commands(unittest.TestCase):
         home = home_blocks.home("alice", False, {"project"}, "/cl", "foot")
         self.assertIn("`/cl project`", str(home), "the Home tab's list is the same help")
 
+    def test_help_and_home_list_the_cluster_commands_with_their_own_summaries(self):
+        # 2026-11-27: the help named only /cluster subcommands, never sq or disk-usage
+        import importlib
+
+        names = ["sq", "disk-usage"]
+        text = commands.help_lines("/cluster", set(), footer="foot", cluster=names)
+        for name in names:
+            summary = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}").COMMAND.summary_ko
+            self.assertTrue(summary, f"{name} has a Korean summary")
+            self.assertIn(f"`{name}`: {summary}", text)
+        self.assertTrue(text.endswith("foot"))
+        self.assertNotIn("로그인 노드의 명령", commands.help_lines("/cluster", set()), "none: no heading")
+        home = home_blocks.home("alice", False, set(), cluster=names)
+        self.assertIn("'text': 'disk-usage', 'style': {'code': True}", str(home))
+
+    def test_every_published_command_has_a_korean_summary(self):
+        import importlib
+
+        import yaml
+
+        builtin = yaml.safe_load((ROOT / "roles/cluster_tools_defaults/defaults/main.yml").read_text())
+        for name in builtin["cluster_tools_builtin"]:
+            command = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}").COMMAND
+            self.assertTrue(command.summary_ko, name)
+
     def test_the_home_tab_opens_each_service_the_config_gives_an_address(self):
         web = home_blocks.links(
             {"portal_url": "https://portal.example/", "dashboard_url": "", "docs_url": "https://d/"}

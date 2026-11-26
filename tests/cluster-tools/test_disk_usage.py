@@ -22,7 +22,8 @@ class FakePrometheus:
         self.asked.append(expr)
         if self.error:
             raise PrometheusError(self.error)
-        metric, selector = re.search(r"(\w+)\{([^}]*)\}", expr).groups()
+        found = re.search(r"(\w+)\{([^}]*)\}", expr) or re.search(r"\((\w+)\)()", expr)
+        metric, selector = found.groups()
         want = dict(MATCHER.findall(selector))
         return [
             {"metric": {k: v for k, v in s.items() if k != "value"}, "value": [0, str(s["value"])]}
@@ -73,6 +74,10 @@ SERIES = merged(
             {"host": "nfs1", "filesystem": "/home", "path": "/home/kim/big", "user": "kim", "value": 90},
             {"host": "nfs1", "filesystem": "/home", "path": "/home/lee/x", "user": "lee", "value": 90},
         ],
+        "disk_cleanup_scan_timestamp_seconds": [
+            {"host": "nfs1", "filesystem": "/home", "value": 1_795_000_000},
+            {"host": "scratch1", "filesystem": "/scratch", "value": 1_795_500_000},
+        ],
         "io_usage_job_read_bytes_total": [
             {"host": "gpu1", "job_id": "11", "user": "kim", "value": 3 * 2**30},
             {"host": "gpu2", "job_id": "12", "user": "kim", "value": 2**20},
@@ -97,7 +102,8 @@ class QueryTests(unittest.TestCase):
         disk_usage.collect(api, 'a"b', 24, 10)
         self.assertTrue(api.asked)
         for expr in api.asked:
-            self.assertIn('user="a\\"b"', expr)
+            if expr != disk_usage.SCANNED:  # when a filesystem was scanned: everyone's
+                self.assertIn('user="a\\"b"', expr)
 
     def test_the_io_window_is_the_hours_asked(self):
         api = FakePrometheus(SERIES)
@@ -163,6 +169,15 @@ class RenderTests(unittest.TestCase):
         self.assertRegex(text, r"/home/kim/big\s+1T\s+90d\s+nfs1:/home")
         self.assertRegex(text, r"12\s+gpu2\s+1M\s+5G")
         self.assertRegex(text, r"I/O of logins\s+last 24h\s+none")
+
+    def test_the_folders_say_when_their_filesystem_was_scanned(self):
+        # 2026-11-27: the help said "the last daily scan"; the home filesystem's is weekly
+        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 24, 10)
+        self.assertEqual(data["scans"][0], {"where": "nfs1:/home", "time": 1_795_000_000})
+        text = disk_usage.render(data, self.theme())
+        self.assertIn(f"scanned nfs1:/home {disk_usage._when(1_795_000_000)}", text)
+        self.assertNotIn("scratch1:/scratch 20", text, "only the filesystems whose folders are shown")
+        self.assertNotIn("daily scan", disk_usage.COMMAND.help(True))
 
     def test_past_a_level_is_painted(self):
         self.assertEqual(disk_usage._level(5, 4, 10), "warn")

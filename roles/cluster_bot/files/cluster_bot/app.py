@@ -154,6 +154,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             cfg["channels"]["help"],
             cfg.get("admin_group", ""),
             home_blocks.links(cfg.get("connect") or {}),
+            cfg.get("cluster_commands") or [],
         )
         if project is not None:
             view["blocks"] += projects_blocks.home(login, projects, projects_root)
@@ -317,7 +318,8 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         client.chat_postEphemeral(
             channel=body["channel_id"], user=body["user_id"],
             **rich.message(commands.help_lines(
-                command, engine.features, home_blocks.help_text(channels["help"], cfg.get("admin_group", ""))
+                command, engine.features, home_blocks.help_text(channels["help"], cfg.get("admin_group", "")),
+                cfg.get("cluster_commands") or [],
             )),
         )  # fmt: skip
 

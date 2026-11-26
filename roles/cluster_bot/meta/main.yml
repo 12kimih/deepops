@@ -13,6 +13,7 @@ dependencies:
   - role: directory_defaults  # directory_groups (GIDs a new project avoids)
   - role: cluster_info_defaults  # cluster_info (login host, SSH port, guide)
   - role: open_ondemand_defaults  # open_ondemand_url, the portal in the onboarding text
+  - role: cluster_tools_defaults  # cluster_tools_commands (the help lists them)
 
 galaxy_info:
   namespace: deepops
