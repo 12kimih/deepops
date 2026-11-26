@@ -39,22 +39,32 @@ class FakeChannel:
     """A fake cluster_tools.slack.Slack over channels of messages, for what the bot keeps
     up to date (cluster_tools.slack.keep): posts, replies, edits, deletes and pins, with
     message metadata and the bot's IDs as Slack reports them. A name (#x) is channel "C" +
-    x upper-cased. NO_HISTORY: the history scopes are missing (the manifest not imported)."""
+    x upper-cased. NO_HISTORY: the history scopes are missing (the manifest not imported).
+    The bot's posts carry its user (USER), as Slack's do; another poster's carry the USER
+    given (none: an incoming webhook's) and what else Slack shows (EXTRA: attachments,
+    subtype, username). A post with replies shows reply_count in the history.
+    REFUSE: the ts chat.delete answers cant_delete_message."""
 
     BOT = ("B1", "A1")
+    USER = "UBOT"
 
     def __init__(self, no_history=False):
         self.messages, self.pins, self.log, self.no_history, self.n = [], set(), [], no_history, 0
+        self.refuse = set()
 
     @staticmethod
     def cid(channel):
         return "C" + channel[1:].upper() if channel.startswith("#") else channel
 
-    def add(self, text, channel="CADMIN", bot=BOT, metadata=None, thread_ts=None, blocks=None):
+    def add(
+        self, text, channel="CADMIN", bot=BOT, metadata=None, thread_ts=None, blocks=None, user=None, **extra
+    ):
         self.n += 1
         ts = f"{1000 + self.n}.0"
+        user = user or (self.USER if bot == self.BOT else None)
         self.messages.append({"ts": ts, "channel": self.cid(channel), "text": text, "blocks": blocks or [],
                               "bot_id": bot[0], "app_id": bot[1], "thread_ts": thread_ts or ts,
+                              **({"user": user} if user else {}), **extra,
                               **({"metadata": metadata} if metadata else {})})  # fmt: skip
         return ts
 
@@ -81,7 +91,7 @@ class FakeChannel:
         from cluster_tools.slack import Error
 
         if method == "auth.test":
-            return {"ok": True, "bot_id": self.BOT[0]}
+            return {"ok": True, "bot_id": self.BOT[0], "user_id": self.USER}
         if method == "bots.info":
             return {"ok": True, "bot": {"app_id": self.BOT[1]}}
         if method == "conversations.list":
@@ -90,7 +100,9 @@ class FakeChannel:
         if method == "conversations.history":
             self._scope()
             shown = sorted(self.posts(p["channel"]), key=lambda m: -float(m["ts"]))
-            return {"ok": True, "messages": [{**m, **({"pinned_to": [m["channel"]]} if m["ts"] in self.pins else {})} for m in shown]}  # fmt: skip
+            return {"ok": True, "messages": [{**m, **({"pinned_to": [m["channel"]]} if m["ts"] in self.pins else {}),
+                                              **({"reply_count": n} if (n := len(self.thread(m["ts"]))) else {})}
+                                             for m in shown]}  # fmt: skip
         if method == "conversations.replies":
             self._scope()
             if not any(m["ts"] == p["ts"] for m in self.messages):
@@ -100,6 +112,8 @@ class FakeChannel:
         if method == "chat.delete":
             if not any(m["ts"] == p["ts"] for m in self.messages):
                 raise Error("Slack chat.delete failed: message_not_found")
+            if p["ts"] in self.refuse:
+                raise Error("Slack chat.delete failed: cant_delete_message")
             self.messages = [m for m in self.messages if m["ts"] != p["ts"]]
         elif method in ("pins.add", "pins.remove"):
             return pins_call(self.pins, method, p)

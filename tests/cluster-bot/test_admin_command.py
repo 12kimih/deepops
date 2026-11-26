@@ -1,5 +1,5 @@
 """roles/cluster_bot: the administrators' command (cluster-bot.j2, `sudo cluster-bot
-notices [--dry-run]`) runs the bot's code with the interpreter, path, config and user of
+notices|tidy [--dry-run]`) runs the bot's code with the interpreter, path, config and user of
 the bot's unit, both rendered from the same role vars. Before, the owner was handed a
 line of internal paths copied from the unit, which drifts when the unit changes."""
 
@@ -39,7 +39,11 @@ class AdminCommand(unittest.TestCase):
         self.assertEqual(argv[:5], ["runuser", "-u", user, "--", "env"])
         self.assertEqual(argv[5], f"PYTHONPATH={path}")
         self.assertEqual(argv[6], exec_start[0], "the interpreter")
-        self.assertEqual(argv[7:10], ["-m", "cluster_bot.notices", exec_start[-1]], "the config")
+        self.assertEqual(argv[7:10], ["-m", "$module", exec_start[-1]], "the config")
+        # Each subcommand is the bot's module of that name.
+        self.assertIn('notices|tidy) module="cluster_bot.$1"', script)
+        for sub in ("notices", "tidy"):
+            self.assertTrue((ROOT / f"roles/cluster_bot/files/cluster_bot/{sub}.py").is_file())
         self.assertEqual(exec_start[1:3], ["-m", "cluster_bot.app"])
 
     def test_it_says_its_usage_and_wants_root(self):
@@ -51,9 +55,10 @@ class AdminCommand(unittest.TestCase):
             self.assertEqual(run().returncode, 2)
             self.assertEqual(run("bogus").returncode, 2)
             if os.geteuid() != 0:
-                done = run("notices", "--dry-run")
-                self.assertEqual(done.returncode, 1)
-                self.assertIn("sudo", done.stderr)
+                for sub in ("notices", "tidy"):
+                    done = run(sub, "--dry-run")
+                    self.assertEqual(done.returncode, 1)
+                    self.assertIn("sudo", done.stderr)
 
     def test_the_role_installs_it_and_records_it(self):
         tasks = (ROOT / "roles/cluster_bot/tasks/present.yml").read_text()
