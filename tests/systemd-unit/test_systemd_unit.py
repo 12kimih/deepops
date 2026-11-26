@@ -91,6 +91,77 @@ class OrderingCycles(unittest.TestCase):
         self.assertEqual(ordering_cycles("foo.service:7: Unknown key name 'Foo'\n"), [])
 
 
+FAKE_SYSTEMCTL = """#!/bin/sh
+# systemctl show -P PROP UNIT: PROP's next value from $FAKE/PROP (one line a call, the
+# last repeated), as a unit's state moves while it is watched.
+[ "$1" = show ] || exit 1
+f="$FAKE/$3"; n="$FAKE/.$3.n"
+i=$(cat "$n" 2>/dev/null || echo 1); echo $((i + 1)) > "$n"
+line=$(sed -n "${i}p" "$f"); [ -n "$line" ] || line=$(tail -n 1 "$f")
+echo "$line"
+"""
+
+
+class Settle(unittest.TestCase):
+    """2026-11-26: the cluster bot failed at import on every start; systemd said
+    started, the deploy said ok, and it restarted 40 times."""
+
+    def setUp(self):
+        sys.path.insert(0, str(ROOT / "plugins" / "action"))
+        import systemd_unit
+
+        self.su = systemd_unit
+
+    def watch(self, **props):
+        with tempfile.TemporaryDirectory() as fake:
+            for tool, text in (
+                ("systemctl", FAKE_SYSTEMCTL),
+                ("journalctl", "#!/bin/sh\necho 'ModuleNotFoundError: No module named days'\n"),
+            ):
+                path = Path(fake) / tool
+                path.write_text(text)
+                path.chmod(0o755)
+            for prop, values in {
+                "Type": "simple",
+                "NRestarts": "0",
+                "SubState": "running",
+                "ActiveState": "active",
+                **props,
+            }.items():
+                Path(fake, prop).write_text(values + "\n")
+            env = {"PATH": f"{fake}:/usr/bin:/bin", "FAKE": fake}
+            done = subprocess.run(["sh", "-c", self.su.SETTLE_SCRIPT, "sh", "x.service", "3"], env=env,
+                                  capture_output=True, text=True, timeout=bounds.CHILD)  # fmt: skip
+            return done.returncode, done.stdout
+
+    def test_a_service_that_stays_up_passes(self):
+        rc, out = self.watch()
+        self.assertEqual((rc, out.strip()), (0, "active/running"))
+        self.assertIsNone(self.su.settle_failure(rc, out))
+
+    def test_a_restart_loop_fails_with_its_journal(self):
+        rc, out = self.watch(ActiveState="activating", SubState="auto-restart")
+        failure = self.su.settle_failure(rc, out)
+        self.assertEqual(failure["state"], "activating/auto-restart")
+        self.assertIn("No module named days", failure["journal"][0])
+
+    def test_a_restart_while_watched_fails(self):
+        rc, out = self.watch(NRestarts="0\n0\n1")
+        self.assertEqual(self.su.settle_failure(rc, out)["state"], "restarted 1 time(s)")
+
+    def test_a_oneshot_is_not_watched(self):
+        self.assertEqual(self.watch(Type="oneshot", ActiveState="failed"), (0, "oneshot\n"))
+
+    def test_only_a_started_service_is_watched(self):
+        watched = self.su.watched
+        self.assertTrue(watched({"name": "bot", "state": "restarted"}, {"changed": True}))
+        self.assertTrue(watched({"name": "bot.service", "state": "started"}, {"changed": True}))
+        self.assertFalse(watched({"name": "bot", "state": "started"}, {"changed": False}), "already running")
+        self.assertFalse(watched({"name": "x.timer", "state": "started"}, {"changed": True}))
+        self.assertFalse(watched({"name": "bot", "state": "stopped"}, {"changed": True}))
+        self.assertFalse(watched({"name": "bot", "state": "restarted"}, {"changed": True, "failed": True}))
+
+
 @unittest.skipUnless(Path("/run/systemd/system").is_dir(), "needs systemd")
 class SystemdUnit(unittest.TestCase):
     def test_a_unit_not_installed_yet_is_previewed(self):
