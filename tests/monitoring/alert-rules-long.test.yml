@@ -476,3 +476,43 @@ tests:
             exp_annotations:
               summary: "/home/shared/datasets on nfs is past its warn level"
               description: "Nothing is refused yet: only the hard limit stops writes. Free space there, or raise its block_hard in disk_quota_projects."
+  - name: a GPU node not diagnosed for four weeks of running diagnostics is overdue
+    interval: 1d
+    input_series:
+      - series: 'slurm_gpu_configured{host="m1",instance="m1:9100",node="g1",gpu_type="a10"}'
+        values: '8x40'
+      - series: 'slurm_gpu_configured{host="m1",instance="m1:9100",node="g2",gpu_type="a10"}'
+        values: '8x40'
+      - series: 'gpu_diag_idle_node_last_success_timestamp_seconds{host="m1",instance="m1:9100",node="g2"}'
+        values: '3369600x40'
+      - series: 'gpu_diag_idle_since_seconds{host="m1",instance="m1:9100"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 20d
+        alertname: GpuDiagOverdue
+      - eval_time: 40d
+        alertname: GpuDiagOverdue
+        exp_alerts:
+          - exp_labels: {node: g1, severity: warning}
+            exp_annotations:
+              summary: "g1's GPUs have not been diagnosed for four weeks"
+              description: >-
+                No weekly pass found it idle. Run the diagnostics in a quiet hour
+                (playbooks/utilities/gpu-diag.yml -e hostlist=g1 drains it first).
+  - name: the weekly pass stopping is reported; before the first pass nothing is
+    interval: 1d
+    input_series:
+      - series: 'gpu_diag_idle_last_success_timestamp_seconds{host="m1",instance="m1:9100"}'
+        values: '1x12'
+      - series: 'gpu_diag_idle_last_success_timestamp_seconds{host="m2",instance="m2:9100"}'
+        values: '0x12'
+    alert_rule_test:
+      - eval_time: 5d
+        alertname: GpuDiagNotRunning
+      - eval_time: 10d
+        alertname: GpuDiagNotRunning
+        exp_alerts:
+          - exp_labels: {host: m1, instance: "m1:9100", severity: warning}
+            exp_annotations:
+              summary: "The weekly DCGM diagnostics have not run for 8 days on m1"
+              description: "`systemctl list-timers gpu-diag-idle*` and `journalctl -u gpu-diag-idle` on m1."

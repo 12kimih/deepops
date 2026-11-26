@@ -36,6 +36,9 @@ def run(args, cwd, mounts=()):
             "--rm",
             "-u",
             f"{os.getuid()}:{os.getgid()}",
+            # The CPUs scripts/check.sh gives a step (GOMAXPROCS=1), which a container
+            # does not inherit: without it promtool took every core.
+            *(["--env", "GOMAXPROCS"] if "GOMAXPROCS" in os.environ else []),
             *binds,
             "-w",
             str(Path(cwd).resolve()),
