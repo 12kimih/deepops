@@ -80,8 +80,8 @@ def new_form(places):
     people = {"type": "multi_users_select", "placeholder": {"type": "plain_text", "text": "Slack에서 고르기"}}
     return _modal("project.new.submit", "새 공동작업 폴더", [
         field("name", "이름 (영문 소문자, 숫자, -)", {"type": "plain_text_input", "max_length": 27}),
-        field("purpose", "무엇을 위한 폴더인가요", {"type": "plain_text_input"}, optional=True),
-        field("place", "어디에 둘까요", {"type": "radio_buttons", "initial_option": _option(names["home"], "home"),
+        field("purpose", "폴더 설명", {"type": "plain_text_input"}, optional=True),
+        field("place", "위치", {"type": "radio_buttons", "initial_option": _option(names["home"], "home"),
                                         "options": [_option(names[p], p) for p in names]}),
         field("owners", "함께 맡을 사람 (소유자)", people, optional=True),
         field("members", "멤버 (읽고 쓰기)", people, optional=True),
@@ -134,7 +134,7 @@ def purpose_form(name, purpose):
     if purpose:
         element["initial_value"] = purpose
     return _modal("project.purpose.submit", f"{name}: 설명", [
-        field("purpose", "무엇을 위한 폴더인가요 (비우면 지움)", element, optional=True),
+        field("purpose", "폴더 설명 (비우면 지움)", element, optional=True),
     ], submit="저장", metadata=name)  # fmt: skip
 
 

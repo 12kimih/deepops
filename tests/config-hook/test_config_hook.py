@@ -31,7 +31,7 @@ ENV = {
     "GIT_COMMITTER_EMAIL": "t@example.invalid",
 }
 
-# Stand-ins for the hook's two checks. generate.py --check --site: the committed page
+# Stand-ins for the hook's checks (terms.py --site has its own test, slack-text). generate.py --check --site: the committed page
 # (DEEPOPS_SITE_REV, the staged tree) states this deepops' facts.
 LINT = "import sys\nsys.exit(0)\n"
 GENERATE = """import os, pathlib, subprocess, sys
@@ -69,6 +69,7 @@ class ConfigHook(unittest.TestCase):
         for name in ("config-pre-commit.sh", "export-tree.sh"):
             shutil.copy(ROOT / "scripts" / "deepops" / name, scripts / "deepops" / name)
         (scripts / "deepops" / "config_lint.py").write_text(LINT)
+        (scripts / "deepops" / "terms.py").write_text(LINT)
         (scripts / "docs" / "generate.py").write_text(GENERATE)
         (self.shared / "facts").write_text("old\n")
         git(self.shared, "add", "-A")

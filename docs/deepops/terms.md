@@ -2,19 +2,40 @@
 
 Everything people read from the cluster in Korean (Slack messages, DMs, the bot, the
 usage and disk reports, alerts, comments, the admin docs and the user docs) uses one word
-for each thing. The list is `scripts/deepops/terms_ko.yml`: each entry names the word to
-use, the variants refused (regular expressions over a line, always phrases, so a common
-verb in its own sense passes), why, and optionally a scope (path prefixes the entry
-applies to, such as the bot's `roles/cluster_bot/`).
+for each thing. The list is `scripts/deepops/terms_ko.yml`. Under `terms`, each entry
+names:
 
-- `tests/slack-text/test_terms.py` refuses a variant in any tracked file of this
-  repository and of the site config (`DEEPOPS_CONFIG_DIR`, or `config/`), so the push
-  check covers both.
-- `scripts/deepops/terms.py` prints each offending line (`scripts/deepops/terms.py`, or
-  with paths to check just those).
-- `scripts/docs/site_facts.py` exports the list (`terms` in the public `site.json`), and
-  the user docs' own test applies it to their pages, snippets and Slack canvases.
+- `use`: the word in a sentence, and `not`: the variants refused anywhere (regular
+  expressions over a line, always phrases, so a common verb in its own sense passes);
+- `title`: its form in a title, where that differs (titles are nouns, sentences stay
+  descriptive: `GPU 유휴 잡` in a heading, `할당받은 GPU를 쓰지 않는 잡` in a sentence),
+  and `title_not`: phrases refused in titles only (`하는 일` is `역할` in a table header);
+- `code`: the constants code sends the two forms through (`usage_report.IDLE_JOB`,
+  `IDLE_JOB_TITLE`), so a title may not interpolate the sentence constant, nor a
+  sentence the title one;
+- `why`, and optionally `scope`: path prefixes the entry applies to (the bot's
+  `roles/cluster_bot/`).
 
-To change a word, edit its entry and the texts in the same commit; the test lists every
-line still using the old one. A word code sends from one constant (such as
-`usage_report.IDLE_JOB`) has a test that the constant equals its entry.
+Under `titles`, `endings` refuses a sentence ending (-다, -요, -까, -죠) at the end of a
+title, and `exempt` lists files whose titles may be sentences, each with why. Today one:
+the user docs' troubleshooting page, whose headings are the readers' own questions
+(FAQ). Notice titles are not exempt: they are nouns (`사용 규정 변경 안내`).
+
+A title is, by format: a Markdown heading, a bold-only line or a list item's bold lead,
+a table header row, a Slack guide's `title`, `table` and `bookmark` (front matter of
+`slack/*.md`); in Python a Slack header block, a modal title, a `**bold**` lead in a
+string, a form field's label, a button and a `table()` header; a Grafana dashboard's or
+panel's `title`; an alert's `summary`. Code blocks hold no titles.
+
+Each repository checks its own files at its own commit, so none waits on another's
+checkout:
+
+- deepops: `tests/slack-text/test_terms.py` (every tracked file);
+- the site config: its commit hook (`scripts/deepops/config-pre-commit.sh`) runs
+  `scripts/deepops/terms.py --site` over the staged tree;
+- the user docs: `scripts/docs/site_facts.py` exports the list (`terms` and `titles` in
+  the public `site.json`) and their own test applies it.
+
+`scripts/deepops/terms.py` prints each offending line (with paths, just those). To change
+a word, edit its entry and the texts in the same commit; the check lists every line
+still using the old one.

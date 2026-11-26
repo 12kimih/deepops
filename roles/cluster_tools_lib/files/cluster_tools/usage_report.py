@@ -63,6 +63,10 @@ from .vocab import job_holds, node_unavailable
 # idle the whole window (the rule is in the text beside it). Without "allocated" it
 # reads as a CPU-only job (owner, 2026-11-27); tests/slack-text/test_terms.py guards it.
 IDLE_JOB = "할당받은 GPU를 쓰지 않는 잡"
+# Its title form, in a card field or a section heading: titles are nouns (owner, 2026-11-27).
+IDLE_JOB_TITLE = "GPU 유휴 잡"
+# A drained or down node: in sentences what it means, in a title its noun.
+DOWN_TITLE = "중단 노드"
 NOTIFY = {"mention", "dm"}
 # The fields a DM text may use: the person's jobs, one line each, how many, the hours.
 DM_FIELDS = {"jobs": "- `1234_5` (GPU 8장, 1:00:00 실행 중)", "count": 1, "hours": "2"}
@@ -314,9 +318,9 @@ def summary_card(report):
     fields = [
         f"**할당된 GPU**\n{alloc} / {total}장 ({100 * alloc / total:.0f}%)",
         f"**평균 사용률**\n{avg}",
-        f"**{IDLE_JOB}**\n{len(idle)}개" + (" :zzz:" if idle else ""),
+        f"**{IDLE_JOB_TITLE}**\n{len(idle)}개" + (" :zzz:" if idle else ""),
         f"**대기 중인 잡**\n{pend_jobs}개, GPU {pend_gpus}장",
-        f"**쓸 수 없는 노드 (drain, down)**\n{len(report['reasons'])}대"
+        f"**{DOWN_TITLE} (drain, down)**\n{len(report['reasons'])}대"
         + (" :warning:" if report["reasons"] else ""),
     ]
     footer = "자세한 내용은 스레드에 있습니다"
@@ -334,7 +338,7 @@ def idle_section(idle, cfg, due, who):
     if not idle:
         return []
     rule = f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게"
-    lines = [f":zzz: **{IDLE_JOB}**  _{rule}_"]
+    lines = [f":zzz: **{IDLE_JOB_TITLE}**  _{rule}_"]
     owners = by_owner(idle)
     for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
         told = "mention" in cfg["notify"] and user in due
@@ -355,7 +359,7 @@ def nodes_section(reasons):
         return []
     rows = [(n, st, since.replace("T", " ")[:16], u, why) for n, st, since, u, why in reasons]
     return sections(
-        ":warning: **쓸 수 없는 노드 (drain, down)**\n"
+        f":warning: **{DOWN_TITLE} (drain, down)**\n"
         + table(("노드", "상태", "언제부터", "누가", "사유"), rows)
     )
 

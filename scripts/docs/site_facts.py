@@ -23,8 +23,10 @@ Facts:
   messages  how the submit holds' refusals begin (cluster_tools.submit_holds): hold_ended
             (past the membership's end), hold_disk (at a disk hard limit)
   terms     the Korean glossary (scripts/deepops/terms_ko.yml, scripts/deepops/terms.py):
-            each entry's word to use, the variants refused, why, and its scope, so the
-            user docs' own test refuses the same variants
+            each entry's word to use, its title form, the variants refused (anywhere, or
+            in titles only), why, and its scope; titles, the title rules (the sentence
+            endings a title may not have, the files exempt), so the user docs' own test
+            applies the same list
   storage   each measured filesystem's speeds (io_fairness_models, its model): read_bps
             and write_bps (sequential, bytes a second), read_iops and write_iops (random)
   services  what the cluster runs that the pages describe, so none says a service is coming
@@ -168,7 +170,8 @@ PUBLIC = {
     "schedules": {"scratch_purge"},
     "messages": {"hold_ended", "hold_disk"},
     "storage": None,  # each measured mount, its fields STORAGE_FIELDS
-    "terms": {"use", "not", "why", "scope", "id"},  # every glossary entry
+    "terms": {"use", "title", "not", "title_not", "why", "scope", "id", "code"},  # every glossary entry
+    "titles": {"endings", "exempt"},  # the glossary's title rules
 }
 STORAGE_FIELDS = {
     "read_bps": "rbps",
@@ -619,6 +622,7 @@ def facts(config):
         "messages": {"hold_ended": submit_holds.ENDED, "hold_disk": submit_holds.DISK_HELD},
         "storage": storage(s),
         "terms": terms.public(terms.load()),
+        "titles": terms.public_titles(terms.load()),
         "slurm": slurm_values(config),
         "dates": schedule(config),
         "quota": quota_limits(config, s),

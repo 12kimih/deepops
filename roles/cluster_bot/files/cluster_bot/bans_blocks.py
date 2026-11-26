@@ -18,7 +18,7 @@ def unban_form():
                 "공인 IP 주소를 적어 주세요. 그 네트워크에서 웹 브라우저로 \"what is my ip\"를 검색하면 나옵니다. "
                 "관리자가 확인한 뒤 풀어 드립니다."),
             field("ip", "IP 주소", {"type": "plain_text_input", "placeholder": {"type": "plain_text", "text": "203.0.113.7"}}),
-            field("reason", "어떤 상황이었나요?", {"type": "plain_text_input", "multiline": True}),
+            field("reason", "상황", {"type": "plain_text_input", "multiline": True}),
         ],
     }  # fmt: skip
 

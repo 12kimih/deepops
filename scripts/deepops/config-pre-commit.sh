@@ -3,7 +3,8 @@
 # settings checks of scripts/deepops/config_lint.py run on what is being committed, so
 # a value a deploy would refuse (a retired setting, a removal the registry does not
 # know, a setting nothing reads) never reaches the clone deploys run from; and its
-# pages' generated blocks (scripts/docs/generate.py) must match the settings committed.
+# pages' generated blocks (scripts/docs/generate.py) must match the settings committed,
+# and its texts keep the Korean glossary (scripts/deepops/terms.py --site).
 #
 # Both sides are read as committed: the site at its staged tree, deepops in a throwaway
 # worktree, so work in progress in either clone blocks no one's commit. The deepops is
@@ -41,3 +42,5 @@ cd "${work}/deepops"
 export DEEPOPS_CONFIG_DIR="${site}" DEEPOPS_SITE_REV="${tree}"
 "${deepops}/.venv/bin/python" scripts/deepops/config_lint.py redundant dead shadow retired removals
 "${deepops}/.venv/bin/python" scripts/docs/generate.py --check --site
+# The Korean glossary over the site's own files as staged (deepops checks its own).
+"${deepops}/.venv/bin/python" scripts/deepops/terms.py --site
