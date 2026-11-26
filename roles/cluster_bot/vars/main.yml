@@ -9,6 +9,12 @@ _cluster_bot_venv_steps:
       slack_sdk=={{ cluster_bot_slack_sdk_version }} --hash=sha256:{{ cluster_bot_sha256.slack_sdk[cluster_bot_slack_sdk_version] }}
       ruamel.yaml=={{ cluster_bot_ruamel_yaml_version }} --hash=sha256:{{ cluster_bot_sha256.ruamel_yaml[cluster_bot_ruamel_yaml_version] }}
 _cluster_bot_lib: "{{ _cluster_bot_prefix }}/lib"
+# The roster module (plugins/filter/people.py, the very file the deploy uses) and every
+# in-tree module it imports, installed side by side in the bot's package by these names:
+# shipped alone, its import of days failed and the bot never started (2026-11-26).
+_cluster_bot_roster_modules:
+  people_roster.py: people.py
+  days.py: days.py
 # How the bot's Python runs: its unit and the administrators' command (cluster-bot.j2)
 # both take these, so the two never name a different interpreter, path or config.
 _cluster_bot_python: "{{ _cluster_bot_venv }}/bin/python"

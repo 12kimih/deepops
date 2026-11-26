@@ -93,13 +93,16 @@
 
 # The roster's checks and editors, the very file the deploy and people.py use: account
 # requests edit the roster as an administrator would.
-- name: Install the roster module
+- name: Install the roster module and what it imports
   ansible.builtin.copy:
-    src: "{{ role_path }}/../../plugins/filter/people.py"
-    dest: "{{ _cluster_bot_lib }}/cluster_bot/people_roster.py"
+    src: "{{ role_path }}/../../plugins/filter/{{ item.value }}"
+    dest: "{{ _cluster_bot_lib }}/cluster_bot/{{ item.key }}"
     owner: root
     group: root
     mode: "0644"
+  loop: "{{ _cluster_bot_roster_modules | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
   notify: Restart the cluster bot
 
 - name: Write the GitHub App's private key

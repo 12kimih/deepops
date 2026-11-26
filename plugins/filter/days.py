@@ -14,8 +14,6 @@ the roster's days through here too. Anything else is an error naming it.
 import datetime
 import time
 
-from ansible.errors import AnsibleFilterError
-
 
 def parse(value):
     """VALUE (a date, a datetime, "YYYY-MM-DD" or empty) as a datetime.date, or None.
@@ -35,6 +33,10 @@ def _parsed(value):
     try:
         return parse(value)
     except (TypeError, ValueError) as e:
+        # Imported here: the module runs without Ansible too, shipped beside the roster
+        # module in the cluster bot (roles/cluster_bot), where only parse() is used.
+        from ansible.errors import AnsibleFilterError
+
         raise AnsibleFilterError(f"{value!r} is not a day (YYYY-MM-DD): {e}") from None
 
 
