@@ -50,7 +50,10 @@ class SlackTests(unittest.TestCase):
         self.assertEqual(slack.member(client, "c", {}, "", cache), "")
 
     ANSWERS = {"conversations.open": {"ok": True, "channel": {"id": "D9"}}, "chat.postMessage": {"ok": True, "ts": "1.2", "channel": "C42"},
-               "chat.getPermalink": {"ok": True, "permalink": "https://x/p1"}, "chat.update": {"ok": True}}  # fmt: skip
+               "chat.getPermalink": {"ok": True, "permalink": "https://x/p1"}, "chat.update": {"ok": True},
+               "conversations.list": {"ok": True, "channels": [{"name": "alerts", "id": "C42"}]},
+               "auth.test": {"ok": True, "bot_id": "B1"}, "bots.info": {"ok": True, "bot": {"app_id": "A1"}},
+               "conversations.history": {"ok": True, "messages": []}}  # fmt: skip
 
     def posts(self, client):
         return [(p["channel"], p["text"]) for m, p in client.calls if m == "chat.postMessage"]
@@ -75,7 +78,7 @@ class SlackTests(unittest.TestCase):
             day = time.strftime("%Y-%m-%d")
             self.assertEqual(posts[0][:2], ("chat.postMessage", "D9"))
             self.assertEqual(posts[0][2], "Your disk use is high.\nMore.")  # the DM as written
-            self.assertEqual(posts[1], ("chat.postMessage", "#alerts", slack.dm_log_title(day, 0), None))
+            self.assertEqual(posts[1], ("chat.postMessage", "C42", slack.dm_log_title(day, 0), None))
             # Then by the ID Slack gave: chat.update takes no channel name.
             self.assertEqual(posts[2], ("chat.postMessage", "C42",
                                         "disk to kim: Your disk use is high.  open (https://x/p1)", "1.2"))  # fmt: skip
@@ -105,6 +108,39 @@ class SlackTests(unittest.TestCase):
             self.assertEqual(len(titles), 1, "one message a day, the count failing or not")
             self.assertIn("count was not updated", err.getvalue())
 
+    def test_a_lost_state_finds_the_days_message_again(self):
+        """A state file lost (or another process's) posted a second message for the day."""
+        with tempfile.TemporaryDirectory() as d:
+            log = slack.DmLog("#alerts", f"{d}/dm-log.json")
+            day = time.strftime("%Y-%m-%d")
+            mark = {"event_type": slack.KEPT, "event_payload": {"key": f"dm-log {day}", "part": 0}}
+            answers = {**self.ANSWERS, "conversations.history": {"ok": True, "messages": [
+                {"ts": "7.0", "bot_id": "B1", "metadata": mark},
+                {"ts": "6.0", "bot_id": "B9", "metadata": mark},  # another app's: not ours
+            ]}}  # fmt: skip
+            client = Fake(answers)
+            log.record(client, "a")
+            titles = [p for m, p in client.calls if m == "chat.postMessage" and "thread_ts" not in p]
+            self.assertEqual(titles, [], "no second message for the day")
+            line = next(p for m, p in client.calls if m == "chat.postMessage")
+            self.assertEqual((line["channel"], line["thread_ts"]), ("C42", "7.0"))
+
+    def test_a_token_without_the_read_scopes_logs_as_before(self):
+        with tempfile.TemporaryDirectory() as d:
+            log = slack.DmLog("#alerts", f"{d}/dm-log.json")
+            client = Fake(self.ANSWERS)
+            sent = client.call
+
+            def call(method, **params):
+                if method in ("conversations.list", "conversations.history"):
+                    raise slack.Error(f"Slack {method} failed: missing_scope")
+                return sent(method, **params)
+
+            client.call = call
+            log.record(client, "a")
+            titles = [p for m, p in client.calls if m == "chat.postMessage" and "thread_ts" not in p]
+            self.assertEqual([p["channel"] for p in titles], ["#alerts"])
+
     def test_a_new_day_starts_a_new_message(self):
         with tempfile.TemporaryDirectory() as d:
             log = slack.DmLog("#alerts", f"{d}/dm-log.json")
@@ -130,7 +166,7 @@ class SlackTests(unittest.TestCase):
             sent = client.call
 
             def call(method, **params):
-                if method == "chat.postMessage" and params["channel"] == "#alerts":
+                if method == "chat.postMessage" and params["channel"] == "C42":
                     raise slack.Error("Slack chat.postMessage failed: channel_not_found")
                 return sent(method, **params)
 

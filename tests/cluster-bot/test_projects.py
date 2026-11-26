@@ -190,6 +190,15 @@ class Blocks(unittest.TestCase):
         self.assertEqual([o["value"] for o in options], ["nlp"])
         self.assertIsNone(projects_blocks.join_form({"vision": self.PROJECTS["vision"]}, "alice"))
 
+    def test_join_offers_every_project_past_a_selects_limit(self):
+        """A select takes 100 options: the 101st project and on were cut before."""
+        many = {f"p{i:03d}": {"owners": ["bob"], "members": [], "viewers": []} for i in range(250)}
+        element = projects_blocks.join_form(many, "alice")["blocks"][0]["element"]
+        values = [o["value"] for g in element["option_groups"] for o in g["options"]]
+        self.assertEqual(values, sorted(many))
+        self.assertTrue(all(len(g["options"]) <= 100 for g in element["option_groups"]))
+        self.assertEqual(element["option_groups"][0]["label"]["text"], "p000 ~ p099")
+
     def test_forms_name_the_fields_their_handlers_read(self):
         places = {"home": "/data/shared", "scratch": "/fast", "scratch_stale_days": 30}
         self.assertEqual([b.get("block_id") for b in projects_blocks.new_form(places)["blocks"][:6]],

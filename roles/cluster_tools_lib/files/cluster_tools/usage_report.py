@@ -42,7 +42,7 @@ from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
-from .slack import MAX_BLOCKS, MEMBER, DmLog, Slack, bar, escape, mentioning, sections, table
+from .slack import MEMBER, DmLog, Slack, bar, escape, mentioning, pages, sections, table
 from .slack import member as slack_member
 from .slurm import (
     Error,
@@ -285,7 +285,7 @@ def render(report, cfg, who):
         *pending_section(report["pending"]),
         *people_section(report["jobs"], max(report["total_gpus"], 1)),
     ]
-    thread = [("GPU 사용 현황 자세히", blocks[i : i + MAX_BLOCKS]) for i in range(0, len(blocks), MAX_BLOCKS)]
+    thread = pages("GPU 사용 현황 자세히", blocks)
     return summary_card(report), thread
 
 
@@ -365,7 +365,7 @@ def pending_section(pending):
             p["jobs"],
             p["gpus"],
             duration(p["wait"]),
-            ", ".join(f"{r.split(',')[0][:32]} ({c})" for r, c in p["reasons"].most_common(2)),
+            ", ".join(f"{r.split(',')[0][:32]} ({c})" for r, c in p["reasons"].most_common()),
         )
         for u, p in sorted(pending.items(), key=lambda kv: -kv[1]["gpus"])
     ]
@@ -452,7 +452,7 @@ CONFIG_KEYS = {
     "dm_text": str, "cancel_after_hours": (int, float), "user_map": dict, "email_domain": str,
     "state_file": str, "admin_channel": str, "admin_mention": str, "repeat_idle_gpu_hours": (int, float),
     "repeat_idle_share": (int, float), "repeat_weeks": int,
-    "cancel_warn_hours": (int, float), "cancel_warn_text": str, "disk_top": int,
+    "cancel_warn_hours": (int, float), "cancel_warn_text": str,
     "disk_notify": list, "disk_repeat_days": (int, float), "people": list,
     "holds_on": bool, "holds_from": (int, float),
     "disk_fill": (int, float), "disk_fill_mentions": int, "stale_days": int,
@@ -461,10 +461,13 @@ CONFIG_KEYS = {
 # (which every host gets first) never refuses a config its role has not rewritten yet.
 # No io_mounts, no I/O notices.
 # No dm_log_channel: the DMs are not logged for the administrators (cluster_tools.slack).
+# disk_top is retired (the disk report lists every person): accepted, read by nothing,
+# until every config is rewritten by its role.
 CONFIG_DEFAULTS = {"io_mounts": {}, "io_share": 0.4, "io_minutes": 15, "io_top_jobs": 3, "io_repeat_hours": 6,
                    "io_advice": "", "dm_log_channel": ""}  # fmt: skip
 CONFIG_OPTIONAL = {"io_mounts": dict, "io_share": (int, float), "io_minutes": int, "io_top_jobs": int,
-                   "io_repeat_hours": (int, float), "io_advice": str, "dm_log_channel": str}  # fmt: skip
+                   "io_repeat_hours": (int, float), "io_advice": str, "dm_log_channel": str,
+                   "disk_top": int}  # fmt: skip
 
 
 def _positive(value):
@@ -479,8 +482,6 @@ def load_config(path):
     for key in ("notify", "disk_notify"):
         if set(cfg[key]) - NOTIFY:
             raise ConfigError(f"{path}: {key} takes only {', '.join(sorted(NOTIFY))}")
-    if cfg["disk_top"] < 1:
-        raise ConfigError(f"{path}: disk_top must be 1 or more")
     if not 0 < cfg["disk_fill"] <= 1:
         raise ConfigError(f"{path}: disk_fill is a fraction above 0, at most 1")
     if cfg["disk_repeat_days"] < 0:
@@ -762,7 +763,7 @@ def disk(cfg, args):
     who = namer(cfg, slack, cache)
     hold = cfg["holds_from"] if cfg["holds_on"] else None
     card, thread = disk_report.render(
-        data, who, cfg["disk_top"], set(cfg["people"]), keys if "mention" in notify else set(), hold,
+        data, who, people=set(cfg["people"]), mention=keys if "mention" in notify else set(), hold=hold,
         fill=fill, fill_mention=fill_due, stale_days=cfg["stale_days"],
     )  # fmt: skip
     if not preview:

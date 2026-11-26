@@ -20,6 +20,7 @@ from cluster_bot import (  # noqa: E402
 )
 from cluster_bot.requests import Failed  # noqa: E402
 from cluster_tools import rich  # noqa: E402
+from cluster_tools.slack import mentioning  # noqa: E402
 
 CONNECT = {"login_host": "login.example.org", "ssh_port": 2222, "portal_url": "https://portal.example.org/",
            "docs_url": "https://docs.example.org/"}  # fmt: skip
@@ -38,9 +39,14 @@ def messages():
         "gpu1": Failed("봇의 키가 허용되지 않았습니다", "플레이북을 실행하세요"),
         "gpu2": Failed("시간 초과"),
     }
-    yield "ban list", bans_blocks.ban_list([BAN] * 3, errors)
-    yield "ban list, none", bans_blocks.ban_list([], {})
-    yield "new bans", bans_blocks.new_bans([BAN] * 2)
+    for name, (card, thread) in (
+        ("ban list", bans_blocks.ban_list([BAN] * 3, errors)),
+        ("ban list, none", bans_blocks.ban_list([], {})),
+        ("new bans", bans_blocks.new_bans([BAN] * 2)),
+    ):
+        yield name, card
+        for i, page in enumerate(thread):
+            yield f"{name}, reply {i + 1}", page
     yield "unban form", bans_blocks.unban_form()
     yield "join form", accounts_blocks.join_form(["team-a"])
     yield "leave form", accounts_blocks.leave_form("alice", True, "2026-11-25")
@@ -49,7 +55,7 @@ def messages():
         accounts_blocks.leave_reminder({"ends": "2026-12-01", "login_expires": "2026-12-31"}, 7),
     )
     yield "held", ("요청", blocks.held("<@U1>", "**3개**의 요청", "k1"))
-    yield "mentioning", blocks.mentioning("<!subteam^SADMINS>", "알림", rich.blocks("**2개**의 잡"))
+    yield "mentioning", mentioning("<!subteam^SADMINS>", "알림", rich.blocks("**2개**의 잡"))
     for muted in (True, False):
         yield "home", home_blocks.home("alice", muted, {"project", "join"}, "/cluster", "<#C1>", "<!subteam^S1>",
                                        web=[("포털", "https://portal.example.org/")])  # fmt: skip

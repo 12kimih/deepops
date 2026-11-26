@@ -1,7 +1,7 @@
 """The Slack form of unban requests (cluster_bot.bans)."""
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
-from cluster_tools.slack import escape  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+from cluster_tools.slack import escape, pages  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 from cluster_tools.slurm import hostlist  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 
 from .blocks import field
@@ -23,26 +23,38 @@ def unban_form():
     }  # fmt: skip
 
 
-# The most bans one message lists (a section holds 3000 characters); the rest are counted.
-LIST_MAX = 40
-
-
 def _line(b):
     return f"`{escape(b['ip'])}` {escape(b['host'])} ({escape(b['jail'])}), {escape(b['since'])}부터"
 
 
-def _sections(lines):
-    """LINES as rich text, within Slack's limits (cluster_tools.rich)."""
-    return rich.blocks("\n".join(lines))
+def _summary(bans):
+    """The lines that sum BANS up: how many on each host, and the newest."""
+    hosts = {}
+    for b in bans:
+        hosts[b["host"]] = hosts.get(b["host"], 0) + 1
+    newest = max(bans, key=lambda b: b["since"])
+    return [
+        "호스트별: " + ", ".join(f"{escape(h)} {n}개" for h, n in sorted(hosts.items())),
+        f"가장 최근: {_line(newest)}",
+    ]
+
+
+def _listing(title, bans):
+    """TITLE and BANS as a card (text, blocks: the count, each host's count, the newest)
+    and the thread [(text, blocks)] with every ban, newest first, in as many replies as
+    Slack's limits need (cluster_tools.slack.pages); none when the card shows them all."""
+    bans = sorted(bans, key=lambda b: b["since"], reverse=True)
+    blocks = [rich.section(f"**{title}**"), *rich.blocks("\n".join(_summary(bans)))]
+    if len(bans) < 2:
+        return (title, blocks), []
+    lines = rich.blocks("\n".join(_line(b) for b in bans))
+    return (title, blocks), pages(f"{title}: 전체 목록", lines)
 
 
 def new_bans(bans):
-    """The administrators' notice of the bans made since the last look: (text, blocks)."""
-    text = f"새로 차단된 주소 {len(bans)}개"
-    shown = [_line(b) for b in bans[:LIST_MAX]]
-    if len(bans) > LIST_MAX:
-        shown.append(f"외 {len(bans) - LIST_MAX}개")
-    return text, [rich.section(f"**{text}**"), *_sections(shown)]
+    """The administrators' notice of the bans made since the last look: the card (text,
+    blocks) and its thread [(text, blocks)], every ban in it."""
+    return _listing(f"새로 차단된 주소 {len(bans)}개", bans)
 
 
 def unread(errors):
@@ -62,24 +74,25 @@ def by_reason(errors):
 
 
 def ban_list(bans, errors, command="/cluster", read=True):
-    """The bans now, newest first, as the one message kept up to date: (text, blocks).
-    ERRORS ({host: Failed}) are the hosts not read this time, by reason with what to do;
-    their bans stay as last seen. READ: any host was read. COMMAND is the bot's."""
+    """The bans now as the one message kept up to date: the card (text, blocks) sums them
+    up, the thread [(text, blocks)] lists every one, newest first. ERRORS ({host: Failed})
+    are the hosts not read this time, by reason with what to do; their bans stay as last
+    seen. READ: any host was read. COMMAND is the bot's."""
     if bans:
-        text = f"현재 차단된 주소 {len(bans)}개"
+        (text, blocks), thread = _listing(f"현재 차단된 주소 {len(bans)}개", bans)
     else:
         text = "현재 차단된 주소가 없습니다" if read else "차단 목록을 읽지 못했습니다"
-    blocks = [rich.section(f"**{text}**")]
-    lines = [_line(b) for b in bans[:LIST_MAX]]
-    if len(bans) > LIST_MAX:
-        lines.append(f"외 {len(bans) - LIST_MAX}개 (가장 최근 {LIST_MAX}개만 보입니다)")
-    blocks += _sections(lines)
+        blocks, thread = [rich.section(f"**{text}**")], []
     if errors:
         shown = [
             f"- {escape(hosts)}: {reason}." + (f" {fix}." if fix else "")
             for hosts, reason, fix in unread(errors)
         ]
-        blocks += _sections(["**읽지 못한 호스트** (그 호스트의 차단은 마지막으로 읽은 대로입니다)", *shown])
+        blocks += rich.blocks(
+            "\n".join(["**읽지 못한 호스트** (그 호스트의 차단은 마지막으로 읽은 대로입니다)", *shown])
+        )
     note = f"해제는 `{command} unban` 신청을 받아 승인합니다."
+    if thread:
+        note = f"전체 목록은 이 메시지의 스레드에 있습니다. {note}"
     blocks.append(rich.context(note))
-    return text, blocks
+    return (text, blocks), thread

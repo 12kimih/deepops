@@ -297,9 +297,10 @@ Every morning (`slurm_usage_report_disk_schedule`) it posts the day's disk usage
 the disk quota metrics ([disk-quota.md](../deepops/disk-quota.md); without them it posts
 nothing). The card has each counted filesystem's disk (how full, what is free, how the
 use changed in a day) and everyone past a warn level or at a hard limit, worst first.
-The thread lists each filesystem's `slurm_usage_report_disk_top` largest people (the
-roster's active logins, `slurm_usage_report_people`), with their day's growth and levels;
-everyone else there (root, the services, people who left) on one line; and the projects. `slurm_usage_report_disk_notify` says
+The thread lists each filesystem's people, every one, largest first (the roster's active
+logins, `slurm_usage_report_people`), with their day's growth and levels; everyone else
+there (root, the services, people who left) in a table of their own; and the projects.
+The thread takes as many replies as Slack's limits need: no list is cut. `slurm_usage_report_disk_notify` says
 how the people past a level hear about it: `mention` on the card, `dm`, both, or `[]`.
 They are told when they first pass a level, every day while at a hard limit (their
 writes fail), and again every `slurm_usage_report_disk_repeat_days` while past the

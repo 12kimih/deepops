@@ -118,7 +118,7 @@ class Language(unittest.TestCase):
         data = disk_report.collect(disk_fixture.site(), disk_fixture.NOW)
         fill = disk_report.fill_rows(data, 0.7)
         for hold in (None, 0, disk_fixture.NOW + disk_report.DAY):
-            (text, card), thread = disk_report.render(data, who, 2, people={"alice", "bob"}, hold=hold, fill=fill,
+            (text, card), thread = disk_report.render(data, who, people={"alice", "bob"}, hold=hold, fill=fill,
                                                       stale_days=60)  # fmt: skip
             self.assertShown("disk card", (text, card))
             for _, blocks in thread:

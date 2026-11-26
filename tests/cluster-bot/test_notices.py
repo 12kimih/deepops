@@ -47,7 +47,11 @@ class FakeSlack:
         if method == "bots.info":
             return {"ok": True, "bot": {"app_id": "A1"}}
         if method == "conversations.history":
-            return {"ok": True, "messages": sorted(self.messages, key=lambda m: -float(m["ts"]))}
+            shown = [
+                {**m, **({"pinned_to": [p["channel"]]} if m["ts"] in self.pins else {})}
+                for m in self.messages
+            ]
+            return {"ok": True, "messages": sorted(shown, key=lambda m: -float(m["ts"]))}
         if method == "conversations.replies":
             return {"ok": True, "messages": [{"ts": p["ts"]}, *self.replies.get(p["ts"], [])]}
         self.log.append((method, p.get("ts") or p.get("timestamp")))
@@ -139,6 +143,25 @@ class Round(Base):
         self.run_round("2026-03-01")
         newest = self.record()[notice("later", "2026-03-01")["id"]]["ts"]
         self.assertEqual(self.slack.pins, {newest}, "the earlier pin was taken off")
+
+    def test_a_pin_whose_record_was_lost_is_taken_off(self):
+        """A lost pinned record left the earlier notice pinned beside the newest."""
+        self.run_round("2026-01-01")
+        self.run_round("2026-02-01")
+        first = self.record()[notice("today", "2026-02-01")["id"]]["ts"]
+        self.assertEqual(self.slack.pins, {first})
+        os.unlink(self.pinned)
+        self.run_round("2026-03-01")
+        newest = self.record()[notice("later", "2026-03-01")["id"]]["ts"]
+        self.assertEqual(self.slack.pins, {newest}, f"{first} unpinned, one pinned notice")
+
+    def test_the_newest_unpinned_by_hand_is_pinned_again(self):
+        self.run_round("2026-01-01")
+        self.run_round("2026-02-01")
+        pinned = set(self.slack.pins)
+        self.slack.pins.clear()
+        self.run_round("2026-02-01")
+        self.assertEqual(self.slack.pins, pinned)
 
     def test_a_malformed_notice_is_left_out(self):
         self.run_round("2026-01-01")

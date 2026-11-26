@@ -27,6 +27,8 @@ import hashlib
 import json
 import re
 
+from cluster_tools.slack import own, own_user  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+
 from . import state
 
 MENTION = re.compile(r"\[\[#([a-z]+)\]\]")
@@ -121,25 +123,43 @@ def _lock(slack, canvas_id, cid, role, log):
 
 
 def _bookmarks(slack, cid, wanted, path, role, urls):
-    existing = {b["id"]: b for b in slack.call("bookmarks.list", channel_id=cid).get("bookmarks", [])}
+    """The bot's bookmarks in CID made what WANTED says. The bot's are those whose IDs it
+    recorded, or that Slack names as its app's (app_id) or as last changed by its user
+    (last_updated_by_user_id): a state file lost re-added every bookmark beside the ones
+    there. One of each title is kept (the recorded one, else the first), and the copies
+    removed."""
+    existing = slack.call("bookmarks.list", channel_id=cid).get("bookmarks", [])
     want = {b["title"]: {**b, "url": url} for b in wanted if (url := _url(b["url"], urls))}
+    app_id, user = own(slack)[1], own_user(slack)
     with state.locked(path, {}) as st:
-        mine = st.setdefault("bookmarks", {}).setdefault(role, {})
-        for title, bid in list(mine.items()):
-            if bid not in existing:  # removed by hand: added again below if still wanted
-                del mine[title]
-            elif title not in want:
-                slack.call("bookmarks.remove", channel_id=cid, bookmark_id=bid)
-                del mine[title]
+        recorded = st.setdefault("bookmarks", {}).setdefault(role, {})
+        ours = {}
+        for b in existing:
+            by_bot = (app_id and b.get("app_id") == app_id) or (
+                user and b.get("last_updated_by_user_id") == user
+            )
+            if b["id"] in recorded.values() or by_bot:
+                ours.setdefault(b.get("title", ""), []).append(b)
+        mine = {}
+        for title, copies in ours.items():
+            copies.sort(key=lambda b: b["id"] != recorded.get(title))
+            extra = copies[1:] if title in want else copies
+            for b in extra:
+                slack.call("bookmarks.remove", channel_id=cid, bookmark_id=b["id"])
+            if title in want:
+                mine[title] = copies[0]
         for title, b in want.items():
-            bid = mine.get(title)
-            if bid is None:
+            have = mine.get(title)
+            if have is None:
                 added = slack.call(
                     "bookmarks.add", channel_id=cid, title=title, type="link", link=b["url"], emoji=b["emoji"]
                 )
-                mine[title] = added["bookmark"]["id"]
-            elif (existing[bid].get("link"), existing[bid].get("emoji") or "") != (b["url"], b["emoji"]):
-                slack.call("bookmarks.edit", channel_id=cid, bookmark_id=bid, link=b["url"], emoji=b["emoji"])
+                mine[title] = added["bookmark"]
+            elif (have.get("link"), have.get("emoji") or "") != (b["url"], b["emoji"]):
+                slack.call(
+                    "bookmarks.edit", channel_id=cid, bookmark_id=have["id"], link=b["url"], emoji=b["emoji"]
+                )
+        st["bookmarks"][role] = {title: b["id"] for title, b in mine.items()}
 
 
 def round_(fetch, slack, names, state_path, today, log, urls=None):

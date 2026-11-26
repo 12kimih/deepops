@@ -46,10 +46,10 @@ from datetime import date
 from pathlib import Path
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
-from cluster_tools.slack import Error, Slack
+from cluster_tools.slack import Error, Slack, channel_id, delete, history, is_own, replies
+from cluster_tools.slack import own as own_ids
 
 from . import state
-from .channels import channel_ids
 
 FETCH_TIMEOUT = 30
 
@@ -174,6 +174,7 @@ def plan(messages, notes, seen, mine, today, adopt):
       missing  a notice recorded as posted whose post is gone (deleted by hand): not again
       foreign  a notice post of another app or a person: left, said
       pin      the newest notice's post, the channel's one pinned notice
+      unpin    another post of the bot's pinned (a pin whose record was lost): taken off
     """
     bot_id, app_id = mine
     recorded = {e["ts"]: nid for nid, e in seen.items() if isinstance(e, dict) and e.get("ts")}
@@ -192,7 +193,8 @@ def plan(messages, notes, seen, mine, today, adopt):
                         "by": m.get("bot_id") or m.get("user") or "?"})  # fmt: skip
             continue
         found.setdefault(nid, []).append({"ts": m["ts"], "how": how, "title": title,
-                                          "replies": m.get("reply_count", 0)})  # fmt: skip
+                                          "replies": m.get("reply_count", 0),
+                                          "pinned": bool(m.get("pinned_to"))})  # fmt: skip
     kept = {}
     for nid, posts in sorted(found.items()):
         n = notes.get(nid)
@@ -215,38 +217,27 @@ def plan(messages, notes, seen, mine, today, adopt):
         do = "missing" if n["id"] in seen else "post"
         out.append({"do": do, "id": n["id"], "title": _header(n["blocks"])})
     shown = set(kept) | {a["id"] for a in out if a["do"] == "post"}
-    if shown:
-        out.append({"do": "pin", "id": max(shown, key=lambda nid: (notes[nid]["date"], nid))})
+    newest = max(shown, key=lambda nid: (notes[nid]["date"], nid)) if shown else None
+    deleted = {a["ts"] for a in out if a["do"] == "delete"}
+    for nid, posts in sorted(found.items()):
+        for p in posts:
+            if p["pinned"] and p["ts"] != kept.get(newest) and p["ts"] not in deleted:
+                if adopt or p["how"] in EXACT:
+                    out.append({"do": "unpin", "id": nid, "ts": p["ts"], "title": p["title"]})
+    if newest is not None:
+        pin = {"do": "pin", "id": newest}
+        target = next((p for p in found.get(newest, []) if p["ts"] == kept.get(newest)), None)
+        if target is not None and messages:
+            pin["pinned"] = target["pinned"]
+        out.append(pin)
     return out
-
-
-def history(slack, channel):
-    """Every message in CHANNEL, newest first, with its metadata."""
-    out, cursor = [], ""
-    while True:
-        params = {"channel": channel, "limit": 200, "include_all_metadata": "true"}
-        if cursor:
-            params["cursor"] = cursor
-        body = slack.call("conversations.history", **params)
-        out += body.get("messages", [])
-        cursor = (body.get("response_metadata") or {}).get("next_cursor") or ""
-        if not cursor:
-            return out
-
-
-def mine(slack):
-    """(bot_id, app_id) of the bot's token: what its own posts carry."""
-    bot_id = slack.call("auth.test").get("bot_id") or ""
-    app_id = (slack.call("bots.info", bot=bot_id).get("bot") or {}).get("app_id", "") if bot_id else ""
-    return bot_id, app_id
 
 
 def own_replies(slack, channel, ts, ids):
     """(the ts of the bot's own replies under TS, how many replies are someone else's)."""
-    replies = slack.call("conversations.replies", channel=channel, ts=ts, limit=1000).get("messages", [])
-    replies = [r for r in replies if r.get("ts") != ts]
-    own = [r["ts"] for r in replies if r.get("bot_id") == ids[0] or (ids[1] and r.get("app_id") == ids[1])]
-    return own, len(replies) - len(own)
+    found = replies(slack, channel, ts)
+    own = [r["ts"] for r in found if is_own(r, ids)]
+    return own, len(found) - len(own)
 
 
 def describe(action, extra=""):
@@ -256,9 +247,6 @@ def describe(action, extra=""):
     by = f", posted by {a['by']}" if a.get("by") else ""
     why = f", {a['why']}" if a.get("why") else ""
     return f"{a['do']}{where} {a['id']} {a.get('title', '')!r}{how}{by}{why}{extra}"
-
-
-GONE = ("message_not_found", "thread_not_found")
 
 
 def apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log):
@@ -274,8 +262,8 @@ def apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log):
                 if a.get("replies"):
                     own, theirs = own_replies(slack, channel, a["ts"], ids)
                     for ts in own:
-                        _delete(slack, channel, ts)
-                _delete(slack, channel, a["ts"])
+                        delete(slack, channel, ts)
+                delete(slack, channel, a["ts"])
                 log(describe(a, f", {theirs} replies of others left" if theirs else ""))
                 with state.locked(seen_path, {}) as seen:
                     if n is None and (seen.get(nid) or {}).get("ts") in (a["ts"], None):
@@ -292,23 +280,18 @@ def apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log):
                     seen[nid] = {"date": n["date"], "ts": ts, "digest": n["digest"]}
             elif a["do"] == "pin":
                 ts = (state.read(seen_path, {}).get(nid) or {}).get("ts")
-                if ts and ts != (state.read(pinned_path, {}) or {}).get("ts"):
+                if ts and (ts != (state.read(pinned_path, {}) or {}).get("ts") or a.get("pinned") is False):
                     pin_latest(slack, channel, pinned_path, ts)
                     log(describe(a, f" ({ts})"))
+            elif a["do"] == "unpin":
+                _unpin(slack, channel, a["ts"])
+                log(describe(a))
             elif a["do"] in ("foreign", "missing"):
                 pass  # said by the dry run; nothing to do
         except Exception as e:
             if not any(code in str(e) for code in ("cant_update_message", "cant_delete_message")):
                 raise
             log(describe(a, f": not allowed ({e})"))
-
-
-def _delete(slack, channel, ts):
-    try:
-        slack.call("chat.delete", channel=channel, ts=ts)
-    except Exception as e:
-        if not any(code in str(e) for code in GONE):
-            raise
 
 
 def round_(fetch, slack, channel, seen_path, pinned_path, today, log, dry_run=False, adopt=False):
@@ -322,7 +305,7 @@ def round_(fetch, slack, channel, seen_path, pinned_path, today, log, dry_run=Fa
         log("notices.json lists no notice: nothing changed")
         return []
     channel = channel_id(slack, channel)
-    ids = mine(slack)
+    ids = own_ids(slack)
     with _one_round(seen_path, dry_run):
         first = state.read(seen_path, None) is None
         seed = {n["id"]: {"date": n["date"]} for n in notes.values() if n["date"] <= today} if first else {}
@@ -378,11 +361,6 @@ def _entries(seen, pinned_path):
         seen[old[-1][1]]["ts"] = ts
 
 
-def channel_id(slack, channel):
-    """CHANNEL as an ID: a name (#...) is looked up; pins and edits take the ID."""
-    return channel_ids(slack)[channel[1:]] if channel.startswith("#") else channel
-
-
 def pin_latest(slack, channel, path, ts):
     """Pin the message TS in CHANNEL and unpin the one pinned before it (kept at PATH): the
     channel keeps one pinned notice, the newest. A previous pin someone already removed is
@@ -392,11 +370,16 @@ def pin_latest(slack, channel, path, ts):
         slack.call("pins.add", channel=channel, timestamp=ts)
         old, pinned["ts"] = pinned.get("ts"), ts
         if old and old != ts:
-            try:
-                slack.call("pins.remove", channel=channel, timestamp=old)
-            except Exception as e:
-                if not any(code in str(e) for code in ("no_pin", "not_pinned", "message_not_found")):
-                    raise
+            _unpin(slack, channel, old)
+
+
+def _unpin(slack, channel, ts):
+    """Take the pin off TS; one already off, or a message gone, is no error."""
+    try:
+        slack.call("pins.remove", channel=channel, timestamp=ts)
+    except Exception as e:
+        if not any(code in str(e) for code in ("no_pin", "not_pinned", "message_not_found")):
+            raise
 
 
 def main(argv=None):

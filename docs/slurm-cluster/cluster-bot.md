@@ -84,9 +84,19 @@ database). The form refuses what is not an IP address before anything is asked.
 
 The administrators see the bans in their channel without asking: every five minutes the
 bot reads each such host's list, tells the bans made since its last look in one message
-(a wave of bans is one message), and keeps one pinned message listing the bans now,
-newest first, edited in place. Its first look only learns the bans made before it; a
-host it cannot read keeps its bans on the list as last seen and is named there. No Slack
+(a wave of bans is one message, every ban in its thread), and keeps one pinned message
+of the bans now: the count, each host's count and the newest ban, with every ban,
+newest first, in its thread, as many replies as Slack's limits need, edited in place.
+Nothing is cut. Its first look only learns the bans made before it; a host it cannot
+read keeps its bans on the list as last seen and is named there.
+
+Every message the bot keeps up to date (the ban list, the DM log's day message) carries
+Slack's message metadata and is found in the channel's history, not only through the ts
+in its state file (`cluster_tools.slack.keep`): a lost or older state never posts a
+second copy, and copies already there are deleted with their replies, the recorded one
+(else the newest) kept. The channel guides' bookmarks are found the same way, by the
+app that added them, and the docs notices by their own metadata (above), the newest
+pinned and any other pin of the bot's taken off. No Slack
 token is ever on those hosts: the bot reads them over the `bans` service. Invite the bot
 to the admin channel so it can pin the list.
 

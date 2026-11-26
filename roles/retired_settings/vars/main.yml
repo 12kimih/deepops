@@ -168,7 +168,8 @@ retired_settings:
   slurm_usage_report_config_dir: none; the configuration is /etc/cluster-tools/slurm-usage-report.json, as every cluster tool's
   slurm_usage_report_svc_name: none; the units and the state directory are named slurm-usage-report by the role
   slurm_usage_report_storage_schedule: slurm_usage_report_disk_schedule in roles/slurm_usage_report (the daily disk report)
-  slurm_usage_report_storage_top: slurm_usage_report_disk_top in roles/slurm_usage_report
+  slurm_usage_report_storage_top: nothing (the disk report lists every person, in its thread)
+  slurm_usage_report_disk_top: nothing (the disk report lists every person, in its thread)
   slurm_usage_report_storage_notify: slurm_usage_report_disk_notify in roles/slurm_usage_report
   slurm_usage_report_storage_repeat_days: slurm_usage_report_disk_repeat_days in roles/slurm_usage_report
   scratch_alloc_auto_days: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)

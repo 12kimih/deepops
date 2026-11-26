@@ -165,18 +165,6 @@ class Handlers(unittest.TestCase):
         )
         self.assertNotIn("SADMINS", posts["#help"]["text"])
 
-    def test_ban_watch_notices_mention_the_administrators_the_pinned_list_not(self):
-        client = mock.MagicMock()
-        client.chat_postMessage.return_value = {"ts": "1.0", "channel": "C"}
-        post, _ = app.admin_messages(client, "#admin", "<!subteam^SADMINS>")
-        post("new ban", [{"type": "section", "text": {"type": "mrkdwn", "text": "new ban"}}])
-        post("the list", [{"type": "section", "text": {"type": "mrkdwn", "text": "the list"}}], pin=True)
-        notice, pinned = (c.kwargs for c in client.chat_postMessage.call_args_list)
-        self.assertTrue(notice["text"].startswith("<!subteam^SADMINS> "))
-        self.assertEqual(rich.read(notice["blocks"][:1]), "<!subteam^SADMINS>")
-        self.assertEqual(pinned["text"], "the list")
-        self.assertEqual(len(pinned["blocks"]), 1)
-
     def test_the_shared_datas_cleanup_tells_the_requester_by_a_logged_dm(self):
         cfg = {
             **CFG,
