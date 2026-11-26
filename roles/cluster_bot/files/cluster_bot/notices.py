@@ -46,7 +46,17 @@ from datetime import date
 from pathlib import Path
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
-from cluster_tools.slack import Error, Slack, channel_id, delete, history, is_own, replies
+from cluster_tools.slack import (
+    Error,
+    Slack,
+    channel_id,
+    delete,
+    history,
+    is_own,
+    pin_message,
+    replies,
+    unpin_message,
+)
 from cluster_tools.slack import own as own_ids
 
 from . import state
@@ -284,7 +294,7 @@ def apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log):
                     pin_latest(slack, channel, pinned_path, ts)
                     log(describe(a, f" ({ts})"))
             elif a["do"] == "unpin":
-                _unpin(slack, channel, a["ts"])
+                unpin_message(slack, channel, a["ts"])
                 log(describe(a))
             elif a["do"] in ("foreign", "missing"):
                 pass  # said by the dry run; nothing to do
@@ -364,22 +374,14 @@ def _entries(seen, pinned_path):
 def pin_latest(slack, channel, path, ts):
     """Pin the message TS in CHANNEL and unpin the one pinned before it (kept at PATH): the
     channel keeps one pinned notice, the newest. A previous pin someone already removed is
-    no error. CHANNEL is a name (#...) or an ID."""
+    no error, and so is a pin Slack already has (its record lost). CHANNEL is a name (#...)
+    or an ID."""
     channel = channel_id(slack, channel)
     with state.locked(path, {}) as pinned:
-        slack.call("pins.add", channel=channel, timestamp=ts)
+        pin_message(slack, channel, ts)
         old, pinned["ts"] = pinned.get("ts"), ts
         if old and old != ts:
-            _unpin(slack, channel, old)
-
-
-def _unpin(slack, channel, ts):
-    """Take the pin off TS; one already off, or a message gone, is no error."""
-    try:
-        slack.call("pins.remove", channel=channel, timestamp=ts)
-    except Exception as e:
-        if not any(code in str(e) for code in ("no_pin", "not_pinned", "message_not_found")):
-            raise
+            unpin_message(slack, channel, old)
 
 
 def main(argv=None):
