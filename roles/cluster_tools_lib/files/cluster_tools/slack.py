@@ -428,6 +428,29 @@ def delete(slack, channel, ts, ids=None):
             raise
 
 
+# Slack's answers that mean the pin already stands as asked: no error to whoever pins.
+PINNED = ("already_pinned",)
+UNPINNED = ("no_pin", "not_pinned", "message_not_found")
+
+
+def pin_message(slack, channel, ts):
+    """Pin the message TS in CHANNEL (an ID); one already pinned is no error."""
+    try:
+        slack.call("pins.add", channel=channel, timestamp=ts)
+    except Error as e:
+        if not any(code in str(e) for code in PINNED):
+            raise
+
+
+def unpin_message(slack, channel, ts):
+    """Take the pin off TS in CHANNEL (an ID); one already off, or a message gone, is no error."""
+    try:
+        slack.call("pins.remove", channel=channel, timestamp=ts)
+    except Error as e:
+        if not any(code in str(e) for code in UNPINNED):
+            raise
+
+
 def marked(key, part=0):
     """The metadata of the message kept as KEY (PART: its reply's number, 0 the message)."""
     return {"event_type": KEPT, "event_payload": {"key": key, "part": part}}
@@ -523,10 +546,9 @@ def keep(slack, channel, key, card, thread=(), record=None, *, legacy=None, pin=
         if not pin:
             return
         try:
-            slack.call("pins.add", channel=cid, timestamp=ts)
+            pin_message(slack, cid, ts)
         except Error as e:  # the message stands unpinned (the bot is not in the channel)
-            if "already_pinned" not in str(e):
-                log(f"{key}: not pinned: {e}")
+            log(f"{key}: not pinned: {e}")
 
     fresh = not record.get("ts")
     if fresh:

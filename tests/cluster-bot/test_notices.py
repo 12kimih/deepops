@@ -18,6 +18,9 @@ sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools
 from cluster_bot import notices  # noqa: E402
 from cluster_tools.slack import Error  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "tests/lib"))
+from fake_slack import pins_call  # noqa: E402
+
 CHANNEL = "C1"
 SITE = "https://docs.example.org/news/"
 
@@ -61,10 +64,8 @@ class FakeSlack:
             self.messages = [m for m in self.messages if m["ts"] != p["ts"]]
             for ts, rs in self.replies.items():
                 self.replies[ts] = [r for r in rs if r["ts"] != p["ts"]]
-        elif method == "pins.add":
-            self.pins.add(p["timestamp"])
-        elif method == "pins.remove":
-            self.pins.discard(p["timestamp"])
+        elif method in ("pins.add", "pins.remove"):
+            return pins_call(self.pins, method, p)
         return {"ok": True}
 
     def post(self, channel, text, blocks=None, metadata=None):
@@ -154,6 +155,17 @@ class Round(Base):
         self.run_round("2026-03-01")
         newest = self.record()[notice("later", "2026-03-01")["id"]]["ts"]
         self.assertEqual(self.slack.pins, {newest}, f"{first} unpinned, one pinned notice")
+
+    def test_a_pin_slack_has_whose_record_was_lost_is_recorded(self):
+        """The owner's run stopped on pins.add already_pinned: the newest post was pinned
+        in Slack while the pinned record did not name it."""
+        self.run_round("2026-01-01")
+        self.run_round("2026-02-01")
+        first = self.record()[notice("today", "2026-02-01")["id"]]["ts"]
+        os.unlink(self.pinned)
+        self.run_round("2026-02-01")
+        self.assertEqual(self.slack.pins, {first})
+        self.assertEqual(json.loads(Path(self.pinned).read_text())["ts"], first)
 
     def test_the_newest_unpinned_by_hand_is_pinned_again(self):
         self.run_round("2026-01-01")
@@ -365,6 +377,21 @@ class Markdown(unittest.TestCase):
         self.assertEqual(len(found), 3, found)
         self.assertIn("title", found[1])
         self.assertEqual(notices.check({"nope": []}), ['notices.json: no "notices" list'])
+
+
+class PinLatest(unittest.TestCase):
+    def test_the_channel_keeps_one_pinned_notice_the_newest(self):
+        slack = FakeSlack()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "notices-pinned.json")
+            notices.pin_latest(slack, CHANNEL, path, "1.0")
+            notices.pin_latest(slack, CHANNEL, path, "2.0")
+            self.assertEqual(slack.pins, {"2.0"})
+            slack.pins.clear()  # someone unpinned it by hand
+            notices.pin_latest(slack, CHANNEL, path, "3.0")
+            self.assertEqual(slack.pins, {"3.0"})
+            notices.pin_latest(slack, CHANNEL, path, "3.0")  # pinned already: no error
+            self.assertEqual(slack.pins, {"3.0"})
 
 
 if __name__ == "__main__":

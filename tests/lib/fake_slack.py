@@ -17,6 +17,24 @@ class FakeDM:
         return channel, ts
 
 
+def pins_call(pins, method, p):
+    """pins.add and pins.remove on PINS (the set of pinned ts) as Slack answers them: a
+    message pinned twice is already_pinned, one not pinned no_pin. The one pin board of
+    every fake, so no test's Slack is kinder than Slack."""
+    from cluster_tools.slack import Error
+
+    ts = p["timestamp"]
+    if method == "pins.add":
+        if ts in pins:
+            raise Error("Slack pins.add failed: already_pinned")
+        pins.add(ts)
+    elif method == "pins.remove":
+        if ts not in pins:
+            raise Error("Slack pins.remove failed: no_pin")
+        pins.discard(ts)
+    return {"ok": True}
+
+
 class FakeChannel:
     """A fake cluster_tools.slack.Slack over channels of messages, for what the bot keeps
     up to date (cluster_tools.slack.keep): posts, replies, edits, deletes and pins, with
@@ -83,10 +101,8 @@ class FakeChannel:
             if not any(m["ts"] == p["ts"] for m in self.messages):
                 raise Error("Slack chat.delete failed: message_not_found")
             self.messages = [m for m in self.messages if m["ts"] != p["ts"]]
-        elif method == "pins.add":
-            if p["timestamp"] in self.pins:
-                raise Error("Slack pins.add failed: already_pinned")
-            self.pins.add(p["timestamp"])
+        elif method in ("pins.add", "pins.remove"):
+            return pins_call(self.pins, method, p)
         elif method == "chat.postMessage":  # the DM log's day message
             import json
 

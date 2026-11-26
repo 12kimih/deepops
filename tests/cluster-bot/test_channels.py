@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
-from cluster_bot import channels, notices  # noqa: E402
+from cluster_bot import channels  # noqa: E402
 
 
 class Refused(RuntimeError):
@@ -26,7 +26,7 @@ class FakeSlack:
             "C1": {"name": "news", "topic": "", "purpose": "", "canvas": existing_canvas, "bookmarks": {}},
             "C2": {"name": "ask", "topic": "", "purpose": "", "canvas": None, "bookmarks": {}},
         }
-        self.calls, self.canvases, self.pins, self.refuse, self.n = [], {}, {}, set(), 0
+        self.calls, self.canvases, self.refuse, self.n = [], {}, set(), 0
 
     def _id(self, prefix):
         self.n += 1
@@ -78,10 +78,6 @@ class FakeSlack:
             c["bookmarks"][p["bookmark_id"]].update(link=p["link"], emoji=p["emoji"])
         elif method == "bookmarks.remove":
             del c["bookmarks"][p["bookmark_id"]]
-        elif method == "pins.add":
-            self.pins.setdefault(p["channel"], set()).add(p["timestamp"])
-        elif method == "pins.remove":
-            self.pins[p["channel"]].discard(p["timestamp"])
         return {}
 
     @staticmethod
@@ -227,19 +223,6 @@ class Guides(unittest.TestCase):
         channels.round_(lambda: self.doc, slack, names, self.state, "2026-01-01", self.log.append)
         self.assertIn("announce: #gone: no such channel the bot can see (invite it)", self.log)
         self.assertTrue(slack.chan["C2"]["canvas"])
-
-
-class PinLatest(unittest.TestCase):
-    def test_the_channel_keeps_one_pinned_notice_the_newest(self):
-        slack = FakeSlack()
-        with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "notices-pinned.json")
-            notices.pin_latest(slack, "#news", path, "1.0")
-            notices.pin_latest(slack, "#news", path, "2.0")
-            self.assertEqual(slack.pins["C1"], {"2.0"})
-            slack.pins["C1"].clear()  # someone unpinned it by hand
-            notices.pin_latest(slack, "#news", path, "3.0")
-            self.assertEqual(slack.pins["C1"], {"3.0"})
 
 
 if __name__ == "__main__":
