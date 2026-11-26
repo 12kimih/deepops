@@ -33,7 +33,7 @@ def form(kinds):
             field("url", "공개된 https 주소", text),
             field("size", "크기 (예: 120G, 1.5T)", text),
             field("sha256", "sha256 (출처가 알려 주면)", text, optional=True),
-            field("purpose", "무엇에 쓰나요", {"type": "plain_text_input", "multiline": True}),
+            field("purpose", "용도", {"type": "plain_text_input", "multiline": True}),
         ],
     }  # fmt: skip
 
@@ -56,7 +56,7 @@ def notice_dm(key, path, unused_days, removal):
     text = (f"{path}을(를) {unused_days}일 동안 쓴다고 알린 사람이 없습니다. "
             f"계속 쓰면 아래 버튼을 눌러 주세요. 아니면 {_date(removal)}에 지웁니다.")  # fmt: skip
     return text, [rich.section(text),
-                  {"type": "actions", "elements": [button("계속 씁니다", "data.use", key, style="primary")]}]  # fmt: skip
+                  {"type": "actions", "elements": [button("계속 사용", "data.use", key, style="primary")]}]  # fmt: skip
 
 
 def notice_channel(key, path, requester, removal):
@@ -64,7 +64,7 @@ def notice_channel(key, path, requester, removal):
     text = (f"공유 데이터 {path} ({requester} 요청)을(를) {_date(removal)}에 지웁니다. "
             "쓰고 있다면 버튼을 눌러 주세요.")  # fmt: skip
     return text, [rich.section(text),
-                  {"type": "actions", "elements": [button("저도 씁니다", "data.use", key)]}]  # fmt: skip
+                  {"type": "actions", "elements": [button("저도 사용", "data.use", key)]}]  # fmt: skip
 
 
 def removed(path, unused_days, grace_days):

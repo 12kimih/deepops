@@ -2,100 +2,139 @@
 # The one Korean glossary of everything people read from this cluster: Slack messages,
 # DMs, the bot, reports, alerts, comments and docs, in deepops, the site config and the
 # user docs (cluster-docs reads it from data/site.json, written by
-# scripts/docs/site_facts.py). Each entry names the word to use, the variants that are
-# refused (regular expressions over a line, matching phrases, never a lone common
-# word), and why. scope limits an entry to paths starting with one of its prefixes
-# (deepops paths; the other repositories skip a scoped entry). scripts/deepops/terms.py
-# reads it; tests/slack-text/test_terms.py refuses a variant anywhere.
+# scripts/docs/site_facts.py). Under terms, each entry names the word to use in a
+# sentence (use), its title form (title: titles are nouns), the variants refused
+# anywhere (not) or in titles only (title_not), regular expressions over a line that
+# match phrases, never a lone common word, the code constants of the two forms (code),
+# and why; scope limits an entry to deepops paths starting with one of its prefixes.
+# Under titles, the sentence endings no title may have and the files exempt.
+# scripts/deepops/terms.py applies it; each repository checks its own files.
 # Docs: docs/deepops/terms.md.
-- use: 할당받은 GPU를 쓰지 않는 잡
-  id: idle_job
-  not:
-    - (?<!할당받은 )GPU를 (?:\S+ ){0,2}쓰지 않
-    - GPU를 할당받아 두고
-    - 유휴 (?:GPU|잡)
-    - 쉬(?:는|던) 잡
-    - 잡아 둔
-  why: '"GPU를 쓰지 않는 잡" alone reads as a CPU-only job (owner, 2026-11-27); the GPUs
-    were allocated to it. Its rule: every GPU it was allocated sat idle the whole time.'
-- use: a job leaving its GPUs idle
-  not:
-    - (?i:\bidle[- ](?:GPU )?(?:jobs?|rule)\b)
-  why: The English for the same job, as plain as the Korean.
-- use: 대기 중인 잡
-  not:
-    - 기다리는 잡
-    - 대기 잡
-    - 대기하는 잡
-  why: Slurm's PENDING, as the owner names it (2026-11-27); a verb phrase as a noun reads
-    loosely.
-- use: 실행 중인 잡
-  not:
-    - 도는 잡
-    - 돌고 있는 잡
-  why: Slurm's RUNNING, in the words the reports use; "도는" is spoken Korean.
-- use: 실행 중이던 잡
-  not:
-    - 돌던 잡
-  why: The same, for jobs that were running when something happened.
-- use: 공개키
-  not:
-    - 공개 키
-  why: One spelling, the one most pages already use (as 개인키).
-- use: 개인키
-  not:
-    - 개인 키
-  why: One spelling, as 공개키.
-- use: 오류
-  not:
-    - 에러
-  why: The standard word (National Institute of Korean Language), and the one most
-    texts use.
-- use: 디스크 한도
-  not:
-    - 디스크 할당량
-  why: The disk limit is a 한도 everywhere else (경고 수준과 한도); 할당량 is what a job is
-    given.
-- use: 잡을 제출할 수 없습니다
-  not:
-    - 잡(?:은|이) 제출되지 않
-  why: The person cannot submit; the passive reads as if the jobs failed on their own.
-- use: 명부
-  not:
-    - 사람 명부
-  why: The roster is 명부 in every other text.
-- use: 계산 노드
-  not:
-    - 컴퓨트 노드
-    - 연산 노드
-  why: The docs' word for the nodes jobs run on, beside 로그인 노드.
-- use: 디렉터리
-  not:
-    - 디렉토리
-  why: The standard spelling, the one every text uses.
-- use: 공유 스토리지
-  not:
-    - 공유 저장소
-  why: The docs' word for the shared filesystems.
-- use: 질문 채널
-  not:
-    - 도움 채널
-  why: The help channel's name in the channel guides (slack/help.md) and notices.
-- use: 공동작업 폴더
-  not:
-    - 공동 작업 폴더
-    - 프로젝트 폴더
-  why: The bot's name for a shared folder (/cluster project), written one way.
-- use: 공동작업 폴더
-  scope: [roles/cluster_bot/]
-  not:
-    - 프로젝트
-  why: The bot's buttons and messages called one folder both 공동작업 폴더 and 프로젝트;
-    elsewhere 프로젝트 is a uv project.
-- use: 소유자
-  scope: [roles/cluster_bot/]
-  not:
-    - 관리자(?:와 멤버| \(|만 할 수|가 됩니다| 중 한 명)
-    - 함께 관리할 사람
-  why: A shared folder's owners were 관리자, the cluster administrators' word, so
-    "관리자가 승인합니다" meant two people.
+terms:
+  - use: 할당받은 GPU를 쓰지 않는 잡
+    id: idle_job
+    title: GPU 유휴 잡
+    code: {use: IDLE_JOB, title: IDLE_JOB_TITLE}
+    not:
+      - (?<!할당받은 )GPU를 (?:\S+ ){0,2}쓰지 않
+      - GPU를 할당받아 두고
+      - 유휴 GPU
+      - 쉬(?:는|던) 잡
+      - 잡아 둔
+    why: '"GPU를 쓰지 않는 잡" alone reads as a CPU-only job (owner, 2026-11-27); the GPUs
+      were allocated to it. Its rule: every GPU it was allocated sat idle the whole time.'
+  - use: a job leaving its GPUs idle
+    not:
+      - (?i:\bidle[- ](?:GPU )?(?:jobs?|rule)\b)
+    why: The English for the same job, as plain as the Korean.
+  - use: 대기 중인 잡
+    not:
+      - 기다리는 잡
+      - 대기 잡
+      - 대기하는 잡
+    why: Slurm's PENDING, as the owner names it (2026-11-27); a verb phrase as a noun reads
+      loosely.
+  - use: 실행 중인 잡
+    not:
+      - 도는 잡
+      - 돌고 있는 잡
+    why: Slurm's RUNNING, in the words the reports use; "도는" is spoken Korean.
+  - use: 실행 중이던 잡
+    not:
+      - 돌던 잡
+    why: The same, for jobs that were running when something happened.
+  - use: 공개키
+    not:
+      - 공개 키
+    why: One spelling, the one most pages already use (as 개인키).
+  - use: 개인키
+    not:
+      - 개인 키
+    why: One spelling, as 공개키.
+  - use: 오류
+    not:
+      - 에러
+    why: The standard word (National Institute of Korean Language), and the one most
+      texts use.
+  - use: 디스크 한도
+    not:
+      - 디스크 할당량
+    why: The disk limit is a 한도 everywhere else (경고 수준과 한도); 할당량 is what a job is
+      given.
+  - use: 잡을 제출할 수 없습니다
+    not:
+      - 잡(?:은|이) 제출되지 않
+    why: The person cannot submit; the passive reads as if the jobs failed on their own.
+  - use: 명부
+    not:
+      - 사람 명부
+    why: The roster is 명부 in every other text.
+  - use: 계산 노드
+    not:
+      - 컴퓨트 노드
+      - 연산 노드
+    why: The docs' word for the nodes jobs run on, beside 로그인 노드.
+  - use: 디렉터리
+    not:
+      - 디렉토리
+    why: The standard spelling, the one every text uses.
+  - use: 공유 스토리지
+    not:
+      - 공유 저장소
+    why: The docs' word for the shared filesystems.
+  - use: 질문 채널
+    not:
+      - 도움 채널
+    why: The help channel's name in the channel guides (slack/help.md) and notices.
+  - use: 공동작업 폴더
+    not:
+      - 공동 작업 폴더
+      - 프로젝트 폴더
+    why: The bot's name for a shared folder (/cluster project), written one way.
+  - use: 공동작업 폴더
+    scope: [roles/cluster_bot/]
+    not:
+      - 프로젝트
+    why: The bot's buttons and messages called one folder both 공동작업 폴더 and 프로젝트;
+      elsewhere 프로젝트 is a uv project.
+  - use: 소유자
+    scope: [roles/cluster_bot/]
+    not:
+      - 관리자(?:와 멤버| \(|만 할 수|가 됩니다| 중 한 명)
+      - 함께 관리할 사람
+    why: A shared folder's owners were 관리자, the cluster administrators' word, so
+      "관리자가 승인합니다" meant two people.
+  - use: 쓸 수 없는 노드
+    title: 중단 노드
+    code: {title: DOWN_TITLE}
+    why: A drained or down node in a title is 중단 노드 (owner, 2026-11-27); not 장애 노드,
+      since a drain is no failure. Sentences say what it means.
+  # Title idioms (owner, 2026-11-27): a verb phrase that names a thing has a noun for
+  # it in a title; refused in titles only, sentences keep them.
+  - title: 역할
+    title_not:
+      - (?<![가-힣])하는 일
+    why: A table's or heading's "하는 일" is the thing's role.
+  - title: 사용법, 확인 방법, 변경 방법 (동작의 명사 + 방법)
+    title_not:
+      - "[가-힣]+는 법"
+    why: '"쓰는 법", "보는 법", "바꾸는 법" are sentences cut short; the noun says it.'
+  - title: 내용
+    title_not:
+      - 보여 주는 것
+    why: What a command shows, as a table header.
+  - title: 용도
+    title_not:
+      - 두는 것
+    why: What a place is for, as a table header.
+  - title: 대상 노드
+    title_not:
+      - 받는 노드
+    why: The nodes a step applies to, as a table header.
+titles:
+  # A title ends no sentence: no -다, -요, -까, -죠 at its end (titles are nouns).
+  endings: (?:다|요|까|죠)$
+  exempt:
+    - path: docs/guide/troubleshooting.md
+      why: Its headings are the readers' own questions (FAQ), asked as they would ask
+        them (owner, 2026-11-27).
