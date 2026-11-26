@@ -42,8 +42,8 @@ slack_dm_log_channel: "{{ slack_channels.admin }}"
 # no one.
 slack_admin_group: ""
 slack_admin_group_id: ""
-# Derived from the ID, not a setting: the mention those notices carry.
-slack_admin_mention: "{{ '<!subteam^' ~ slack_admin_group_id ~ '>' if slack_admin_group_id | length > 0 else '' }}"
+# The mention those notices carry is derived from the ID: slack_admin_mention, in this
+# role's vars, so no site or role sets another (one group, never @channel or @here).
 
 # The Socket Mode app-level token (xapp-, vault it): the cluster bot's connection to
 # Slack, opened from inside (no port to open). Empty keeps the bot off.

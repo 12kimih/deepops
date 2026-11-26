@@ -38,7 +38,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import unrecorded  # noqa: E402
 import local_scratch  # noqa: E402
-from ansible_yaml import role_defaults  # noqa: E402
+from ansible_yaml import role_defaults, role_variables  # noqa: E402
 
 ANSIBLE = ROOT / ".venv" / "bin" / "ansible-playbook"
 TEST_PASSWORD = "smoke-test-only"
@@ -127,14 +127,14 @@ class MonitoringImages(unittest.TestCase):
 
     @classmethod
     def render(cls):
-        """The roles' templates, rendered by Ansible with their defaults and SITE. The
-        defaults are each role's as a play sees them, its meta dependencies' included
-        (tests/lib role_defaults): a hand-kept list of files missed a shared-defaults role
-        a role came to depend on."""
+        """The roles' templates, rendered by Ansible with their variables and SITE: each
+        role's defaults and vars as a play sees them, its meta dependencies' included
+        (tests/lib role_variables): a hand-kept list of files missed a shared-defaults
+        role a role came to depend on, and defaults alone missed a dependency's vars."""
         out = cls.tmp / "rendered"
         values = {}
         for role in ("prometheus", "alertmanager", "grafana"):
-            values.update(role_defaults(role))
+            values.update(role_variables(role))
         defaults = cls.tmp / "defaults.yml"
         defaults.write_text(yaml.safe_dump(values))
         templates = {

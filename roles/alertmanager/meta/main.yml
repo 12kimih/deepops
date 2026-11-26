@@ -2,6 +2,7 @@
 # prometheus_port, alertmanager_port and the other shared paths: roles/prometheus_paths;
 # the administrators' Slack channel and mention: roles/slack_defaults.
 dependencies:
+  - role: retired_settings  # alertmanager_slack_critical_mention
   - role: prometheus_paths
   - role: slack_defaults
 

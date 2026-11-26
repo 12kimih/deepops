@@ -18,8 +18,6 @@ slurm_usage_report_weekly_schedule: "Mon *-*-* 09:00:00"
 # the weeks' numbers, their jobs now and what to do. Loose to start; tighten from the
 # weekly numbers. "" (admin_channel) turns the notice off.
 slurm_usage_report_admin_channel: "{{ slack_channels.admin }}"
-# Whom the notices there mention (roles/slack_defaults).
-slurm_usage_report_admin_mention: "{{ slack_admin_mention }}"
 slurm_usage_report_repeat_idle_gpu_hours: 50
 slurm_usage_report_repeat_idle_share: 0.5
 slurm_usage_report_repeat_weeks: 2

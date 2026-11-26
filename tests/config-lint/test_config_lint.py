@@ -75,6 +75,19 @@ class Commented(Configs):
         self.assertIn("drop the mark", found[1])
 
 
+class Broadcast(Configs):
+    def test_a_channel_wide_mention_is_reported_and_a_comment_is_not(self):
+        self.write("x: '<!here> look'\n", "# not <!channel>\nx: \"<!channel>\"\nz: '<!subteam^S1>'\n")
+        found = cl.check_broadcast()
+        self.assertEqual(len(found), 2, found)
+        self.assertIn("config.example/group_vars/all.yml:1: a value mentions a whole channel", found[0])
+        self.assertEqual(found[1], "broadcast: config/group_vars/all.yml:2", "the site's only by where")
+
+    def test_the_administrators_group_passes(self):
+        self.write("x: '<!subteam^S1>'\n", "x: 1\n")
+        self.assertEqual(cl.check_broadcast(), [])
+
+
 class Retired(Configs):
     def test_a_config_setting_a_retired_name_is_reported(self):
         self.write("#x: 1\n#old_example: 1\n", "x: 2\nold_site: 3\n")
