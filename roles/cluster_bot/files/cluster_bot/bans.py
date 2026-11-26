@@ -60,7 +60,7 @@ class UnbanFeature(Feature):
             raise Refused(f"{req['ip']}은(는) IP 주소가 아닙니다")
         found = self.where(ip)
         if not found:
-            raise Refused(f"{ip}은(는) 지금 차단되어 있지 않습니다. 접속이 안 되면 도움 채널에 알려 주세요")
+            raise Refused(f"{ip}은(는) 지금 차단되어 있지 않습니다. 접속이 안 되면 질문 채널에 알려 주세요")
         since = min(b["since"] for bans in found.values() for b in bans)
         return (
             "admin",

@@ -36,7 +36,7 @@ def _join_help():
 
 def join_text(connect, command):
     """How an account comes about (the join subcommand of COMMAND), then how to log in."""
-    how = (f"**계정 받기** ({_join_help()}): `{command} join` 양식에 아이디, 팀, SSH 공개 키를 냅니다. "
+    how = (f"**계정 받기** ({_join_help()}): `{command} join` 양식에 아이디, 팀, SSH 공개키를 냅니다. "
            "관리자가 승인해 계정이 생기면 접속 방법을 DM으로 알려 드립니다.")  # fmt: skip
     text = connect_text(connect)
     return how + ("\n" + text if text else "")

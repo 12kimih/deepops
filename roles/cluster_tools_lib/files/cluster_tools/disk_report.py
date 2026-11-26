@@ -268,10 +268,8 @@ def hold_note(hold, now):
     if hold is None:
         return ""
     if now >= hold:
-        return "공간을 비우실 때까지 새 Slurm 잡은 제출되지 않습니다"
-    return (
-        f"{datetime.fromtimestamp(hold):%Y-%m-%d}부터는 한도에 닿아 있는 동안 새 Slurm 잡이 제출되지 않습니다"
-    )
+        return "공간을 비우실 때까지 새 Slurm 잡을 제출할 수 없습니다"
+    return f"{datetime.fromtimestamp(hold):%Y-%m-%d}부터는 한도에 닿아 있는 동안 새 Slurm 잡을 제출할 수 없습니다"
 
 
 def past_line(row, who, mention=True, note=""):

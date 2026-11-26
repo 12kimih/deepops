@@ -25,7 +25,7 @@ disk_fixture = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(disk_fixture)
 
 # Names, not words: what the cluster and its tools are called.
-NAMES = {"GPU", "QOS", "Slurm", "Grafana", "drain", "down", "node_exporter", "normal"}
+NAMES = {"GPU", "QoS", "Slurm", "Grafana", "drain", "down", "node_exporter", "normal"}
 FIXTURE = {
     "alice",
     "bob",

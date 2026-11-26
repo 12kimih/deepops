@@ -11,7 +11,7 @@ ROLES = ("owners", "members", "viewers")
 MENU = {
     "manage": "사람 추가, 역할 변경, 빼기",
     "purpose": "설명 바꾸기",
-    "close": "프로젝트 닫기",
+    "close": "폴더 닫기",
     "leave": "나가기",
 }
 
@@ -47,13 +47,13 @@ def home(login, projects, root):
         blocks.append(rich.section(text, accessory={"type": "overflow", "action_id": "project.menu",
                                      "options": [_option(MENU[op], f"{op}:{name}") for op in ops]}))  # fmt: skip
     if not mine:
-        blocks.append(rich.context("참여 중인 프로젝트가 없습니다."))
+        blocks.append(rich.context("참여 중인 공동작업 폴더가 없습니다."))
     blocks.append({"type": "actions", "elements": [
-        button("새 프로젝트", "project.new", "new", style="primary"),
+        button("새 공동작업 폴더", "project.new", "new", style="primary"),
         button("참여 요청", "project.join", "join"),
     ]})  # fmt: skip
-    blocks.append(rich.context("관리자와 멤버는 읽고 쓰고, 열람자는 읽기만 합니다. 바뀐 그룹은 새로 로그인하면 적용됩니다. "
-        "파일은 만든 사람의 디스크 할당량에 들어갑니다."))  # fmt: skip
+    blocks.append(rich.context("소유자와 멤버는 읽고 쓰고, 열람자는 읽기만 합니다. 바뀐 그룹은 새로 로그인하면 적용됩니다. "
+        "파일은 만든 사람의 디스크 한도에 들어갑니다."))  # fmt: skip
     return blocks
 
 
@@ -83,10 +83,10 @@ def new_form(places):
         field("purpose", "무엇을 위한 폴더인가요", {"type": "plain_text_input"}, optional=True),
         field("place", "어디에 둘까요", {"type": "radio_buttons", "initial_option": _option(names["home"], "home"),
                                         "options": [_option(names[p], p) for p in names]}),
-        field("owners", "함께 관리할 사람 (관리자)", people, optional=True),
+        field("owners", "함께 맡을 사람 (소유자)", people, optional=True),
         field("members", "멤버 (읽고 쓰기)", people, optional=True),
         field("viewers", "열람자 (읽기만)", people, optional=True),
-        rich.context("신청한 사람이 관리자가 됩니다. 관리자가 승인하면 폴더가 만들어집니다."),
+        rich.context("신청한 사람이 소유자가 됩니다. 관리자가 승인하면 폴더가 만들어집니다."),
     ])  # fmt: skip
 
 
@@ -112,11 +112,11 @@ def join_form(projects, login):
                for n, p in sorted(projects.items()) if not role_of(p, login)]  # fmt: skip
     if not options:
         return None
-    return _modal("project.join.submit", "프로젝트 참여 요청", [
-        field("project", "프로젝트", {"type": "static_select", **choices(options)}),
+    return _modal("project.join.submit", "공동작업 폴더 참여 요청", [
+        field("project", "공동작업 폴더", {"type": "static_select", **choices(options)}),
         field("role", "역할", {"type": "radio_buttons", "initial_option": _option(ROLE_NAMES["members"], "members"),
                                "options": [_option(ROLE_NAMES[r], r) for r in ("members", "viewers")]}),
-        rich.context("프로젝트 관리자 중 한 명이 승인하면 반영됩니다."),
+        rich.context("그 폴더의 소유자 중 한 명이 승인하면 반영됩니다."),
     ])  # fmt: skip
 
 
