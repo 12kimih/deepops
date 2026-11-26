@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
-from cluster_bot import tidy  # noqa: E402
+from cluster_bot import notices, tidy  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "tests/lib"))
 from fake_slack import FakeChannel  # noqa: E402
@@ -45,13 +45,14 @@ def notice_post(slack, nid, bot=RETIRED):
 
 
 def notes(*nids):
-    return {f"{SITE}{n}/": {"id": f"{SITE}{n}/", "date": "2026-11-19", "text": n, "blocks": [
-        {"type": "header", "text": {"type": "plain_text", "text": n}}]} for n in nids}  # fmt: skip
+    """The notices as the bot reads them (notices.notices_of), never a hand copy of its shape."""
+    return notices.notices_of({"notices": [{"id": f"{SITE}{n}/", "date": "2026-11-19", "text": n, "blocks": [
+        {"type": "header", "text": {"type": "plain_text", "text": n}}]} for n in nids]})  # fmt: skip
 
 
-def run(slack, dry_run, retired=(RETIRED[0],), seen=None, notices=("a", "b")):
-    ctx = tidy.Context(FakeChannel.BOT, FakeChannel.USER, retired, notes(*notices),
-                       {f"{SITE}{n}/": {"date": "2026-11-19"} for n in notices} if seen is None else seen)  # fmt: skip
+def run(slack, dry_run, retired=(RETIRED[0],), seen=None, posted=("a", "b")):
+    ctx = tidy.Context(FakeChannel.BOT, FakeChannel.USER, retired, notes(*posted),
+                       {f"{SITE}{n}/": {"date": "2026-11-19"} for n in posted} if seen is None else seen)  # fmt: skip
     lines, pauses = [], []
     actions = tidy.tidy(slack, CHANNELS, ctx, lines.append, dry_run=dry_run, pause=pauses.append)
     return actions, lines, pauses
@@ -141,7 +142,6 @@ class Tidy(unittest.TestCase):
         self.assertIn("post it again", left["why"])
 
     def test_the_notices_round_says_missing_not_post_for_a_deleted_retired_notice(self):
-        from cluster_bot import notices
 
         run(self.slack, dry_run=False)
         seen = {f"{SITE}{n}/": {"date": "2026-11-19"} for n in ("a", "b")}
