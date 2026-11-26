@@ -31,14 +31,14 @@ Two sources, on every node, with the monitoring stack:
 When a node's NFS traffic to a measured export stays above `slurm_usage_report_io_share`
 (0.4) of what the disk serves (the model's `rbps` or `wbps`) for
 `slurm_usage_report_io_minutes` (15), `slurm-usage-report-io.timer` (every 5 minutes)
-sends the users of that node's `slurm_usage_report_io_top_jobs` (3) jobs by I/O a DM
+sends the users of that node's `slurm_usage_report_io_top_jobs` (3) jobs by NFS traffic a DM
 ending in `slurm_usage_report_io_advice`, and the administrators' channel one line per
 node, at once and every `slurm_usage_report_io_repeat_hours` (6) while it lasts. A root
 job is named to the administrators only. Preview what it would say with
 `sudo /usr/local/libexec/slurm-usage-report --io --to <your Slack member ID>`.
 
 Grafana's **Storage / NFS and disks** dashboard shows them together: each node's NFS
-reads and writes, the top jobs and logins by I/O, and for the disks under iocost whether
+reads and writes, the top jobs by NFS traffic and logins by disk I/O, and for the disks under iocost whether
 it is on, how busy they are, their latency and how long each slice waited for I/O. Set
 the time range across the moment iocost turned on to compare before and after.
 
@@ -50,6 +50,13 @@ directory by the job's SLUID; the `cgroup` label), with the job id Slurm gives t
 so they rank the jobs on a busy node, they are not NFS bytes. A task that already exited
 still counts: the kernel adds a reaped child's counts to its parent, and counts a
 process takes with it when it leaves the job are kept.
+
+A job's NFS traffic is estimated, not measured: `job:nfs_read_bytes:rate5m` and
+`job:nfs_write_bytes:rate5m` (roles/prometheus rules `io-usage.yml`) split each node's NFS
+wire bytes, every export together, across its jobs by their share of the node's job
+counters. It is per node, not per export (a job's counters do not say which mount they
+went to), and traffic from processes outside jobs is put on the jobs. The notices and the
+dashboard rank jobs by it.
 
 ## Measure the disk
 

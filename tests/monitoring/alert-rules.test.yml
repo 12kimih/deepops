@@ -1336,6 +1336,31 @@ tests:
           - labels: 'host_mount:nfs_write_bytes:rate5m{host="n1", mountpoint="/home"}'
             value: 10
 
+  - name: a node's NFS traffic is split across its jobs by their syscall I/O
+    interval: 1m
+    input_series:
+      - series: 'host_mount:nfs_read_bytes:rate5m{host="n1", mountpoint="/home"}'
+        values: '100x10'
+      - series: 'host_mount:nfs_read_bytes:rate5m{host="n1", mountpoint="/scratch"}'
+        values: '60x10'
+      - series: 'io_usage_job_read_bytes_total{host="n1", instance="n1:9100", job_id="7", cgroup="s7", user="alice"}'
+        values: '0+18000x10'
+      - series: 'io_usage_job_read_bytes_total{host="n1", instance="n1:9100", job_id="", cgroup="s8", user="bob"}'
+        values: '0+6000x10'
+      # A node whose jobs do no I/O gets no share, not a division by zero.
+      - series: 'host_mount:nfs_read_bytes:rate5m{host="n2", mountpoint="/home"}'
+        values: '50x10'
+      - series: 'io_usage_job_read_bytes_total{host="n2", instance="n2:9100", job_id="9", cgroup="s9", user="carol"}'
+        values: '5x10'
+    promql_expr_test:
+      - expr: job:nfs_read_bytes:rate5m
+        eval_time: 10m
+        exp_samples:
+          - labels: 'job:nfs_read_bytes:rate5m{host="n1", job_id="7", cgroup="s7", user="alice"}'
+            value: 120
+          - labels: 'job:nfs_read_bytes:rate5m{host="n1", job_id="", cgroup="s8", user="bob"}'
+            value: 40
+
   - name: a scope the bot token lacks warns, per scope
     interval: 1m
     input_series:

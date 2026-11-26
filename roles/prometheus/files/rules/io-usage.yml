@@ -74,6 +74,25 @@ groups:
             shows which nodes and since when: all of them slow points at the server or
             its disks (Disk busy), one alone at its network or its own queue (NFS queue
             share).
+      # Each job's estimated share of its node's NFS traffic, every export together: the
+      # node's wire bytes split across its jobs by their share of its jobs' syscall I/O
+      # (io_usage_job_*). An estimate: syscall I/O counts local files, page cache and
+      # pipes too, and the traffic of processes outside jobs is put on the jobs. Not
+      # per export: a job's syscall counts do not say which mount they went to.
+      - record: job:nfs_read_bytes:rate5m
+        expr: |
+          sum by (host, job_id, cgroup, user) (rate(io_usage_job_read_bytes_total[5m]))
+          / on (host) group_left ()
+          (sum by (host) (rate(io_usage_job_read_bytes_total[5m])) > 0)
+          * on (host) group_left ()
+          sum by (host) (host_mount:nfs_read_bytes:rate5m)
+      - record: job:nfs_write_bytes:rate5m
+        expr: |
+          sum by (host, job_id, cgroup, user) (rate(io_usage_job_written_bytes_total[5m]))
+          / on (host) group_left ()
+          (sum by (host) (rate(io_usage_job_written_bytes_total[5m])) > 0)
+          * on (host) group_left ()
+          sum by (host) (host_mount:nfs_write_bytes:rate5m)
       - alert: IoUsageStale
         expr: time() - io_usage_last_success_timestamp_seconds > 600
         labels: {severity: warning}

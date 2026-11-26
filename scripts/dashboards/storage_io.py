@@ -11,7 +11,7 @@ from grafana import dashboard, host_links, job_links, query, row, timeseries
 
 PATH = "src/dashboards/storage-io.json"
 
-JOB_IO = "rate(io_usage_job_read_bytes_total[5m]) + rate(io_usage_job_written_bytes_total[5m])"
+JOB_NFS = "job:nfs_read_bytes:rate5m + job:nfs_write_bytes:rate5m"
 LOGIN_IO = "rate(io_usage_login_read_bytes_total[5m]) + rate(io_usage_login_written_bytes_total[5m])"
 # The disks iocost is set on, by host and kernel name, for joining node_exporter's.
 SHARED = "max by (host, device) (io_fairness_enabled)"
@@ -89,14 +89,14 @@ def build():
         ),
         row("Jobs and logins"),
         timeseries(
-            "Top jobs by I/O",
-            [query(f"topk(10, sum by (host, job_id, user) ({JOB_IO}))", "{{host}} {{job_id}} {{user}}")],
+            "Top jobs by NFS traffic (estimated)",
+            [query(f"topk(10, sum by (host, job_id, user) ({JOB_NFS}))", "{{host}} {{job_id}} {{user}}")],
             unit="Bps",
             legend="table",
             calcs=("lastNotNull", "max", "mean"),
             description=(
-                "Each job's reads and writes through system calls (rchar and wchar, roles/io_usage): "
-                "page cache and pipes included, so a ranking, not disk or NFS bytes."
+                "Each job's share of its node's NFS reads and writes (job:nfs_*_bytes:rate5m): the node's "
+                "wire bytes split by its jobs' system-call I/O (roles/io_usage), so an estimate."
             ),
             links=[*job_links("${__field.labels.job_id}"), *host_links("${__field.labels.host}")],
         ),
