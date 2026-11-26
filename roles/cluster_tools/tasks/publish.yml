@@ -90,7 +90,7 @@
     recorded_files_record: "{{ cluster_tools_manifest }}"
     recorded_files_names: "{{ cluster_tools_scripts | map(attribute='dest') | list + cluster_tools_commands }}"
     recorded_files_dirs: ["{{ cluster_tools_bin_dir }}", "{{ cluster_tools_completion_dir }}"]
-    recorded_files_retired: "{{ cluster_tools_retired + cluster_tools_retired_builtin }}"
+    recorded_files_retired: "{{ cluster_tools_retired + (cluster_tools_retired_builtin | list) }}"
 
 # A published name that also resolves elsewhere in PATH would shadow the real command
 # for every user, as an `alias squeue=/path/to/squeue.sh` does. Catch it

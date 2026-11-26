@@ -173,6 +173,9 @@ PUBLIC = {
     "terms": {"use", "title", "not", "title_not", "why", "scope", "id", "code"},  # every glossary entry
     "titles": {"endings", "exempt"},  # the glossary's title rules
     "rules": {"id", "title", "action", "check", "anchor", "values"},  # cluster_tools.rules, each
+    # {old: new} of the retired commands (cluster_tools_retired_builtin), for the docs' and
+    # the site config's checks that refuse an old name (scripts/deepops/retired_names.py)
+    "commands_retired": None,
 }
 STORAGE_FIELDS = {
     "read_bps": "rbps",
@@ -638,6 +641,7 @@ def facts(config):
     every = {
         "commands": commands(s.get("cluster_tools_builtin") or []),
         "rules": rules_table(s),
+        "commands_retired": dict(s.get("cluster_tools_retired_builtin") or {}),
         "policy": {
             **{field: s.get(key) for field, key in POLICY.items()},
             **submit_policy(s.get("slurm_job_submit_policy") or {}),
@@ -688,6 +692,8 @@ def public(every):
             out[key] = {
                 m: {f: v for f, v in d.items() if f in QUOTA_FIELDS} for m, d in (value or {}).items()
             }
+        elif key == "commands_retired":
+            out[key] = {old: new for old, new in (value or {}).items() if isinstance(new, str)}
         elif fields is None:  # names the site chooses; the values are checked by kind
             out[key] = {f: v for f, v in (value or {}).items() if isinstance(v, str) and DATE.fullmatch(v)}
         else:

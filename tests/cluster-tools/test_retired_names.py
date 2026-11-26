@@ -12,17 +12,13 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import tracked  # noqa: E402
 
-import yaml  # noqa: E402
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import retired_names  # noqa: E402
 
-RETIRED = yaml.safe_load((ROOT / "roles/cluster_tools_defaults/defaults/main.yml").read_text())[
-    "cluster_tools_retired_builtin"
-]
-# A command's name as a word: not a path, a file name (scratch-space.yml), a longer
-# name (scratch-space-purge) or a channel (#gpu-usage).
-WORD = re.compile(r"(?<![#\w/.-])(" + "|".join(map(re.escape, RETIRED)) + r")(?![\w.-])")
+SELF = {"tests/cluster-tools/test_retired_names.py", "scripts/deepops/retired_names.py"}
 # (file, a pattern of the line) -> why it is not the command.
 ALLOWED = {
-    ("roles/cluster_tools_defaults/defaults/main.yml", r"^cluster_tools_retired_builtin:"): "the list itself",
+    ("roles/cluster_tools_defaults/defaults/main.yml", r"^  [a-z-]+: usage"): "the list itself",
     ("playbooks/generic/scratch-space.yml", r"^\s+- scratch-space$"): "the playbook's tag, its own name",
     (
         "roles/prometheus/files/rules/scratch-space.yml",
@@ -44,22 +40,25 @@ class RetiredNames(unittest.TestCase):
         found = []
         for path in tracked():
             rel = str(path.relative_to(ROOT))
-            if rel == "tests/cluster-tools/test_retired_names.py" or not path.is_file() or path.is_symlink():
+            if rel in SELF or not path.is_file() or path.is_symlink():
                 continue
             try:
                 text = path.read_text()
             except (UnicodeDecodeError, OSError):
                 continue
             for number, line in enumerate(text.splitlines(), 1):
-                if WORD.search(line) and not any(f == rel and re.search(p, line) for f, p in ALLOWED):
-                    found.append(f"{rel}:{number}: {line.strip()[:100]}")
+                if retired_names.mentions(line) and not any(
+                    f == rel and re.search(p, line) for f, p in ALLOWED
+                ):
+                    name, new = retired_names.mentions(line)[0][1:]
+                    found.append(f"{rel}:{number}: {name} -> {new}: {line.strip()[:80]}")
         self.assertEqual(found, [], "name usage and its subcommand instead (cluster_tools.usage)")
 
     def test_the_words_are_found_and_the_look_alikes_not(self):
-        self.assertTrue(WORD.search("run `disk-usage` to see"))
-        self.assertTrue(WORD.search("gpu-usage JOB"))
+        self.assertEqual(retired_names.mentions("run `disk-usage` to see"), [(1, "disk-usage", "usage disk")])
+        self.assertEqual(retired_names.mentions("gpu-usage JOB")[0][2], "usage gpu")
         for line in ("#gpu-usage", "scratch-space.yml", "scratch-space-purge", "roles/scratch-space"):
-            self.assertFalse(WORD.search(line), line)
+            self.assertEqual(retired_names.mentions(line), [], line)
 
 
 if __name__ == "__main__":

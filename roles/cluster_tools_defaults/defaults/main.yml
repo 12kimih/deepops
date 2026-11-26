@@ -5,11 +5,15 @@
 
 # Every command deepops ships.
 cluster_tools_builtin: [sq, qos, usage]
-# The commands deepops shipped and retired since, removed wherever they were published
-# (with their completion): `usage` took their place (owner, 2026-11-27). The one place
-# that names them: tests/cluster-tools/test_retired_names.py holds the rest of the
-# repository to it.
-cluster_tools_retired_builtin: [gpu-usage, disk-usage, scratch-space]
+# The commands deepops shipped and retired since, each with what took its place (owner,
+# 2026-11-27): removed wherever they were published (with their completion). The one
+# place that names them: scripts/deepops/retired_names.py holds deepops to it (and the
+# user docs and the site config through site.json commands_retired), and every refusal
+# names the replacement from here.
+cluster_tools_retired_builtin:
+  gpu-usage: usage gpu
+  disk-usage: usage disk
+  scratch-space: usage disk
 # The ones this site publishes, by name, of cluster_tools_builtin. Empty publishes none and
 # removes what was published.
 cluster_tools_commands: []
