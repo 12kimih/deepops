@@ -28,14 +28,17 @@ def scrape_job():
 
 
 def relabel(rules, labels):
-    """LABELS after RULES (keep the action subset these rules use: drop, replace)."""
+    """LABELS after RULES (the action subset these rules use: drop, replace, labeldrop)."""
     labels = dict(labels)
     for rule in rules:
-        value = ";".join(labels.get(name, "") for name in rule["source_labels"])
+        value = ";".join(labels.get(name, "") for name in rule.get("source_labels", []))
         match = re.fullmatch(rule["regex"], value)
         action = rule.get("action", "replace")
         if action == "drop" and match:
             return None
+        if action == "labeldrop":
+            labels = {k: v for k, v in labels.items() if not re.fullmatch(rule["regex"], k)}
+            continue
         if action == "replace" and match:
             labels[rule["target_label"]] = match.expand(rule.get("replacement", "$1").replace("$", "\\"))
     return labels
@@ -55,14 +58,26 @@ class Mountstats(unittest.TestCase):
         )
         self.assertEqual(nested["mountpoint"], "/a/b")
 
-    def test_only_the_per_mount_counters_stay(self):
-        for name, kept in (("node_mountstats_nfs_total_read_bytes_total", True),
-                           ("node_mountstats_nfs_operations_requests_total", False),
-                           ("node_mountstats_nfs_transport_sends_total", False),
-                           ("node_mountstats_nfs_event_vfs_open_total", False),
-                           ("node_load1", True)):  # fmt: skip
-            with self.subTest(name=name):
-                self.assertEqual(relabel(self.rules, {"__name__": name}) is not None, kept)
+    def test_only_the_per_mount_counters_and_the_named_operations_latency_stay(self):
+        ops = role_defaults("prometheus")["prometheus_nfs_client_operations"]
+        self.assertIn("WRITE", ops)
+        for name, op, kept in (("node_mountstats_nfs_total_read_bytes_total", "", True),
+                               ("node_mountstats_nfs_operations_requests_total", "WRITE", True),
+                               ("node_mountstats_nfs_operations_response_time_seconds_total", "READ", True),
+                               ("node_mountstats_nfs_operations_queue_time_seconds_total", "GETATTR", True),
+                               ("node_mountstats_nfs_operations_major_timeouts_total", "COMMIT", True),
+                               ("node_mountstats_nfs_operations_requests_total", "READDIRPLUS", False),
+                               ("node_mountstats_nfs_operations_sent_bytes_total", "WRITE", False),
+                               ("node_mountstats_nfs_operations_requests_total", "", False),
+                               ("node_mountstats_nfs_transport_sends_total", "", False),
+                               ("node_mountstats_nfs_event_vfs_open_total", "", False),
+                               ("node_load1", "", True)):  # fmt: skip
+            with self.subTest(name=name, operation=op):
+                labels = {"__name__": name, **({"operation": op} if op else {})}
+                out = relabel(self.rules, labels)
+                self.assertEqual(out is not None, kept)
+                if out:
+                    self.assertNotIn("__tmp_nfs_keep", out, "the mark goes")
 
     def test_other_metrics_keep_their_mountpoint(self):
         out = relabel(self.rules, {"__name__": "node_filesystem_avail_bytes", "mountpoint": "/host/home"})

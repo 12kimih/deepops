@@ -21,6 +21,59 @@ groups:
             * on (instance, export, mountaddr, protocol) group_left (mountpoint)
             node_mountstats_nfs_mountpoint_info
           )
+      # Each node's NFS client latency, by mount and operation (the operations the scrape
+      # keeps, prometheus_nfs_client_operations): the mean response, from sending a
+      # request to its reply, and the share of a request's time it first waited in the
+      # client's queue (high: the node itself, its RPC slots, is the bottleneck, not the
+      # server). An operation with no requests in the window has no series.
+      - record: host_mount_operation:nfs_response_seconds:mean5m
+        expr: |
+          sum by (host, mountpoint, operation) (
+            rate(node_mountstats_nfs_operations_response_time_seconds_total[5m])
+            * on (instance, export, mountaddr, protocol) group_left (mountpoint)
+            node_mountstats_nfs_mountpoint_info
+          )
+          / (
+            sum by (host, mountpoint, operation) (
+              rate(node_mountstats_nfs_operations_requests_total[5m])
+              * on (instance, export, mountaddr, protocol) group_left (mountpoint)
+              node_mountstats_nfs_mountpoint_info
+            ) > 0
+          )
+      - record: host_mount_operation:nfs_queue_share:ratio5m
+        expr: |
+          sum by (host, mountpoint, operation) (
+            rate(node_mountstats_nfs_operations_queue_time_seconds_total[5m])
+            * on (instance, export, mountaddr, protocol) group_left (mountpoint)
+            node_mountstats_nfs_mountpoint_info
+          )
+          / (
+            sum by (host, mountpoint, operation) (
+              (
+                rate(node_mountstats_nfs_operations_queue_time_seconds_total[5m])
+                + rate(node_mountstats_nfs_operations_response_time_seconds_total[5m])
+              )
+              * on (instance, export, mountaddr, protocol) group_left (mountpoint)
+              node_mountstats_nfs_mountpoint_info
+            ) > 0
+          )
+      # A node's reads or writes on a watched mount slow for 15 minutes: the server, or
+      # the network to it, answers this node late (deepops_nfs_client_slow_seconds: the
+      # threshold per mountpoint, prometheus_nfs_client_slow_ms).
+      - alert: NfsClientSlow
+        expr: |
+          host_mount_operation:nfs_response_seconds:mean5m{operation=~"READ|WRITE"}
+          > on (mountpoint) group_left () max by (mountpoint) (deepops_nfs_client_slow_seconds)
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "NFS {{ $labels.operation }} on {{ $labels.mountpoint }} answers {{ $labels.host }} in {{ $value | humanizeDuration }} on average"
+          description: >-
+            Past the threshold (prometheus_nfs_client_slow_ms) for 15 minutes, so every
+            job on the node waits on its files. The dashboard Storage / NFS and disks
+            shows which nodes and since when: all of them slow points at the server or
+            its disks (Disk busy), one alone at its network or its own queue (NFS queue
+            share).
       - alert: IoUsageStale
         expr: time() - io_usage_last_success_timestamp_seconds > 600
         labels: {severity: warning}
