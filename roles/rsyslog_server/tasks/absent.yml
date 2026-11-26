@@ -11,8 +11,7 @@
   systemd_unit:
     name: rsyslog
   register: rsyslog_server_rsyslog
-  check_mode: true  # read-only: no state requested
-  failed_when: false
+  check_mode: true  # read-only; a unit not installed is LoadState not-found, no failure
 
 # rsyslog keeps running for the OS; it restarts so the removed file stops applying.
 - name: Restart rsyslog without this component's settings
