@@ -69,6 +69,28 @@ class LinksCreated(unittest.TestCase):
         )
 
 
+# What systemd-analyze verify default.target printed on a GPU node (ARA 344,
+# 2026-11-26), where slurmd then never started at boot.
+GPU_NODE = """\
+power-policy.service: Found ordering cycle on nvidia-power-limit.service/start
+power-policy.service: Found dependency on multi-user.target/start
+power-policy.service: Found dependency on power-policy.service/start
+power-policy.service: Job nvidia-power-limit.service/start deleted to break ordering cycle starting with power-policy.service/start
+/usr/lib/systemd/system/foo.service:7: Unknown key name 'Foo' in section 'Service', ignoring.
+"""
+
+
+class OrderingCycles(unittest.TestCase):
+    def test_the_cycle_and_its_units_and_nothing_else(self):
+        sys.path.insert(0, str(ROOT / "plugins" / "action"))
+        from systemd_unit import ordering_cycles
+
+        found = ordering_cycles(GPU_NODE)
+        self.assertEqual(len(found), 4, found)
+        self.assertTrue(found[0].startswith("power-policy.service: Found ordering cycle"))
+        self.assertEqual(ordering_cycles("foo.service:7: Unknown key name 'Foo'\n"), [])
+
+
 @unittest.skipUnless(Path("/run/systemd/system").is_dir(), "needs systemd")
 class SystemdUnit(unittest.TestCase):
     def test_a_unit_not_installed_yet_is_previewed(self):
@@ -95,6 +117,37 @@ class SystemdUnit(unittest.TestCase):
 """
         got = run("--check", "--diff", play=play)
         self.assertFalse(got["enabled"].get("changed") or got["enabled"].get("failed"), got["enabled"])
+
+    def enable_with(self, report):
+        """Enable an enabled unit for real, systemd-analyze printing REPORT."""
+        unit = enabled_unit()
+        if not unit:
+            self.skipTest("no enabled service unit")
+        with tempfile.TemporaryDirectory() as fake:
+            tool = Path(fake) / "systemd-analyze"
+            tool.write_text(f"#!/bin/sh\ncat >&2 <<'EOF'\n{report}EOF\nexit 1\n")
+            tool.chmod(0o755)
+            play = f"""
+- hosts: localhost
+  gather_facts: false
+  connection: local
+  environment:
+    PATH: "{fake}:{{{{ lookup('env', 'PATH') }}}}"
+  tasks:
+    - name: enabled
+      systemd_unit: {{name: {unit}, enabled: true}}
+"""
+            return run(play=play)["enabled"]
+
+    def test_an_ordering_cycle_fails_the_task_and_names_it(self):
+        got = self.enable_with(GPU_NODE)
+        self.assertTrue(got.get("failed"), got)
+        self.assertIn("nvidia-power-limit.service/start deleted to break ordering cycle", got["msg"])
+        self.assertEqual(len(got["cycles"]), 4)
+
+    def test_other_warnings_of_verify_pass(self):
+        got = self.enable_with("foo.service:7: Unknown key name 'Foo' in section 'Service', ignoring.\n")
+        self.assertFalse(got.get("failed"), got)
 
     def test_a_real_run_still_fails_on_a_missing_unit(self):
         got = run()
