@@ -11,6 +11,7 @@
                                                (cluster_tools.rich: the Markdown every
                                                text is written in, sent as rich text)
     mentioning(who, text, blocks)           -> (text, blocks) that notify WHO first
+    unmentioning(text)                      -> (who, text): its inverse, on a text read
     bar(percent)                            -> a text gauge for a code span or table
     pages(title, blocks)                    -> thread replies [(text, blocks)] holding
                                                every block, each within Slack's limits
@@ -63,6 +64,8 @@ TIMEOUT = 30
 RETRY_MAX = 60
 # A Slack member ID (users, and workspace-wide W... IDs).
 MEMBER = re.compile(r"[UW][A-Z0-9]+")
+# A mention mentioning() puts first: a member, a user group or a special one (<!here>).
+MENTIONED = re.compile(r"(<(?:@[UW][A-Z0-9]+|!subteam\^[A-Z0-9]+|![a-z]+)(?:\|[^>]*)?>)(?: |$)")
 # How long a looked-up member ID is trusted (seconds).
 MEMBER_TTL = 86400
 MAX_BLOCKS = 45  # Slack allows 50 blocks per message
@@ -323,6 +326,13 @@ def mentioning(who, text, blocks=None):
     if not who:
         return text, blocks
     return f"{who} {text}", ([*rich.blocks(who), *blocks] if blocks else blocks)
+
+
+def unmentioning(text):
+    """(who, the text) of a TEXT mentioning() wrote: the mention it put first, "" when there
+    is none. A message read back (tidy, a match on what it says) compares what it says."""
+    match = MENTIONED.match(text or "")
+    return (match[1], text[match.end() :]) if match else ("", text or "")
 
 
 def sections(text):
