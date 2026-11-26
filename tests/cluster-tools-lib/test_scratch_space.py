@@ -3,7 +3,6 @@ removed grace_days after they were first listed, unless used before; nothing is
 followed through a link or across a filesystem; each person sees their list, files used
 since shown as spared; a mass access-time refresh is counted for an administrator."""
 
-import io
 import json
 import os
 import sys
@@ -319,21 +318,26 @@ class Show(Base):
 
 
 class Cli(Base):
-    def test_usage(self):
-        with self.assertRaises(SystemExit) as e, mock.patch("sys.stderr"):
-            ss.main(["bogus", "args", "x", "y"])
-        self.assertEqual(e.exception.code, 2)
+    def test_only_the_purge_runs_from_the_command_line(self):
+        # people see their files through usage disk (show), not a command of this module
+        with mock.patch("sys.stderr"):
+            self.assertEqual(ss.main(["bogus", "args", "x", "y"]), 2)
+            self.assertEqual(ss.main(["--root", self.root]), 2)
 
-    def test_a_person_runs_it_without_a_config(self):
-        self.file("alice/a", 70)
+    def test_a_person_sees_their_files_and_a_long_list_is_cut(self):
+        for n in range(3):
+            self.file(f"alice/a{n}", 70)
         self.run_at(NOW)
-        out = io.StringIO()
-        with (
-            mock.patch.object(ss.pwd, "getpwuid", lambda uid: mock.Mock(pw_name="alice")),
-            mock.patch("sys.stdout", out),
-        ):
-            self.assertEqual(ss.main(["--root", self.root]), 0)
-        self.assertIn("alice/a", out.getvalue())
+        text, status = ss.show(ss.Host(), self.root, "alice", NOW)
+        self.assertEqual(status, 0)
+        self.assertIn("alice/a0", text)
+        short, _ = ss.show(ss.Host(), self.root, "alice", NOW, top=1)
+        self.assertIn("3 listed", short)
+        self.assertEqual(sum("alice/a" in line for line in short.splitlines()), 1)
+        with open(os.path.join(self.root, "alice", ss.LIST_NAME), encoding="utf-8") as f:
+            files, _, first = ss.summarize_list(f)
+        self.assertEqual(files, 3)
+        self.assertTrue(first)
 
     def test_config_is_checked(self):
         path = os.path.join(self.tmp.name, "c.json")

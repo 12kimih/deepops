@@ -1,4 +1,4 @@
-"""Tests for gpu-usage (cluster_tools.gpu_usage) against Slurm 26.05 accounting fixtures."""
+"""Tests for usage gpu (cluster_tools.gpu_usage) against Slurm 26.05 accounting fixtures."""
 
 import copy
 import json
@@ -196,12 +196,19 @@ class CommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "accounting.json"
             path.write_text(json.dumps({**ACCOUNTING, "jobs": jobs}))
-            return run_tool("gpu_usage", *args, env={"ACCOUNTING": str(path)})
+            rules = (
+                Path(d) / "usage.json"
+            )  # the rule on jobs leaving their GPUs idle off: no Prometheus asked
+            rules.write_text(json.dumps({"prometheus_url": ""}))
+            env = {"ACCOUNTING": str(path), "CLUSTER_TOOLS_USAGE_CONFIG": str(rules)}
+            return run_tool("gpu_usage", *args, env=env)
 
     def test_json_names_each_rows_source(self):
         done = self.run_on([with_slurm_gpu_figures(gpu_job())], "123", "--json")
         self.assertEqual(done.returncode, 0, done.stderr)
-        (report,) = json.loads(done.stdout)
+        doc = json.loads(done.stdout)
+        self.assertEqual((doc["schema"], doc["command"], doc["rules"][0]["state"]), (1, "usage gpu", "off"))
+        (report,) = doc["jobs"]
         self.assertEqual([r["source"] for r in report["rows"]], ["slurm"])
 
     def test_a_job_is_found_in_every_cluster_the_accounting_holds(self):
@@ -218,15 +225,16 @@ class CommandTests(unittest.TestCase):
         cpu = gpu_job()
         cpu["tres"]["allocated"] = [t for t in cpu["tres"]["allocated"] if t["type"] != "gres"]
         done = self.run_on([cpu], "123")
-        self.assertEqual((done.returncode, done.stderr.strip()), (1, "gpu-usage: job 123 holds no GPUs"))
+        # a wrong call (2), never "at risk" (1) or "retry later" (3)
+        self.assertEqual((done.returncode, done.stderr.strip()), (2, "usage gpu: job 123 holds no GPUs"))
         done = self.run_on([], "123")
         self.assertEqual(
-            (done.returncode, done.stderr.strip()), (1, "gpu-usage: no job 123 in Slurm's accounting")
+            (done.returncode, done.stderr.strip()), (2, "usage gpu: no job 123 in Slurm's accounting")
         )
 
     def test_help_and_completion_come_from_the_definition(self):
         done = run_tool("gpu_usage", "--help")
-        self.assertIn("Usage: gpu-usage [OPTIONS] JOB", done.stdout)
+        self.assertIn("Usage: usage gpu [OPTIONS] [JOB]", done.stdout)
         self.assertIn("TRESUsageInAve", done.stdout)
         completion = run_tool("gpu_usage", "--completion", "bash").stdout
         self.assertIn("auto slurm prometheus", completion)

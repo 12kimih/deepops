@@ -39,11 +39,11 @@ class BannerTests(unittest.TestCase):
         self.assertEqual(ANSI.sub("", shown(script)), shown(banner.script("t", COMMANDS, LINKS, color=False)))
 
     def test_a_command_named_alone_says_what_its_own_definition_says(self):
-        from cluster_tools import gpu_usage, sq
+        from cluster_tools import sq, usage
 
-        out = shown(banner.script("t", ["sq", "gpu-usage", {"name": "sinfo", "text": "nodes"}], color=False))
+        out = shown(banner.script("t", ["sq", "usage", {"name": "sinfo", "text": "nodes"}], color=False))
         self.assertIn(sq.COMMAND.summary, out)
-        self.assertIn(gpu_usage.COMMAND.summary, out)
+        self.assertIn(usage.COMMAND.summary, out)
         self.assertIn("sinfo", out)
         with self.assertRaises(ModuleNotFoundError):
             banner.script("t", ["no-such-command"], color=False)

@@ -25,9 +25,9 @@ cluster_tools_lib_python: /usr/bin/python3
 # would silently go missing at every site that sets its own.
 cluster_tools_lib_derived_info:
   dashboard_url: "{{ grafana_root_url }}"
-  prometheus_url: "{{ prometheus_url }}"  # gpu-usage reads Prometheus here
+  prometheus_url: "{{ prometheus_url }}"  # usage reads Prometheus here
   gpu_allocation_interval: "{{ slurm_metrics_interval }}"  # and its shortest window
-  scratch_root: "{{ scratch_space_root }}"  # scratch-space and the disk report
+  scratch_root: "{{ scratch_space_root }}"  # usage disk and the disk report
 # Where every cluster tool's configuration lives (<tool>.json), made by this role's
 # main tasks, which every tool's role runs first as its meta dependency.
 cluster_tools_lib_config_dir: /etc/cluster-tools

@@ -82,7 +82,10 @@ class Collect(unittest.TestCase):
             "그 노드가 공유 스토리지와 주고받은 양을 노드 안 잡들의 읽기, 쓰기 호출 양에 비례해 나눈 추정치",
             dm,
         )
-        self.assertTrue(dm.endswith("Use /scratch."))
+        self.assertTrue(
+            dm.endswith("Use /scratch.\n`usage io`로 내 현황을 보실 수 있습니다."),
+            "the rule's own check, last",
+        )
         self.assertIn("2번째로 많이 쓴 잡이 `11`", io_report.dm_text(item, 1, ""))
         self.assertEqual(
             io_report.admin_text([item]),

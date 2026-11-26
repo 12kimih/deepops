@@ -31,7 +31,7 @@ Python 3.9 or newer, standard library only.
 
 from datetime import datetime
 
-from . import rich
+from . import rich, rules
 from .render import size
 from .slack import bar, pages, sections, table
 
@@ -43,7 +43,7 @@ STALE = 3600
 LEEWAY = 3600
 # The command that shows a person their own use, on any host (cluster_tools.disk_usage):
 # every notice and refusal about disk use names it.
-USAGE = "disk-usage"
+USAGE = rules.BY_ID["disk"].check
 HOW = f"내 사용량은 `{USAGE}`로 보실 수 있습니다."
 
 # The disks behind the counted filesystems: node_exporter's mount point is the quota
@@ -391,7 +391,7 @@ def dm_text(row, note=""):
 # The scratch space's cleanup (cluster_tools.scratch_space): each person's files listed for
 # removal, told once per removal date, and the mass access-time refreshes an
 # administrator sees.
-PURGE_HOW = "`scratch-space`로 정리될 파일과, 그사이 쓰셔서 정리 대상에서 빠진 파일을 보실 수 있습니다."
+PURGE_HOW = f"`{rules.BY_ID['scratch-purge'].check}`로 정리될 파일과, 그사이 쓰셔서 정리 대상에서 빠진 파일을 보실 수 있습니다."
 
 
 def collect_purge(prom):

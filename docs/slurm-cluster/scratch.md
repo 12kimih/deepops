@@ -72,7 +72,7 @@ symbolic link and enters no other filesystem.
 
 ### Seeing what will go
 
-- `scratch-space` (on the login node and in jobs) lists your files due to go, each with
+- `usage disk` (on the login node and in jobs) lists your files due to go, each with
   its date, and shows the ones you used since the list was written as spared, looking at
   each file again as you run it:
 
@@ -89,7 +89,7 @@ symbolic link and enters no other filesystem.
   and path per line), rewritten every day and gone when nothing of yours is due.
 - The daily disk report sends you one DM for each new removal date, whatever the disk
   report's own notices are set to (`slurm_usage_report_disk_notify`): how many files, how
-  much, the date, and that `scratch-space` lists them.
+  much, the date, and that `usage disk` lists them.
 
 ### The rule
 

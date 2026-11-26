@@ -1,7 +1,8 @@
 """scratch_space: the fast scratch space's cleanup, and what each person sees of it.
 
-    scratch-space                       (people) what of yours is due to go, and when
-    scratch-space CONFIG.json purge [--check]   (root, a daily timer) find, list, remove
+    python3 -m cluster_tools.scratch_space CONFIG.json purge [--check]
+                    (root, a daily timer) find, list, remove
+    show(...)       what of a person's is due to go, and when (usage disk)
 
 The scratch space is for data in use. A file nobody has used (read or written: the later of its
 access and modification times) for stale_days is due: it is listed in its owner's list
@@ -25,7 +26,7 @@ own directory, a collaboration folder itself and the list files are never remove
 a directory is removed only when this run emptied it. Names may hold any bytes.
 
 The list file, <root>/<login>/<list_name>, is rewritten each run (gone when nothing is
-due): one line per file, its removal date, its size and its path. `scratch-space` reads
+due): one line per file, its removal date, its size and its path. `usage disk` reads
 it, and looks at each file again, so a file used since the list was written shows as
 spared at once. The daily disk report (cluster_tools.usage_report --disk) tells each
 person once per new removal date, from this run's textfile metrics:
@@ -53,22 +54,21 @@ import errno
 import grp
 import json
 import os
-import pwd
 import stat
 import sys
 import time
 from collections import defaultdict
 
-from . import cleanup, config, site, slurm, vocab
+from . import cleanup, config, slurm, vocab
 from .cleanup import last_use, walk
-from .cli import Command, Opt, run_main
+from .cli import run_main
 from .files import write_atomic, write_textfile
 from .prom import key, render
 from .render import size
 
 DAY = 86400
 LIST_NAME = ".purge-list"
-HEADER = "# scratch-space purge list"
+HEADER = "# scratch space purge list"
 
 CONFIG_KEYS = {
     "root": str,
@@ -427,7 +427,7 @@ def list_text(cfg, entries, now):
     head = [
         f"{HEADER}, written {time.strftime('%Y-%m-%d %H:%M', time.localtime(now))}",
         f"# stale_days={cfg['stale_days']} grace_days={cfg['grace_days']}",
-        "# Each file goes on its date unless it is used before (read or written); `scratch-space`",
+        "# Each file goes on its date unless it is used before (read or written); `usage disk`",
         "# shows the list with what was used since. DATE<TAB>BYTES<TAB>PATH",
     ]
     held = sum(1 for _, e in entries if e.get("deferred"))
@@ -527,12 +527,39 @@ def read_list(text):
     return stale, rows
 
 
-def show(host, root, login, now, list_name=LIST_NAME):
-    """What of LOGIN's is due to go, each file looked at again: (text, exit status)."""
+def summarize_list(lines):
+    """(files, bytes, first due date or None) of a list file's LINES, without reading the
+    paths: what the overview of the rules shows (cluster_tools.rules), fast on a list of
+    millions."""
+    n, total, first = 0, 0, None
+    for line in lines:
+        if line.startswith("#"):
+            continue
+        parts = line.split("\t", 2)
+        if len(parts) == 3:
+            n, total = n + 1, total + int(parts[1])
+            first = parts[0] if first is None or parts[0] < first else first
+    return n, total, first
+
+
+def show(host, root, login, now, list_name=LIST_NAME, top=None):
+    """What of LOGIN's is due to go, each file looked at again: (text, exit status). With
+    TOP, only the first TOP files are looked at and listed (the counts say the rest)."""
     path = os.path.join(root, login, list_name)
     try:
         with open(path, encoding="utf-8", errors="surrogateescape") as f:
-            stale, rows = read_list(f.read())
+            if top is None:
+                stale, rows = read_list(f.read())
+                listed = None
+            else:
+                head_lines = []
+                for line in f:
+                    head_lines.append(line)
+                    if sum(1 for x in head_lines if not x.startswith("#")) >= top:
+                        break
+                stale, rows = read_list("".join(head_lines))
+                rest_n, rest_b, _ = summarize_list(f)
+                listed = (len(rows) + rest_n, sum(n for _, n, _ in rows) + rest_b)
     except FileNotFoundError:
         return f"Nothing of yours on {root} is due for removal.\n", 0
     stale = stale or 60
@@ -556,53 +583,30 @@ def show(host, root, login, now, list_name=LIST_NAME):
         f"Files of yours on {root} unused for {stale} days: each goes on its date unless you use it"
         f" (read or write) before. {due_n} due ({size(due_b)}), {spared} spared since the list was written."
     )
+    if listed and listed[0] > len(rows):
+        head = (
+            f"Files of yours on {root} unused for {stale} days: {listed[0]:,} listed ({size(listed[1])}),"
+            f" each going on its date unless you use it (read or write) before. The first {len(rows)}:"
+        )
     return "\n".join([head, "", f"{'STATUS':<26} {'SIZE':>8}  PATH", *out]) + "\n", 0
 
 
-COMMAND = Command(
-    "scratch-space",
-    "which of your files on the scratch space are due to be cleaned up, and when",
-    [
-        Opt(
-            "--root",
-            metavar="DIR",
-            brief=True,
-            help="the scratch space (default: the cluster's, scratch_root in cluster.json)",
-        )
-    ],
-    notes=[
-        "Files nobody used (read or written) for the cluster's stale period are listed with\n"
-        "the date they go; using one before then keeps it. The list is rewritten daily;\n"
-        "this looks at each file again, so one you just used shows as spared. Run as root\n"
-        "from a timer: scratch-space CONFIG.json purge [--check]."
-    ],
-    summary_ko="스크래치 공간에서 정리될 예정인 내 파일과 그 시점",
-)
+USAGE = "python3 -m cluster_tools.scratch_space CONFIG.json purge [--check]"
 
 
 def main(argv=None):
+    """The cleanup, as root from its timer (scratch-space-purge.service): what each person
+    sees of it is usage disk (cluster_tools.disk_usage, through show above)."""
     argv = list(sys.argv[1:] if argv is None else argv)
-    if len(argv) in (2, 3) and argv[1] == "purge" and argv[2:] in ([], ["--check"]):
+    if len(argv) not in (2, 3) or argv[1] != "purge" or argv[2:] not in ([], ["--check"]):
+        print(f"usage: {USAGE}", file=sys.stderr)
+        return 2
 
-        def run():
-            purge(Host(), load_config(argv[0]), time.time(), check=argv[2:] == ["--check"])
-            return 0
+    def run():
+        purge(Host(), load_config(argv[0]), time.time(), check=argv[2:] == ["--check"])
+        return 0
 
-        return run_main("scratch-space", run)
-    args, _ = COMMAND.parse(argv)
-
-    def body():
-        root = args.root or site.info().get("scratch_root")
-        if not root:
-            raise SystemExit(
-                "scratch-space: the cluster names no scratch space (scratch_root in "
-                f"{site.PATH}); give --root DIR"
-            )
-        text, status = show(Host(), root, pwd.getpwuid(os.getuid()).pw_name, time.time())
-        sys.stdout.write(text)
-        return status
-
-    return run_main("scratch-space", body)
+    return run_main("scratch-space-purge", run)
 
 
 if __name__ == "__main__":

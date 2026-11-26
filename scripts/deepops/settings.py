@@ -515,7 +515,12 @@ def site_rev(config_dir):
     being committed (DEEPOPS_SITE_REV, a tree); deepops' commit hook (pre-commit sets
     PRE_COMMIT) reads the site as committed (HEAD), when it has a commit: one session's
     half-done edit there must not block every other's commit."""
-    if os.environ.get("DEEPOPS_SITE_REV"):
+    # The tree names a revision of the config DEEPOPS_CONFIG_DIR names, no other: a test's
+    # own config read meanwhile is read as it is.
+    named = os.environ.get("DEEPOPS_CONFIG_DIR")
+    if os.environ.get("DEEPOPS_SITE_REV") and (
+        not named or Path(named).resolve() == Path(config_dir).resolve()
+    ):
         return os.environ["DEEPOPS_SITE_REV"]
     if not (os.environ.get("PRE_COMMIT") and (Path(config_dir) / ".git").exists()):
         return None

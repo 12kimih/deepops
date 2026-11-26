@@ -4,6 +4,11 @@ dependencies:
   - role: cluster_tools_defaults  # cluster_tools_builtin, cluster_tools_commands
   - role: deepops_paths  # sm_prefix: where a site's shared trees go (cluster_tools_shared_dirs)
   - role: user_environment_defaults  # user_environment_entries (the profile.d files)
+  - role: deploy_defaults  # the switches of the rules' enforcers, cluster_user_warn_fraction (usage)
+  - role: slurm_usage_report_defaults  # the idle GPU and I/O thresholds (usage)
+  - role: io_defaults  # io_fairness_models (the I/O rule's mounts)
+  - role: scratch_space_defaults  # the scratch rule's root and periods
+  - role: people_defaults  # people, people_leave_grace_days (each person's membership end)
 
 galaxy_info:
   namespace: deepops

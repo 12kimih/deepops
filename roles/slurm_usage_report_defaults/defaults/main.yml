@@ -1,0 +1,26 @@
+---
+# The thresholds of the rules the usage report enforces, named once: the report applies
+# them (roles/slurm_usage_report) and `usage` shows each person where they stand against
+# them (roles/cluster_tools, cluster_tools.rules).
+
+# A job leaves its GPUs idle (the report's IDLE_JOB, cluster_tools.usage_report) when
+# it has run for idle_hours and every GPU it holds stayed at or under
+# idle_util_threshold percent for that whole time.
+slurm_usage_report_idle_hours: 2
+slurm_usage_report_idle_util_threshold: 0
+
+# Cancel any job (batch or interactive alike) whose GPUs sat idle this long (0 = never),
+# announced in the report thread, and only once its owner was told, and warned
+# cancel_warn_hours ahead, in earlier runs: needs notify and more than idle_hours.
+# Announce the policy before enabling.
+slurm_usage_report_cancel_after_hours: 0
+# The DM before a cancel, this many hours ahead, one per person for all their jobs about
+# to go (0: no separate warning): {jobs}, {count}, {hours} (cancel_warn_hours).
+slurm_usage_report_cancel_warn_hours: 1
+
+# The I/O notices: a node whose NFS traffic to a measured export (io_fairness_models,
+# roles/io_defaults) stayed above io_share of what the disk serves for io_minutes; the
+# users of its io_top_jobs jobs by I/O are told (roles/slurm_usage_report).
+slurm_usage_report_io_share: 0.4
+slurm_usage_report_io_minutes: 15
+slurm_usage_report_io_top_jobs: 3

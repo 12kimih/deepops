@@ -12,7 +12,7 @@
 # The space is for data in use: a daily timer (cluster_tools.scratch_space purge) lists
 # each file nobody used (read or written) for scratch_space_stale_days in its owner's
 # list file, <root>/<login>/.purge-list, and removes it scratch_space_grace_days after it
-# was first listed unless it is used before. `scratch-space` (a command people run,
+# was first listed unless it is used before. `usage disk` (a command people run,
 # cluster_tools_builtin) shows the list, with what was used since; the daily disk report
 # tells each person once per removal date. Access times need relatime (or strictatime)
 # on the filesystem: under noatime a file only read looks unused.
@@ -29,9 +29,9 @@ scratch_space_root_mode: "0755"
 scratch_space_mode: "{{ people_home_mode }}"
 
 # The cleanup: off removes the timer and stops removing (the list files stay as last
-# written); the periods are the cluster's one stale period and one grace period.
+# written); the periods are the cluster's one stale period and one grace period
+# (scratch_space_stale_days and scratch_space_grace_days, roles/scratch_space_defaults).
 scratch_space_purge: true
-scratch_space_grace_days: "{{ cluster_user_grace_days }}"
 # The collaboration folders' directory: each folder's files count to their owners.
 scratch_space_projects: "{{ scratch_space_root }}/projects"
 # When the timer runs (systemd OnCalendar), spread over the hour that follows.

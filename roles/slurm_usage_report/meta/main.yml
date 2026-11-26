@@ -4,6 +4,7 @@ dependencies:
   - role: deploy_defaults  # slurm_enable_submit_holds, submit_holds_from_time (the disk report says them)
   - role: slack_defaults  # slack_bot_token, slack_channels
   - role: io_defaults  # io_fairness_models (the I/O notices' thresholds)
+  - role: slurm_usage_report_defaults  # the idle GPU and I/O thresholds
   - role: cluster_tools_lib
   - role: prometheus_paths  # node_exporter_prom_dir, prometheus_port
 

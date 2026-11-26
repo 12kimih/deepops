@@ -1,5 +1,7 @@
-"""gpu-usage: what a job's GPUs did, running or finished: utilisation and memory, and
-how much of its CPUs it kept busy.
+"""usage gpu: what a job's GPUs did, running or finished: utilisation and memory, and
+how much of its CPUs it kept busy. Without a job, every job of yours that holds GPUs
+now; the exit status is the rule on jobs leaving their GPUs idle, for you (cluster_tools.rules: 1 when a job
+of yours is idle as the usage report judges it).
 
 Two sources, each row naming its own:
   slurm       Slurm's accounting (sacct TRESUsageIn gres/gpuutil, gres/gpumem), per job
@@ -19,15 +21,15 @@ and from every cluster the accounting database holds: a job of the cluster's old
 Python 3.9 or newer, standard library only.
 """
 
-import json
 import re
 import sys
 import time
 
 from . import slurm
-from .cli import Command, Opt, opt_json, run_main
+from . import rules
+from .usage import JSON_NOTE
+from .cli import UNKNOWN, Command, Opt, opt_json, opt_user, run_main
 from .prometheus import Error as PrometheusError
-from .prometheus import Prometheus
 from .render import Grid, duration
 from .site import PATH as SITE_PATH
 from .site import info as site_info
@@ -77,10 +79,17 @@ NOTES = [
 ]
 
 COMMAND = Command(
-    "gpu-usage",
+    "usage gpu",
     "what a job's GPUs did: utilisation, SM activity, memory and power, running or finished",
     [
-        Opt("job", metavar="JOB", brief=True, help="the job: an id, or ARRAY_TASK for an array task"),
+        Opt(
+            "job",
+            metavar="JOB",
+            brief=True,
+            required=False,
+            help="the job: an id, or ARRAY_TASK for an array task (default: yours holding GPUs now)",
+        ),  # fmt: skip
+        opt_user("someone else's jobs instead of yours", metavar="NAME"),
         Opt(
             "--source",
             metavar="WHERE",
@@ -89,11 +98,11 @@ COMMAND = Command(
             brief=True,
             help="auto (default: Slurm's figures where the job has them, else Prometheus'), slurm or prometheus",
         ),
-        opt_json("the figures as JSON, for scripts"),
+        opt_json("one object, schema 1 (below): jobs, one report each"),
     ],
-    usage="gpu-usage [OPTIONS] JOB",
+    usage="usage gpu [OPTIONS] [JOB]",
     machine="--json",
-    notes=NOTES,
+    notes=[*NOTES, JSON_NOTE],
     summary_ko="잡이 GPU를 실제로 얼마나 썼는지: 사용률, SM 활동, 메모리, 전력 (실행 중이거나 끝난 잡)",
 )
 
@@ -275,29 +284,41 @@ def render(reports, theme):
     return "\n".join(out) + "\n"
 
 
+def mine(user, now):
+    """The ids of USER's jobs that hold GPUs now (the usage report's own reading)."""
+    from . import usage_report
+
+    running, _ = usage_report.parse_jobs(slurm.load("jobs_detail"), now)
+    return [j["label"] for j in running if j["user"] == user and j["gpus"]]
+
+
 def main(argv=None):
+    from .usage import context, emit, table
+
     args, theme = COMMAND.parse(argv)
 
     def body():
-        jobs = slurm.load("accounting", args.job)["jobs"]
-        if not jobs:
-            print(f"gpu-usage: no job {args.job} in Slurm's accounting", file=sys.stderr)
-            return 1
-        held = [j for j in jobs if holds_gpus(j)]
-        if not held:
-            print(f"gpu-usage: job {args.job} holds no GPUs", file=sys.stderr)
-            return 1
-        url = site_info().get("prometheus_url")
-        api = Prometheus(url) if url else None
+        user, _, cfg, api = context(args.user)
         now = time.time()
+        ids = [args.job] if args.job else mine(user, now)
+        held = []
+        for job in ids:
+            jobs = slurm.load("accounting", job)["jobs"]
+            if not jobs:
+                print(f"usage gpu: no job {job} in Slurm's accounting", file=sys.stderr)
+                return 2
+            held += [j for j in jobs if holds_gpus(j)]
+        if args.job and not held:
+            print(f"usage gpu: job {args.job} holds no GPUs", file=sys.stderr)
+            return 2
         reports = [report(j, args.source, api, now) for j in held]
-        if args.json:
-            print(json.dumps(reports, indent=2))
-        else:
-            sys.stdout.write(render(reports, theme))
-        return 0
+        # The rule off (not run here) reads nothing more: no Slurm, no Prometheus.
+        detail = slurm.load("jobs_detail") if cfg.get("gpu_idle") and api else None
+        row = rules.gpu_idle(user, cfg, detail, api, now)
+        text = table([row], theme, f"idle GPUs of {user}") + (render(reports, theme) if reports else "")
+        return emit("usage gpu", user, [row], args, theme, text, jobs=reports)
 
-    return run_main("gpu-usage", body)
+    return run_main("usage gpu", body, unknown=UNKNOWN)
 
 
 if __name__ == "__main__":

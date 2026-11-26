@@ -1,7 +1,7 @@
 """Storage / per person: one person's space and files against their levels, folders
 worth cleaning and the I/O of their jobs and logins, over time.
 
-The queries are disk-usage's own (cluster_tools.disk_usage: space, folders, io), with
+The queries are usage's own (cluster_tools.disk_usage: space, folders; cluster_tools.io_load: io), with
 the person the User variable picks, so the command and this dashboard read one
 definition of the same series: roles/disk_quota's metrics, cluster_tools.cleanup's
 folders and roles/io_usage's counters.
@@ -13,7 +13,7 @@ from pathlib import Path
 from grafana import dashboard, host_links, job_links, label_variable, query, row, table, timeseries
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from cluster_tools import disk_usage  # noqa: E402
+from cluster_tools import disk_usage, io_load  # noqa: E402
 
 PATH = "src/dashboards/storage-person.json"
 PERSON = 'user=~"$user"'
@@ -41,8 +41,8 @@ def build():
         return timeseries(
             f"I/O of {who}s",
             [
-                query(disk_usage.io(who, "read", PERSON, "5m", "rate"), f"read {legend}"),
-                query(disk_usage.io(who, "written", PERSON, "5m", "rate"), f"written {legend}"),
+                query(io_load.io(who, "read", PERSON, "5m", "rate"), f"read {legend}"),
+                query(io_load.io(who, "written", PERSON, "5m", "rate"), f"written {legend}"),
             ],
             unit="Bps",
             legend="table",
@@ -110,5 +110,5 @@ def build():
         tags=["storage"],
         variables=[label_variable("user", "disk_quota_used_bytes", "user", label_text="User")],
         description="One person's space and files against their levels, folders worth cleaning, and "
-        "their jobs' and logins' I/O: the figures disk-usage prints, over time.",
+        "their jobs' and logins' I/O: the figures usage disk and usage io print, over time.",
     )

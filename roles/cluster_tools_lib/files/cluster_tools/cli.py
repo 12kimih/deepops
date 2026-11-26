@@ -55,8 +55,10 @@ class Opt:
         choices=None,
         aliases=(),
         renamed=(),
+        required=True,
     ):
         self.flags, self.help, self.dest, self.metavar = flags, help, dest, metavar
+        self.required = required  # a positional only: false leaves it out when not given
         self.aliases, self.renamed = tuple(aliases), tuple(renamed)
         self.default, self.negate, self.brief = default, negate, brief
         self.complete, self.section = complete, section
@@ -99,7 +101,7 @@ class Opt:
 
     def label(self):
         if self.positional:
-            return self.metavar
+            return self.metavar if self.required else f"[{self.metavar}]"
         flags = ", ".join(self.flags)
         if self.negate:
             long = next(f for f in self.flags if f.startswith("--"))
@@ -251,8 +253,9 @@ class Command:
                 lines += ["", text.rstrip()]
         return "\n".join(lines) + "\n"
 
-    def completion(self):
-        """A bash completion function for this command, generated from its options."""
+    def completion_parts(self):
+        """(words, case lines) of this command's completion: its flags, and for each one
+        that takes a value, what completes the value."""
         flagged = [o for o in self.options if not o.positional]
         words = sorted(
             {f for o in flagged for f in o.flags}
@@ -267,6 +270,11 @@ class Command:
                 pattern = "|".join(o.flags)
                 body = f'COMPREPLY=($(compgen -W "$({src})" -- "$cur"))' if src else "COMPREPLY=()"
                 cases.append(f"        {pattern}) {body}; return ;;")
+        return words, cases
+
+    def completion(self):
+        """A bash completion function for this command, generated from its options."""
+        words, cases = self.completion_parts()
         fn = "_" + self.name.replace("-", "_")
         return "\n".join(
             [
@@ -305,7 +313,9 @@ class Command:
             sys.stdout.write(self.completion())
             raise SystemExit(0)
         missing = [
-            o.metavar for o in self.options if o.positional and getattr(args, o.flags[0]) in (None, "")
+            o.metavar
+            for o in self.options
+            if o.positional and o.required and getattr(args, o.flags[0]) in (None, "")
         ]
         if missing:
             self.parser().error(f"{' '.join(missing)} is required (usage: {self.usage})")
@@ -355,19 +365,31 @@ def me():
         return str(os.getuid())
 
 
-def run_main(name, body):
+# The exit statuses of a command that judges (usage and its subcommands), as monitoring
+# tools give them: an agent tells "you called it wrong" (2) from "retry later" (3).
+OK, AT_RISK, CANNOT_RUN, UNKNOWN = 0, 1, 2, 3
+
+
+def run_main(name, body, unknown=None):
     """Run BODY() -> exit status, with the failures every command shares, each as one
     line: Slurm's (slurm.Error, with its own status: 127 for a missing client, else 1)
-    a config's (2, cluster_tools.config) and a file's (1). Ctrl-C and a closed pipe end quietly. Anything else is a bug and
+    a config's (2, cluster_tools.config) and a file's (1). With UNKNOWN (a judging
+    command's: cli.UNKNOWN), a source that did not answer (Slurm, Prometheus, a file)
+    gives it instead. Ctrl-C and a closed pipe end quietly. Anything else is a bug and
     keeps its traceback, rather than being reported as Slurm's."""
+    from .prometheus import Error as PrometheusError
+
     try:
         return body() or 0
     except config.ConfigError as e:  # names the file and the key
         print(f"{name}: {e}", file=sys.stderr)
-        return 2
+        return CANNOT_RUN
     except slurm.Error as e:
         print(f"{name}: {e}", file=sys.stderr)
-        return e.status
+        return e.status if unknown is None else unknown
+    except PrometheusError as e:
+        print(f"{name}: {e}", file=sys.stderr)
+        return 1 if unknown is None else unknown
     except KeyboardInterrupt:
         return 130
     except BrokenPipeError:
@@ -375,4 +397,65 @@ def run_main(name, body):
         return 0
     except OSError as e:
         print(f"{name}: {e.filename}: {e.strerror}" if e.filename else f"{name}: {e}", file=sys.stderr)
-        return 1
+        return 1 if unknown is None else unknown
+
+
+class Group:
+    """A command of subcommands, NAME [SUB] [OPTIONS]: without one, DEFAULT runs (a
+    module); with one, the module SUBS names for it. Each module has COMMAND (named
+    "NAME SUB" for a subcommand) and main(argv), and keeps its own domain's code: this
+    only dispatches, and makes the one bash completion of them all."""
+
+    def __init__(self, name, default, subs):
+        self.name, self.default, self.subs = name, default, dict(subs)
+
+    def module(self, sub=None):
+        import importlib
+
+        return importlib.import_module(self.subs[sub] if sub else self.default)
+
+    def commands(self):
+        """[(sub, COMMAND)] in order; the default first, with sub None."""
+        return [(None, self.module().COMMAND)] + [(s, self.module(s).COMMAND) for s in self.subs]
+
+    def main(self, argv=None):
+        argv = list(sys.argv[1:] if argv is None else argv)
+        if argv and argv[0] in self.subs:
+            return self.module(argv[0]).main(argv[1:])
+        if argv[:2] == ["--completion", "bash"]:
+            sys.stdout.write(self.completion())
+            return OK
+        return self.module().main(argv)
+
+    def completion(self):
+        """One bash completion function: the subcommands and the default's flags at the
+        first word, then the subcommand's own flags and values."""
+        fn = "_" + self.name.replace("-", "_")
+        branches = []
+        # The subcommands first: the default's branch (*) catches every other word.
+        for sub, command in self.commands()[1:] + self.commands()[:1]:
+            words, cases = command.completion_parts()
+            label = sub or "*"
+            branches += [
+                f"        {label})",
+                '            case "$prev" in',
+                *("    " + c for c in cases),
+                "            esac",
+                f'            words="{" ".join(words)}" ;;',
+            ]
+        first = " ".join(list(self.subs) + self.commands()[0][1].completion_parts()[0])
+        return "\n".join(
+            [
+                f"# bash completion for {self.name}, generated by `{self.name} --completion bash`",
+                f"{fn}() {{",
+                "    local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD-1]} words",
+                '    case "${COMP_WORDS[1]}" in',
+                *branches,
+                "    esac",
+                f'    [ "$COMP_CWORD" -eq 1 ] && words="{first}"',
+                '    COMPREPLY=($(compgen -W "$words" -- "$cur"))',
+                "}",
+                f"complete -F {fn} {self.name}",
+                "",
+            ]
+        )

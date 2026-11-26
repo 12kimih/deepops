@@ -43,6 +43,12 @@ SUBCOMMANDS = (
         "공유 데이터(데이터셋, 모델, 컨테이너 이미지) 신청",
         "ask for public data stored once for everyone",
     ),
+    Sub(
+        "usage",
+        None,
+        "규칙마다 내 현황 (로그인 노드의 usage 명령과 같은 숫자, 로그인 노드 한도만 빼고)",
+        "where you stand against every rule, as the usage command shows it",
+    ),
     Sub("help", None, "이 안내", "this list"),
 )
 NAMES = tuple(s.name for s in SUBCOMMANDS)
@@ -125,16 +131,19 @@ def offered(features):
 def cluster_lines(names):
     """One line per cluster command a login has (NAMES: cluster_tools_commands), with
     what its definition says (cluster_tools.<name, - as _>.COMMAND.summary_ko), under a
-    heading; none, no lines. The bot's help listed only its own subcommands, never sq or
-    disk-usage (2026-11-27)."""
+    heading, a command of subcommands (usage) with each of them; none, no lines. The
+    bot's help listed only its own subcommands, never the cluster commands (2026-11-27)."""
     if not names:
         return []
     import importlib
 
     lines = ["**로그인 노드의 명령** (`<명령> --help`로 자세히)"]
     for name in names:
-        command = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}").COMMAND
-        lines.append(f"`{name}`: {command.summary_ko or command.summary}")
+        module = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}")
+        lines.append(f"`{name}`: {module.COMMAND.summary_ko or module.COMMAND.summary}")
+        group = getattr(module, "GROUP", None)
+        for sub, sub_command in group.commands()[1:] if group else ():
+            lines.append(f"`{name} {sub}`: {sub_command.summary_ko or sub_command.summary}")
     return lines
 
 

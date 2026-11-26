@@ -43,11 +43,9 @@ slurm_usage_report_prometheus_url: "http://localhost:{{ prometheus_port }}"
 # The report links the site facts' dashboard_url (cluster_tools_lib, from
 # grafana_root_url), read on the host through cluster_tools.site; empty drops the link.
 
-# A job leaves its GPUs idle (the report's IDLE_JOB, cluster_tools.usage_report) when
-# it has run for idle_hours and every GPU it holds stayed at or under
-# idle_util_threshold percent for that whole time.
-slurm_usage_report_idle_hours: 2
-slurm_usage_report_idle_util_threshold: 0
+# The thresholds of the rule on jobs leaving their GPUs idle (idle_hours, idle_util_threshold, cancel_after_hours,
+# cancel_warn_hours) and the I/O notices' (io_share, io_minutes, io_top_jobs):
+# roles/slurm_usage_report_defaults, which `usage` reads too (cluster_tools.rules).
 # How the owners of such jobs are told, once per person for all of them: any of
 # mention (in the report thread) and dm; [] lists the jobs without telling anyone. Told
 # when a job of theirs first turns idle, then every notify_repeat_hours while any stays
@@ -62,14 +60,7 @@ slurm_usage_report_dm_text: |-
   잡 {count}개가 할당받은 GPU를 {hours}시간 넘게 쓰지 않고 있습니다:
   {jobs}
   더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요. 반납하시면 대기 중인 잡이 그 GPU를 쓸 수 있습니다.
-# Cancel any job (batch or interactive alike) whose GPUs sat idle this long (0 = never),
-# announced in the report thread, and only once its owner was told, and warned
-# cancel_warn_hours ahead, in earlier runs: needs notify and more than idle_hours.
-# Announce the policy before enabling.
-slurm_usage_report_cancel_after_hours: 0
-# The DM before a cancel, this many hours ahead, one per person for all their jobs about
-# to go (0: no separate warning): {jobs}, {count}, {hours} (cancel_warn_hours).
-slurm_usage_report_cancel_warn_hours: 1
+# The DM before a cancel (cancel_warn_hours ahead): {jobs}, {count}, {hours}.
 slurm_usage_report_cancel_warn_text: |-
   아래 잡은 할당받은 GPU를 오래 쓰지 않아 {hours}시간 뒤에 취소됩니다:
   {jobs}
@@ -81,9 +72,6 @@ slurm_usage_report_cancel_warn_text: |-
 # DM ending in io_advice and the administrators one line per node (admin_channel), at
 # once and every io_repeat_hours while it lasts. No models, no notices.
 slurm_usage_report_io_schedule: "*:0/5"
-slurm_usage_report_io_share: 0.4
-slurm_usage_report_io_minutes: 15
-slurm_usage_report_io_top_jobs: 3
 slurm_usage_report_io_repeat_hours: 6
 slurm_usage_report_io_advice: >-
   잡이 많이 읽고 쓰는 데이터는 클러스터의 스크래치 공간(있다면)이나 노드의 로컬 디스크에

@@ -102,8 +102,8 @@ runs it at low priority (`disk_quota_scan_on_calendar`). The scratch space is we
 its own daily cleanup walk (`roles/scratch_space`), never a second one: list it in
 `disk_quota_scan` never.
 
-Each person sees their own share of the same figures with `disk-usage` (a
-`cluster_tools_commands` entry, `cluster_tools.disk_usage`): their space and files on each
+Each person sees their own share of the same figures with `usage disk` (the
+`usage` command of `cluster_tools_commands`, `cluster_tools.disk_usage`): their space and files on each
 counted filesystem against the warn level and the limit, their folders worth cleaning, and
 how much their jobs and logins read and wrote over the last `--hours` (roles/io_usage).
 It reads Prometheus, as the report does. The Grafana dashboard Storage / per person
@@ -120,7 +120,8 @@ With `slurm_enable_submit_holds` (off by default; `roles/submit_holds`, on the c
 and `submit_holds_disk`, someone at a hard limit, of space or of files, on any counted
 filesystem cannot submit
 Slurm jobs until they free space there. `sbatch`, `srun` and `salloc` refuse the job
-with the reason (where, how much, `disk-usage` to look); their running jobs go on.
+with the reason (where, how much, `usage disk` to look; `usage submit` says every
+hold); their running jobs go on.
 
 | Setting | What it does |
 |---|---|

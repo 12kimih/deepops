@@ -37,7 +37,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from . import config, disk_report, io_report, notices, rich
+from . import config, disk_report, io_report, notices, rich, rules
 from .config import ConfigError
 from .files import write_atomic
 from .prometheus import Prometheus
@@ -939,7 +939,7 @@ def act(report, cfg, who, slack, cache, now):
         if "dm" in cfg["notify"]:
             try:
                 text = cfg["dm_text"].format(jobs=job_lines(jobs), count=len(jobs), hours=hours)
-                slack.dm(member, text, kind="idle", login=user)
+                slack.dm(member, f"{text}\n{rules.check_note('gpu-idle')}", kind="idle", login=user)
                 delivered = True
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {user}: {e}")
@@ -966,7 +966,12 @@ def act(report, cfg, who, slack, cache, now):
                     text = cfg["cancel_warn_text"].format(
                         jobs=job_lines(ahead), count=len(ahead), hours=f"{cfg['cancel_warn_hours']:g}"
                     )
-                    slack.dm(member, text, kind="idle-cancel-warning", login=user)
+                    slack.dm(
+                        member,
+                        f"{text}\n{rules.check_note('gpu-idle')}",
+                        kind="idle-cancel-warning",
+                        login=user,
+                    )
                     for j in ahead:
                         j["state"]["warned"] = now
             except (RuntimeError, OSError) as e:

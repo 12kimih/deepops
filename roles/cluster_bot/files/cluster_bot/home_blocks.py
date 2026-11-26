@@ -33,7 +33,9 @@ def help_text(channel, group):
     )
 
 
-def home(login, muted, features, command="/cluster", help_channel="", admin_group="", web=(), cluster=()):
+def home(
+    login, muted, features, command="/cluster", help_channel="", admin_group="", web=(), cluster=(), usage=()
+):
     """LOGIN's Home tab: the services to open in a browser (WEB: links()), whether job
     notices reach them, the subcommands of COMMAND they can use (FEATURES: the request
     kinds this cluster runs; cluster_bot.commands' list) and how to ask for help
@@ -48,6 +50,8 @@ def home(login, muted, features, command="/cluster", help_channel="", admin_grou
         {"type": "divider"},
         rich.section(f"**잡 알림**: {state}\n`--mail-type=END,FAIL`을 적은 잡이 끝나면 DM이 옵니다 (잠깐 사이에 생긴 알림은 한 메시지로 묶어 보냅니다).", accessory=button("알림 켜기" if muted else "알림 끄기", "home.notices", "on" if muted else "off")),
     ]  # fmt: skip
+    if usage:  # the same rows as the usage command (cluster_bot.app usage_lines)
+        blocks += [{"type": "divider"}, rich.section("\n".join(usage))]
     blocks.append(rich.context(commands.help_lines(command, features, cluster=cluster)))
     if help_channel:
         blocks += [

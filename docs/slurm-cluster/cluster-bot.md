@@ -16,6 +16,7 @@ by default; just `/cluster` is the help):
 - `/cluster unban`: ask to lift a ban after failed logins
 - `/cluster project`: start a collaboration folder
 - `/cluster data`: ask for public data stored once for everyone
+- `/cluster usage`: where you stand against every rule, as the usage command shows it
 - `/cluster help`: this list
 <!-- END GENERATED: bot-subcommands -->
 

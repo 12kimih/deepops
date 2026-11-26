@@ -98,10 +98,10 @@ class Commands(unittest.TestCase):
         self.assertIn("`/cl project`", str(home), "the Home tab's list is the same help")
 
     def test_help_and_home_list_the_cluster_commands_with_their_own_summaries(self):
-        # 2026-11-27: the help named only /cluster subcommands, never sq or disk-usage
+        # 2026-11-27: the help named only /cluster subcommands, never the cluster commands
         import importlib
 
-        names = ["sq", "disk-usage"]
+        names = ["sq", "usage"]
         text = commands.help_lines("/cluster", set(), footer="foot", cluster=names)
         for name in names:
             summary = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}").COMMAND.summary_ko
@@ -110,7 +110,7 @@ class Commands(unittest.TestCase):
         self.assertTrue(text.endswith("foot"))
         self.assertNotIn("로그인 노드의 명령", commands.help_lines("/cluster", set()), "none: no heading")
         home = home_blocks.home("alice", False, set(), cluster=names)
-        self.assertIn("'text': 'disk-usage', 'style': {'code': True}", str(home))
+        self.assertIn("'text': 'usage disk', 'style': {'code': True}", str(home), "a subcommand each")
 
     def test_every_published_command_has_a_korean_summary(self):
         import importlib

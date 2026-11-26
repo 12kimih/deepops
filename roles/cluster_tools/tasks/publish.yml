@@ -32,6 +32,21 @@
       once: {{ cluster_tools_commands | intersect(cluster_tools_scripts | map(attribute='dest')) }}
       is also in cluster_tools_scripts.
 
+# Only while usage is published (a removal publishes nothing: the files go).
+- name: Publish what usage measures against
+  ansible.builtin.include_tasks: usage.yml
+  when: "'usage' in cluster_tools_commands"
+
+- name: Withdraw what usage measured against
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _cluster_tools_usage_file }}"
+    - "{{ cluster_tools_lib_config_records }}/cluster_tools.json"
+    - "{{ _cluster_tools_ends_dir }}"
+  when: "'usage' not in cluster_tools_commands"
+
 - name: Publish the built-in commands
   ansible.builtin.include_role:
     name: cluster_tools_lib
@@ -75,7 +90,7 @@
     recorded_files_record: "{{ cluster_tools_manifest }}"
     recorded_files_names: "{{ cluster_tools_scripts | map(attribute='dest') | list + cluster_tools_commands }}"
     recorded_files_dirs: ["{{ cluster_tools_bin_dir }}", "{{ cluster_tools_completion_dir }}"]
-    recorded_files_retired: "{{ cluster_tools_retired }}"
+    recorded_files_retired: "{{ cluster_tools_retired + cluster_tools_retired_builtin }}"
 
 # A published name that also resolves elsewhere in PATH would shadow the real command
 # for every user, as an `alias squeue=/path/to/squeue.sh` does. Catch it

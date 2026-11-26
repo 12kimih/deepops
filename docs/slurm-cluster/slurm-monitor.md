@@ -67,7 +67,7 @@ fixed UID, so links survive renames:
 | Node Exporter / Hosts | `node-exporter-hosts` | Every host in depth. Upstream "Node Exporter Full" (grafana.com dashboard 1860); panels for collectors or sensors a host lacks stay empty. | `grafana` |
 | Slurm / Scheduler | `slurm-scheduler` | Nodes, CPUs, GPUs, jobs and scheduler health of the Slurm cluster (slurmctld's own metrics). | `grafana` |
 | Storage / NFS and disks | `storage-io` | Who drives the NFS exports and the server's disks, by node, job and login, before and after iocost. | `grafana` |
-| Storage / per person | `storage-person` | One person's space and files against their levels, folders worth cleaning, and their jobs' and logins' I/O: the figures disk-usage prints, over time. | `grafana` |
+| Storage / per person | `storage-person` | One person's space and files against their levels, folders worth cleaning, and their jobs' and logins' I/O: the figures usage disk and usage io print, over time. | `grafana` |
 | Slurm / GPU allocation | `slurm-gpu-allocation` | Who holds which GPU: Slurm allocation (roles/slurm_metrics) against usable capacity, joined with DCGM utilisation; each job's GPU use, with User and Job to pick your own. | `slurm_metrics` |
 <!-- END GENERATED: dashboards -->
 
@@ -143,7 +143,7 @@ for at least one allocation interval (`slurm_metrics_interval`), for as long as 
 Slurm's own accounting (`sacct` gres/gpuutil, gres/gpumem) records them only with
 `AutoDetect=nvml` in gres.conf.
 
-`gpu-usage JOB` (a `cluster_tools_commands` entry) prints one job's figures, running or
+`usage gpu JOB` (the `usage` command of `cluster_tools_commands`) prints one job's figures, running or
 finished: Slurm's per step where the job has them, else Prometheus' per GPU, each row
 naming its source (`--source slurm|prometheus` asks for one, `--json` for scripts). The
 two differ in meaning: Slurm keeps each task's high-water mark, Prometheus the mean and

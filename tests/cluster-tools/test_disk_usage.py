@@ -1,4 +1,4 @@
-"""Tests for disk-usage (cluster_tools.disk_usage): one person's figures from Prometheus."""
+"""Tests for usage disk (cluster_tools.disk_usage): one person's figures from Prometheus."""
 
 import re
 import sys
@@ -99,18 +99,11 @@ SERIES = merged(
 class QueryTests(unittest.TestCase):
     def test_every_query_selects_the_person(self):
         api = FakePrometheus(SERIES)
-        disk_usage.collect(api, 'a"b', 24, 10)
+        disk_usage.collect(api, 'a"b', 10)
         self.assertTrue(api.asked)
         for expr in api.asked:
             if expr != disk_usage.SCANNED:  # when a filesystem was scanned: everyone's
                 self.assertIn('user="a\\"b"', expr)
-
-    def test_the_io_window_is_the_hours_asked(self):
-        api = FakePrometheus(SERIES)
-        disk_usage.collect(api, "kim", 6, 10)
-        io = [e for e in api.asked if "io_usage" in e]
-        self.assertEqual(len(io), 4)
-        self.assertTrue(all("increase(" in e and "[6h]" in e for e in io), io)
 
     def test_the_dashboard_reads_the_same_definitions(self):
         sys.path.insert(0, str(HERE.parents[1] / "scripts/dashboards"))
@@ -122,14 +115,11 @@ class QueryTests(unittest.TestCase):
             self.assertTrue(any(expr in e for e in exprs), figure)
         for figure, expr in disk_usage.folders(sel).items():
             self.assertTrue(any(expr in e for e in exprs), figure)
-        for who, direction in disk_usage.IO:
-            expr = disk_usage.io(who, direction, sel, "5m", "rate")
-            self.assertTrue(any(expr in e for e in exprs), (who, direction))
 
 
 class CollectTests(unittest.TestCase):
     def test_one_persons_space_files_and_levels(self):
-        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 24, 10)
+        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 10)
         self.assertEqual(
             data["space"],
             [
@@ -141,22 +131,13 @@ class CollectTests(unittest.TestCase):
         )  # fmt: skip
 
     def test_folders_longest_unused_and_largest_first(self):
-        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 24, 10)
+        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 10)
         self.assertEqual([f["path"] for f in data["folders"]], ["/home/kim/big", "/home/kim/old"])
         self.assertEqual(data["folders"][1]["unused_days"], 400)
 
-    def test_io_by_job_most_first_idle_disks_left_out(self):
-        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 24, 10)
-        self.assertEqual(
-            data["jobs"],
-            [{"host": "gpu2", "job_id": "12", "read": 2**20, "written": 5 * 2**30},
-             {"host": "gpu1", "job_id": "11", "read": 3 * 2**30, "written": 0.0}],
-        )  # fmt: skip
-        self.assertEqual(data["logins"], [])
-
     def test_top_caps_each_list(self):
-        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 24, 1)
-        self.assertEqual((len(data["folders"]), len(data["jobs"])), (1, 1))
+        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 1)
+        self.assertEqual(len(data["folders"]), 1)
 
 
 class RenderTests(unittest.TestCase):
@@ -164,15 +145,13 @@ class RenderTests(unittest.TestCase):
         return render.Theme(color=False, cols=100)
 
     def test_rows_with_levels(self):
-        text = disk_usage.render(disk_usage.collect(FakePrometheus(SERIES), "kim", 24, 10), self.theme())
+        text = disk_usage.render(disk_usage.collect(FakePrometheus(SERIES), "kim", 10), self.theme())
         self.assertRegex(text, r"nfs1:/home\s+4\.5T\s+4T\s+5T\s+900,000\s+-\s+1,000,000")
         self.assertRegex(text, r"/home/kim/big\s+1T\s+90d\s+nfs1:/home")
-        self.assertRegex(text, r"12\s+gpu2\s+1M\s+5G")
-        self.assertRegex(text, r"I/O of logins\s+last 24h\s+none")
 
     def test_the_folders_say_when_their_filesystem_was_scanned(self):
         # 2026-11-27: the help said "the last daily scan"; the home filesystem's is weekly
-        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 24, 10)
+        data = disk_usage.collect(FakePrometheus(SERIES), "kim", 10)
         self.assertEqual(data["scans"][0], {"where": "nfs1:/home", "time": 1_795_000_000})
         text = disk_usage.render(data, self.theme())
         self.assertIn(f"scanned nfs1:/home {disk_usage._when(1_795_000_000)}", text)
@@ -186,7 +165,7 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(disk_usage._level(3, 0, 0), "text")
 
     def test_nothing_counted_is_said(self):
-        text = disk_usage.render(disk_usage.collect(FakePrometheus({}), "nobody", 24, 10), self.theme())
+        text = disk_usage.render(disk_usage.collect(FakePrometheus({}), "nobody", 10), self.theme())
         self.assertIn("no space of nobody is counted on any filesystem", text)
 
 
@@ -194,7 +173,7 @@ class CommandTests(unittest.TestCase):
     def test_help_names_the_command(self):
         done = run_tool("disk_usage", "-h")
         self.assertEqual(done.returncode, 0)
-        self.assertIn("Usage: disk-usage [OPTIONS]", done.stdout)
+        self.assertIn("Usage: usage disk [OPTIONS]", done.stdout)
 
 
 if __name__ == "__main__":

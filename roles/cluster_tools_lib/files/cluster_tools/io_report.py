@@ -16,6 +16,7 @@ reads Prometheus and changes nothing; cluster_tools.usage_report --io tells the 
 and the administrators. Python 3.9 or newer, standard library only.
 """
 
+from . import rules
 from .render import size
 
 DIRECTIONS = {
@@ -97,7 +98,7 @@ def dm_text(item, rank, advice):
         f"{rate(item['rate'])}로, `{item['mount']}` 디스크가 클러스터 전체에 낼 수 있는 속도의 {share_of(item)}%를 "
         f"차지해 모두의 `{item['mount']}` 작업이 느려집니다. 그 노드에서 {lead} {what} 잡이 `{job}`입니다 "
         f"({rate(job_rate)}: 그 노드가 공유 스토리지와 주고받은 양을 노드 안 잡들의 읽기, 쓰기 호출 양에 비례해 나눈 추정치입니다)."
-        f"\n{advice}"
+        f"\n{advice}\n{rules.check_note('io-heavy')}"
     )
 
 

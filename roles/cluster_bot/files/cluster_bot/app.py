@@ -155,6 +155,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             cfg.get("admin_group", ""),
             home_blocks.links(cfg.get("connect") or {}),
             cfg.get("cluster_commands") or [],
+            usage_lines(login, cfg),
         )
         if project is not None:
             view["blocks"] += projects_blocks.home(login, projects, projects_root)
@@ -323,6 +324,11 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             )),
         )  # fmt: skip
 
+    def usage_command(body, client):
+        login = user_of(body["user_id"])
+        text = "\n".join(usage_lines(login, cfg)) if login else "명부에 이 Slack 계정이 없습니다."
+        client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], **rich.message(text))
+
     # The one slash command (cfg command, /cluster): every request is a subcommand, the
     # table cluster_bot.commands.SUBCOMMANDS names them, and each has its handler here.
     handlers = {
@@ -331,6 +337,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         "unban": unban_command,
         "project": project_command,
         "data": data_command,
+        "usage": usage_command,
         "help": help_command,
     }
     command = cfg["command"]
@@ -451,6 +458,22 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             tell(client, outcome.request["slack_id"], outcome, log=True)
 
     return app
+
+
+def usage_lines(login, cfg, path=None):
+    """LOGIN's place against every rule, the lines the CLI's usage shows (cluster_tools.rules
+    overview, one function for both), with the membership end from the bot's own roster
+    copy; the login node limits stay the CLI's (usage login-node on that node)."""
+    from cluster_tools import prometheus, rules
+
+    try:
+        rcfg = rules.load_config(path or rules.PATH)
+    except Exception as e:  # noqa: BLE001 - no rules file on this host: say so, never fail the bot
+        return [f"규칙의 기준을 읽지 못했습니다: {e}"]
+    url = rcfg.get("prometheus_url")
+    rows = rules.overview(login, rcfg, prom=prometheus.Prometheus(url) if url else None, here=False,
+                          ends=(cfg.get("leave") or {}).get("leaving") or {})  # fmt: skip
+    return [f"**{login}님의 현황** (로그인 노드에서 `usage`로 자세히)", *rules.lines(rows)]
 
 
 def reminder_sources(cfg):

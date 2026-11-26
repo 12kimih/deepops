@@ -2,9 +2,12 @@
 # The scratch space (roles/scratch_space), named once for the roles that tell people
 # about it: the cluster bot's collaboration folders form names the place and its
 # cleanup, and roles/cluster_tools_lib publishes the root in cluster.json (scratch_root),
-# where scratch-space and the disk report read it.
+# where usage disk and the disk report read it.
 
 # The scratch filesystem's mount point on this host.
 scratch_space_root: /scratch
 # A file unused this long is listed for removal (roles/scratch_space: the cleanup).
 scratch_space_stale_days: "{{ cluster_user_stale_days }}"
+# A listed file goes this many days after it was first listed (its owner told), unless
+# used meanwhile: the cluster's one grace period.
+scratch_space_grace_days: "{{ cluster_user_grace_days }}"

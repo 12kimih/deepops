@@ -128,7 +128,7 @@ SUBMIT_RULES = ("strict_gpu_type", "force_gpu_partition", "gpu_jobs_use_defaults
 # The only top-level keys the public file may carry, and under commands and policy the
 # only fields: what a user may read on a public site.
 PUBLIC = {
-    "commands": {"summary", "summary_ko", "usage", "options"},
+    "commands": {"summary", "summary_ko", "usage", "options", "subcommands"},
     "policy": {
         "stale_days",
         "grace_days",
@@ -172,6 +172,7 @@ PUBLIC = {
     "storage": None,  # each measured mount, its fields STORAGE_FIELDS
     "terms": {"use", "title", "not", "title_not", "why", "scope", "id", "code"},  # every glossary entry
     "titles": {"endings", "exempt"},  # the glossary's title rules
+    "rules": {"id", "title", "action", "check", "anchor", "values"},  # cluster_tools.rules, each
 }
 STORAGE_FIELDS = {
     "read_bps": "rbps",
@@ -339,23 +340,45 @@ def _path_or_url(value):
     return value == "" or value.startswith(("/", "~/")) or "://" in value
 
 
+def rules_table(settings_):
+    """[{id, title, action, check, anchor, values}] of every rule that warns, limits or
+    cancels (cluster_tools.rules RULES, in order): what usage and the bot show, and the
+    docs' rules table. values: each of the rule's settings this site resolves to a plain
+    number, word or switch (a mapping, a site's own limits per filesystem, stays out)."""
+    import cluster_tools.rules as registry
+
+    return [
+        {"id": r.id, "title": r.title, "action": r.action, "check": r.check, "anchor": r.anchor,
+         "values": {n: settings_[n] for n in r.settings
+                    if isinstance(settings_.get(n), (int, float, str, bool)) and settings_.get(n) != ""}}
+        for r in registry.RULES
+    ]  # fmt: skip
+
+
+def _command(cmd):
+    return {
+        "summary": cmd.summary,
+        "summary_ko": cmd.summary_ko,
+        "usage": cmd.usage,
+        "options": [
+            {"flags": list(o.flags), "metavar": o.metavar or "", "help": o.help}
+            for o in cmd.options
+            if not getattr(o, "positional", False)
+        ],
+    }
+
+
 def commands(names):
-    """{command: {summary, usage, options: [{flags, metavar, help}]}} from each
-    command's definition (cluster_tools.<module>.COMMAND)."""
+    """{command: {summary, summary_ko, usage, options: [{flags, metavar, help}]}} from
+    each command's definition (cluster_tools.<module>.COMMAND), and for a command of
+    subcommands (usage, its GROUP) subcommands: [{name, the same}] in order."""
     out = {}
     for name in names:
         module = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}")
-        cmd = module.COMMAND
-        out[name] = {
-            "summary": cmd.summary,
-            "summary_ko": cmd.summary_ko,
-            "usage": cmd.usage,
-            "options": [
-                {"flags": list(o.flags), "metavar": o.metavar or "", "help": o.help}
-                for o in cmd.options
-                if not getattr(o, "positional", False)
-            ],
-        }
+        out[name] = _command(module.COMMAND)
+        group = getattr(module, "GROUP", None)
+        if group:
+            out[name]["subcommands"] = [{"name": sub, **_command(c)} for sub, c in group.commands()[1:]]
     return out
 
 
@@ -614,6 +637,7 @@ def facts(config):
     s = settings(config)
     every = {
         "commands": commands(s.get("cluster_tools_builtin") or []),
+        "rules": rules_table(s),
         "policy": {
             **{field: s.get(key) for field, key in POLICY.items()},
             **submit_policy(s.get("slurm_job_submit_policy") or {}),
@@ -654,7 +678,7 @@ def public(every):
                 for e in value or []
                 if _path_or_url(e["login"]) and _path_or_url(e["job"])
             ]
-        elif key == "terms":
+        elif key in ("terms", "rules"):
             out[key] = [{f: v for f, v in e.items() if f in fields} for e in value or []]
         elif key == "storage":
             out[key] = {

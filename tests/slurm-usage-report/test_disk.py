@@ -256,7 +256,7 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(
             disk_report.dm_text(rows[1]),
             "login:/의 디스크 사용량이 18G입니다. 경고 수준(15G)을 넘었습니다 (한도 20G). 아직 막힌 것은"
-            " 없습니다. 한도에 닿기 전에 공간을 비워 주세요. 내 사용량은 `disk-usage`로 보실 수 있습니다.",
+            " 없습니다. 한도에 닿기 전에 공간을 비워 주세요. 내 사용량은 `usage disk`로 보실 수 있습니다.",
         )
         self.assertIn(
             "지금은 그곳에 쓸 수 없습니다. 공간을 비우시면 다시 쓰실 수 있습니다.",
@@ -365,7 +365,7 @@ class RunTests(unittest.TestCase):
             dm = [p for p in posted if p[0] == "UALICE" and "스크래치 공간" in p[1]]
             self.assertEqual(len(dm), 1)
             self.assertIn("스크래치 공간의 파일 3개(2G)", dm[0][1])
-            self.assertIn("`scratch-space`", dm[0][1])
+            self.assertIn("`usage disk`", dm[0][1])
             admin = [p for p in posted if p[0] == self.CFG["admin_channel"] and "carol" in p[1]]
             self.assertEqual(len(admin), 1)
             self.assertTrue(admin[0][1].startswith("<!subteam^SADMINS> "), "the administrators are mentioned")

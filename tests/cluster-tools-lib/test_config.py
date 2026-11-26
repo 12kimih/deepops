@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import bounds  # noqa: E402
 from cluster_tools import config  # noqa: E402
-from repo_scan import ansible_files  # noqa: E402
+from repo_scan import ansible_files, tracked  # noqa: E402
 
 ROLES = ROOT / "roles"
 
@@ -173,7 +173,7 @@ class Roles(unittest.TestCase):
     def test_the_tools_that_read_a_role_written_config_are_all_recorded(self):
         self.assertEqual(
             sorted(recorded()),
-            ["container_storage_gc", "disk_quota", "egress_policy", "gpu_diag_idle", "io_fairness", "io_usage", "job_notice",
+            ["cluster_tools", "container_storage_gc", "disk_quota", "egress_policy", "gpu_diag_idle", "io_fairness", "io_usage", "job_notice",
              "power_policy", "scratch_space", "shared_space", "slurm_backup", "slurm_usage_report", "submit_holds"],
         )  # fmt: skip
 
@@ -182,7 +182,8 @@ class Roles(unittest.TestCase):
             with self.subTest(role=role):
                 self.assertEqual(record["role"], role)
                 self.assertTrue((ROOT / record["playbook"]).is_file(), record["playbook"])
-                tasks = (ROLES / role / "tasks/present.yml").read_text()
+                # present.yml, or a tasks file it includes (cluster_tools: usage.yml)
+                tasks = "".join((ROOT / p).read_text() for p in tracked(f"roles/{role}/tasks/*.yml"))
                 self.assertIn(f"{{{{ cluster_tools_lib_config_validate }}}} {record['module']} %s", tasks)
                 items = (ROLES / role / "vars/main.yml").read_text()
                 self.assertRegex(items, rf"cluster_tools_lib_config_records \}}?\}}?[^\n]*/{role}\.json")

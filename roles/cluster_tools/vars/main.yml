@@ -11,6 +11,38 @@ cluster_tools_items:
   - "file:{{ cluster_tools_manifest }}"
   - "file:{{ cluster_tools_lib_manifest }}"
   - "file:{{ user_environment_cpus_command }}"
+  - "file:{{ cluster_tools_lib_config_dir }}/usage.json"
+  - "file:{{ cluster_tools_lib_config_records }}/cluster_tools.json"
+  - "dir:{{ cluster_tools_lib_config_dir }}/ends"
 
 # The users' environment entries a login gets (a job-only one is the task prolog's).
 cluster_tools_profile_entries: "{{ user_environment_entries | rejectattr('login', 'equalto', '') | list }}"
+
+# What `usage` measures each person against (cluster_tools.rules: the rules file, every
+# node): each part the thresholds its enforcer reads, from the same settings, and absent
+# where the cluster does not run that enforcer, so its rule says off.
+_cluster_tools_usage_file: "{{ cluster_tools_lib_config_dir }}/usage.json"
+# Each person's membership end, in a file only they can read (cluster_tools.rules).
+_cluster_tools_ends_dir: "{{ cluster_tools_lib_config_dir }}/ends"
+_cluster_tools_ends: "{{ people | people_leaving(people_leave_grace_days) }}"
+# Every part always there: an empty one is a rule the cluster does not run (off).
+_cluster_tools_usage_cfg:
+  prometheus_url: "{{ prometheus_url }}"
+  ends_dir: "{{ _cluster_tools_ends_dir }}"
+  gpu_idle: >-
+    {{ {'idle_hours': slurm_usage_report_idle_hours | float,
+        'idle_util_threshold': slurm_usage_report_idle_util_threshold | float,
+        'cancel_after_hours': slurm_usage_report_cancel_after_hours | float,
+        'cancel_warn_hours': slurm_usage_report_cancel_warn_hours | float} if slurm_enable_monitoring | bool else {} }}
+  io: >-
+    {{ {'share': slurm_usage_report_io_share | float, 'minutes': slurm_usage_report_io_minutes | int,
+        'top': slurm_usage_report_io_top_jobs | int, 'mounts': io_fairness_models | io_notice_mounts}
+       if slurm_enable_monitoring | bool and io_fairness_models | length > 0 else {} }}
+  disk: >-
+    {{ {'warn_fraction': cluster_user_warn_fraction | float,
+        'holds_on': slurm_enable_submit_holds | bool and submit_holds_disk | bool,
+        'holds_from': submit_holds_from_time | int} if slurm_enable_disk_quota | bool else {} }}
+  scratch: >-
+    {{ {'root': scratch_space_root, 'stale_days': scratch_space_stale_days | int,
+        'grace_days': scratch_space_grace_days | int} if slurm_enable_scratch_space | bool else {} }}
+  login: "{{ cluster_tools_user_slice_limits }}"

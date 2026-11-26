@@ -207,7 +207,7 @@ on it (its copy names the new cluster, and `slurmctld` holds each `slurmd`'s
 registration). The restarted `slurmctld` takes
 each partition's state from `slurm.conf` again (it starts without `-R`), so the drain
 ends with the rename. The old cluster's history stays in the database:
-`sacct -M <old name>`, `sreport -M <old name>` (`gpu-usage JOB` looks in every cluster).
+`sacct -M <old name>`, `sreport -M <old name>` (`usage gpu JOB` looks in every cluster).
 
 Everything else that shows the name follows `slurm_cluster_name`; a portal (Open
 OnDemand) reads it from its cluster file, which its role writes from the same setting.

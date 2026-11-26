@@ -1,5 +1,6 @@
-"""disk-usage: your space on each filesystem against its levels, your folders worth
-cleaning, and how much your jobs and logins read and wrote lately.
+"""usage disk: your space on each filesystem against its levels, your folders worth
+cleaning, and your files on the scratch space due to be cleaned up, with their dates.
+The exit status is the disk and scratch rules' for you (cluster_tools.rules).
 
 All from Prometheus (prometheus_url in the site file), the series the cluster already
 keeps; nothing is measured here:
@@ -8,26 +9,23 @@ keeps; nothing is measured here:
            refuses the write that would pass it)
   folders  the folders worth cleaning (cluster_tools.cleanup: unused past the stale
            period), the largest and longest unused first
-  I/O      roles/io_usage's counters: each job's reads and writes through system calls
-           (page cache and pipes included: a ranking, not disk or NFS bytes) and each
-           login's block I/O on the node's own disks, outside jobs
+and the scratch cleanup's list of your files (cluster_tools.scratch_space), each looked
+at again, so one used since shows as spared. Your I/O: usage io.
 The Grafana dashboard "Storage / per person" (scripts/dashboards/storage_person.py)
-draws the same queries (space, folders, io below) over time, for the person picked.
+draws the same queries (space, folders below) over time, for the person picked.
 Python 3.9 or newer, standard library only.
 """
 
-import json
+import os
 import sys
 import time
 
-from .cli import Command, Opt, me, opt_json, opt_user, run_main
+from . import rules
+from .usage import JSON_NOTE
+from .cli import UNKNOWN, Command, Opt, opt_json, opt_user, run_main
 from .disk_report import USAGE, host_of, where
 from .io_report import quoted
-from .prometheus import Error as PrometheusError
-from .prometheus import Prometheus
 from .render import Grid, size, width
-from .site import PATH as SITE_PATH
-from .site import info as site_info
 
 # The person's series. SELECTOR is a PromQL label matcher on the person: user="kim"
 # here, user=~"$user" on the dashboard, so both read one definition.
@@ -44,13 +42,6 @@ FOLDERS = (("bytes", "disk_cleanup_candidate_bytes"), ("unused_days", "disk_clea
 # When each filesystem's folders were last weighed (cluster_tools.cleanup): the folders
 # are as of then, and each filesystem is scanned on its own schedule.
 SCANNED = "max by (host, filesystem) (disk_cleanup_scan_timestamp_seconds)"
-# (who, direction): (counter, the labels a row keeps)
-IO = {
-    ("job", "read"): ("io_usage_job_read_bytes_total", "host, job_id"),
-    ("job", "written"): ("io_usage_job_written_bytes_total", "host, job_id"),
-    ("login", "read"): ("io_usage_login_read_bytes_total", "host, device"),
-    ("login", "written"): ("io_usage_login_written_bytes_total", "host, device"),
-}
 
 
 def space(selector):
@@ -67,13 +58,6 @@ def folders(selector):
     return {figure: f"max by (host, filesystem, path) ({metric}{{{selector}}})" for figure, metric in FOLDERS}
 
 
-def io(who, direction, selector, window, function="increase"):
-    """The bytes (FUNCTION increase) or bytes a second (rate) of the person's jobs or
-    logins over WINDOW, one series per job or per disk of a login."""
-    counter, by = IO[(who, direction)]
-    return f"sum by ({by}) ({function}({counter}{{{selector}}}[{window}]))"
-
-
 NOTES = [
     "Sources, all read from Prometheus (nothing is measured here):\n"
     "  space    the disk quota metrics: bytes and files on each counted filesystem, the warn\n"
@@ -82,33 +66,29 @@ NOTES = [
     "  folders  the folders worth cleaning: unused past the stale period, the largest and\n"
     "           longest unused first, from each filesystem's last scan (its time shown; the\n"
     "           scans run on their own schedules, not daily everywhere).\n"
-    "  I/O      each job's reads and writes through system calls over the window (page\n"
-    "           cache and pipes included: a ranking of your jobs, not their disk or NFS\n"
-    "           bytes) and each login's block I/O on the node's own disks, outside jobs.\n"
+    "  scratch  the scratch cleanup's list of your files unused for its stale period, each\n"
+    "           with the date it goes unless you use it (read or write) before.\n"
     'The Grafana dashboard "Storage / per person" shows the same series over time.',
 ]
 
 COMMAND = Command(
     USAGE,
-    "your space and files on each filesystem against their limits, folders worth cleaning, recent I/O",
+    "your space and files against their limits, folders worth cleaning, scratch files due to go",
     [
         opt_user("someone else's figures instead of yours", metavar="NAME"),
         Opt(
-            "--hours",
+            "--top",
             metavar="N",
             type=int,
-            default=24,
-            brief=True,
-            help="the I/O window, in hours (default 24)",
+            default=10,
+            help="rows per table of folders and scratch files (default 10)",
         ),
-        Opt(
-            "--top", metavar="N", type=int, default=10, help="rows per table of folders and I/O (default 10)"
-        ),
-        opt_json("the figures as JSON, for scripts"),
+        opt_json("one object, schema 1 (below): space, folders, scans, scratch"),
     ],
+    usage=f"{USAGE} [OPTIONS]",
     machine="--json",
-    notes=NOTES,
-    summary_ko="내 파일시스템별 사용량과 파일 수, 경고 수준과 한도, 정리하면 좋을 폴더, 최근 I/O",
+    notes=[*NOTES, JSON_NOTE],
+    summary_ko="내 용량과 파일 수, 경고 수준과 한도, 정리하면 좋을 폴더, 정리될 스크래치 파일",
 )
 
 
@@ -120,8 +100,8 @@ def _series(api, expr, labels):
     }
 
 
-def collect(api, user, hours, top):
-    """The person's figures: space rows, folders and I/O rows, each list sorted."""
+def collect(api, user, top):
+    """The person's figures: space rows and folders, each list sorted."""
     selector = f"user={quoted(user)}"
     figures = {}
     for figure, expr in space(selector).items():
@@ -146,19 +126,7 @@ def collect(api, user, hours, top):
         {"where": where(h, fs), "time": int(v)}
         for (h, fs), v in sorted(_series(api, SCANNED, ("filesystem",)).items())
     ]
-    out = {"user": user, "hours": hours, "space": rows, "folders": kept[:top], "scans": scans,
-           "jobs": [], "logins": []}  # fmt: skip
-    for who, label in (("job", "job_id"), ("login", "device")):
-        moved = {}
-        for direction in ("read", "written"):
-            for k, v in _series(api, io(who, direction, selector, f"{hours}h"), (label,)).items():
-                moved.setdefault(k, {"read": 0.0, "written": 0.0})[direction] = v
-        listed = [
-            {"host": h, label: name, **d} for (h, name), d in moved.items() if d["read"] or d["written"]
-        ]
-        listed.sort(key=lambda r: (-(r["read"] + r["written"]), r["host"], r[label]))
-        out[f"{who}s"] = listed[:top]
-    return out
+    return {"user": user, "space": rows, "folders": kept[:top], "scans": scans}
 
 
 def _level(used, warn, hard):
@@ -221,47 +189,44 @@ def render(data, theme):
         if scanned:
             tally.append(("scanned " + ", ".join(scanned), "muted"))
         out.append(grid.render("folders worth cleaning", tally))
-    for who_, label, heading, title_ in (
-        ("jobs", "job_id", "JOB", "I/O of jobs"),
-        ("logins", "device", "DISK", "I/O of logins"),
-    ):
-        rows = data[who_]
-        tally = [(f"last {data['hours']}h", "sub")]
-        if not rows:
-            out.append(_heading(theme, title_, [*tally, ("none", "muted")]))
-            continue
-        grid = Grid(theme, [heading, "HOST", "READ", "WRITTEN"], align=["l", "l", "r", "r"])
-        for r in rows:
-            grid.row([(r[label], "text"), (r["host"], "muted"), (size(r["read"]), "text"),
-                      (size(r["written"]), "text")])  # fmt: skip
-        out.append(grid.render(title_, tally))
     return "\n".join(out) + "\n"
 
 
+def scratch(user, cfg, top, now):
+    """The scratch cleanup's view of USER's files (cluster_tools.scratch_space), or "":
+    no scratch space on this cluster, or none mounted here."""
+    from . import scratch_space
+
+    part = cfg.get("scratch")
+    if not part or not os.path.isdir(part["root"]):
+        return ""
+    text, _ = scratch_space.show(scratch_space.Host(), part["root"], user, now, top=top)
+    return "\n" + text
+
+
 def main(argv=None):
+    from .usage import context, emit, table
+
     args, theme = COMMAND.parse(argv)
 
     def body():
-        if args.hours < 1 or args.top < 1:
-            print("disk-usage: --hours and --top take a whole number from 1", file=sys.stderr)
+        if args.top < 1:
+            print(f"{USAGE}: --top takes a whole number from 1", file=sys.stderr)
             return 2
-        url = site_info().get("prometheus_url")
-        if not url:
-            print(f"disk-usage: no prometheus_url in {SITE_PATH}", file=sys.stderr)
-            return 1
-        try:
-            data = collect(Prometheus(url), args.user or me(), args.hours, args.top)
-        except PrometheusError as e:
-            print(f"disk-usage: {e}", file=sys.stderr)
-            return 1
-        data["at"] = int(time.time())
-        if args.json:
-            print(json.dumps(data, indent=2))
-        else:
-            sys.stdout.write(render(data, theme))
-        return 0
+        user, _, cfg, api = context(args.user)
+        if api is None:
+            print(f"{USAGE}: no prometheus_url", file=sys.stderr)
+            return UNKNOWN
+        now = time.time()
+        data = collect(api, user, args.top)
+        rows = [rules.disk(user, cfg, api, now), rules.scratch(user, cfg, now)]
+        text = (
+            table(rows, theme, f"space of {user}") + render(data, theme) + scratch(user, cfg, args.top, now)
+        )
+        data.pop("user", None)
+        return emit(USAGE, user, rows, args, theme, text, **data)
 
-    return run_main("disk-usage", body)
+    return run_main(USAGE, body, unknown=UNKNOWN)
 
 
 if __name__ == "__main__":

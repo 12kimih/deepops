@@ -1,0 +1,64 @@
+---
+# What `usage` measures each person against (cluster_tools.rules): the thresholds the
+# enforcers read, rendered from the same settings, before the command itself is published.
+- name: Write the rules usage measures against
+  ansible.builtin.copy:
+    content: "{{ _cluster_tools_usage_cfg | to_nice_json }}\n"
+    dest: "{{ _cluster_tools_usage_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.rules %s"
+
+- name: Record the rules' configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: cluster_tools, module: cluster_tools.rules, file: "{{ _cluster_tools_usage_file }}", playbook: playbooks/slurm-cluster/cluster-tools.yml}
+
+# Each person's membership end (the roster's, as the submit holds apply it), in a file
+# only they can read: Prometheus is open to everyone, so no series carries it.
+- name: Make the directory of the membership ends
+  ansible.builtin.file:
+    path: "{{ _cluster_tools_ends_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Look up the people whose membership ends
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ item }}"
+    fail_key: false
+  loop: "{{ _cluster_tools_ends.keys() | list }}"
+  register: _cluster_tools_ends_accounts
+
+# A login this host cannot resolve gets no file (said by its absence: usage reads none).
+- name: Write each person's membership end, readable by them alone
+  ansible.builtin.copy:
+    content: "{{ _cluster_tools_ends[item.item] | to_json }}\n"
+    dest: "{{ _cluster_tools_ends_dir }}/{{ item.item }}"
+    owner: "{{ item.item }}"
+    group: root
+    mode: "0400"
+  loop: "{{ _cluster_tools_ends_accounts.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: (item.ansible_facts.getent_passwd | default({})).get(item.item) is not none
+
+- name: Find the membership ends written before
+  find_present:
+    paths: "{{ _cluster_tools_ends_dir }}"
+    file_type: file
+  register: _cluster_tools_ends_found
+
+- name: Remove the membership ends no longer in the roster
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ _cluster_tools_ends_found.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: item.path | basename not in _cluster_tools_ends

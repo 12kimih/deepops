@@ -1,5 +1,5 @@
 ---
-# gpu-usage reads the interval too (cluster_tools.gpu_usage.seconds): a span it parses.
+# usage gpu reads the interval too (cluster_tools.gpu_usage.seconds): a span it parses.
 - name: Require an interval in seconds or minutes
   ansible.builtin.assert:
     that: slurm_metrics_interval | string is match('^[0-9]+ ?(s|sec|min|m)?$')

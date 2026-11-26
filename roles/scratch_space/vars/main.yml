@@ -1,5 +1,6 @@
 ---
-_scratch_space_command: /usr/local/libexec/scratch-space
+# The cleanup's own entry, root's, for its timer and an administrator alone (never on PATH).
+_scratch_space_command: /usr/local/libexec/scratch-space-purge
 _scratch_space_config: "{{ cluster_tools_lib_config_dir }}/scratch-space.json"
 _scratch_space_textfile: "{{ node_exporter_prom_dir }}/scratch-space.prom"
 _scratch_space_kept: "{{ node_exporter_prom_keep_dir }}/scratch-space.prom"

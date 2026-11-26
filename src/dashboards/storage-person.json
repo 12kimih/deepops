@@ -2,7 +2,7 @@
   "uid": "storage-person",
   "title": "Storage / per person",
   "id": null,
-  "description": "One person's space and files against their levels, folders worth cleaning, and their jobs' and logins' I/O: the figures disk-usage prints, over time.",
+  "description": "One person's space and files against their levels, folders worth cleaning, and their jobs' and logins' I/O: the figures usage disk and usage io print, over time.",
   "tags": [
     "deepops",
     "storage"

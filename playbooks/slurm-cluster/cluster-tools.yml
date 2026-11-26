@@ -9,6 +9,7 @@
   become: true
   tags:
     - cluster-tools
+    - people  # each person's membership end comes from the roster (usage)
   roles:
     - role: proxy_defaults
     - role: deploy_defaults
