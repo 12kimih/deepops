@@ -280,7 +280,7 @@ class Reasons(unittest.TestCase):
             (
                 2,
                 "cluster-bot-serve: this host offers no 'bans'\n",
-                "이 서비스를 제공하지 않습니다",
+                "호스트가 이 서비스를 제공하지 않습니다",
                 "cluster-bot.yml",
             ),
             (2, "cluster-bans: not banned 203.0.113.8\n", "not banned 203.0.113.8", ""),

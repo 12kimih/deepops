@@ -52,8 +52,8 @@ def home(login, projects, root):
         button("새 공동작업 폴더", "project.new", "new", style="primary"),
         button("참여 요청", "project.join", "join"),
     ]})  # fmt: skip
-    blocks.append(rich.context("소유자와 멤버는 읽고 쓰고, 열람자는 읽기만 합니다. 바뀐 그룹은 새로 로그인하면 적용됩니다. "
-        "파일은 만든 사람의 디스크 한도에 들어갑니다."))  # fmt: skip
+    blocks.append(rich.context("소유자와 멤버는 읽고 쓰고, 열람자는 읽기만 합니다. 바뀐 권한은 새로 로그인해야 적용됩니다. "
+        "파일은 만든 사람의 디스크 사용량으로 셉니다."))  # fmt: skip
     return blocks
 
 
@@ -148,4 +148,4 @@ def notice(name, before, after, root):
         if before
         else f"{role_name(after)}(으)로 추가되었습니다"
     )
-    return f"공동작업 폴더 {name}에 {verb}: `{root}/{name}` ({access}). 새로 로그인하면 적용됩니다."
+    return f"공동작업 폴더 {name}의 {verb}: `{root}/{name}` ({access}). 새로 로그인하면 적용됩니다."

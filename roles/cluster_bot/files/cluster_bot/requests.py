@@ -81,7 +81,7 @@ class Engine:
         except Refused as e:
             return Outcome("refused", f"요청할 수 없습니다: {e}", request=req)
         except Failed as e:
-            return Outcome("refused", f"처리할 시스템에 닿지 못했습니다: {e}", request=req)
+            return Outcome("refused", f"처리할 시스템에 연결하지 못했습니다: {e}", request=req)
         if verdict == "auto":
             return self._apply(req)
         # Who approves: the administrators, or any of some people (an administrator may too).

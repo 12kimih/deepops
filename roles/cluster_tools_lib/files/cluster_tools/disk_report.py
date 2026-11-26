@@ -213,7 +213,7 @@ def where(host, filesystem):
 def change(now, before):
     """A day's change of a usage: +3.2G, -512M, 0, or 새로 (not counted a day ago)."""
     if before is None:
-        return "새로"
+        return "신규"
     d = now - before
     return "0" if abs(d) < 1024**2 else ("+" if d > 0 else "") + size(d)
 
@@ -323,7 +323,7 @@ def render(data, who, *, people=(), mention=None, hold=None, fill=None, fill_men
         for h, t in data["reported"].items()
         if data["now"] - t > STALE
     )
-    notes = [f"경고 수준은 알려 드리기만 하고, 한도에 닿으면 바로 쓰기가 막힙니다. {HOW}"]
+    notes = [f"경고 수준을 넘으면 알려 드리기만 하고, 한도에 닿으면 바로 쓰기가 막힙니다. {HOW}"]
     if stale:
         notes.append(f"최근 보고가 없어 예전 수치입니다: {', '.join(stale)}.")
     card.append(rich.context(" ".join(notes)))
@@ -338,19 +338,19 @@ def render(data, who, *, people=(), mention=None, hold=None, fill=None, fill_men
             continue
         mine = [r for r in everyone if not people or r[0] in people]
         others = [r for r in everyone if people and r[0] not in people]
-        unit = "명" if people else "개 계정"
+        count = (lambda n: f"{n}명") if people else (lambda n: f"계정 {n}개")
         if mine:
             body = [
                 (u, size(e["used"]), change(e["used"], e["before"]), _level(e, "warn"), _level(e, "hard"))
                 for u, e in mine
             ]
-            head = f":file_cabinet: **{where(*key)}**: {len(mine)}{unit}, 많이 쓰는 순"
+            head = f":file_cabinet: **{where(*key)}**: {count(len(mine))}, 많이 쓰는 순"
             detail += sections(f"{head}\n{table(('사용자', '사용량', '하루', '경고', '한도'), body)}")
         if others:
             body = [(u, size(e["used"]), change(e["used"], e["before"])) for u, e in others]
             total = size(sum(e["used"] for _, e in others))
             head = (
-                f"**{where(*key)}**: 명부에 없는 계정 (root, 서비스, 떠난 분) {len(others)}개, 모두 {total}"
+                f"**{where(*key)}**: 명부에 없는 계정 (root, 서비스, 떠난 분) {len(others)}개, 합계 {total}"
             )
             detail += sections(f"{head}\n{table(('계정', '사용량', '하루'), body)}")
     if data["projects"]:
@@ -391,7 +391,7 @@ def dm_text(row, note=""):
 # The scratch space's cleanup (cluster_tools.scratch_space): each person's files listed for
 # removal, told once per removal date, and the mass access-time refreshes an
 # administrator sees.
-PURGE_HOW = "`scratch-space`로 그 파일과, 그사이 쓰신 파일을 보실 수 있습니다."
+PURGE_HOW = "`scratch-space`로 정리될 파일과, 그사이 쓰셔서 정리 대상에서 빠진 파일을 보실 수 있습니다."
 
 
 def collect_purge(prom):
@@ -429,8 +429,8 @@ def purge_dm_text(k, entry):
         f"스크래치 공간의 파일 {entry['files']}개({size(entry['bytes'])})를 {entry['stale_days']}일 동안"
         f" 쓰지 않으셨습니다. {when}부터 차례로 정리되니, 남겨 두실 파일은 그전에 한 번 읽거나 써 주세요."
         + (
-            f" 그중 {entry['deferred']}개는 실행 중인 잡이 있어 미뤄졌습니다. 잡이 계속 돌더라도 새 날짜에"
-            " 정리되니, 필요하시면 그전에 써 주세요."
+            f" 그중 {entry['deferred']}개는 실행 중인 잡이 있어 미뤄졌습니다. 잡이 계속 실행 중이어도 미뤄진 날짜에는"
+            " 정리되니, 남겨 두실 파일은 그전에 써 주세요."
             if entry.get("deferred")
             else ""
         )

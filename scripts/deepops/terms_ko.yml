@@ -11,18 +11,19 @@
 # scripts/deepops/terms.py applies it; each repository checks its own files.
 # Docs: docs/deepops/terms.md.
 terms:
-  - use: 할당받은 GPU를 쓰지 않는 잡
+  - use: GPU 유휴 잡
     id: idle_job
-    title: GPU 유휴 잡
-    code: {use: IDLE_JOB, title: IDLE_JOB_TITLE}
+    code: {use: IDLE_JOB}
     not:
       - (?<!할당받은 )GPU를 (?:\S+ ){0,2}쓰지 않
+      - 할당받은 GPU를 쓰지 않는 잡
       - GPU를 할당받아 두고
       - 유휴 GPU
       - 쉬(?:는|던) 잡
       - 잡아 둔
-    why: '"GPU를 쓰지 않는 잡" alone reads as a CPU-only job (owner, 2026-11-27); the GPUs
-      were allocated to it. Its rule: every GPU it was allocated sat idle the whole time.'
+    why: 'A noun in titles and sentences alike (owner, 2026-11-27); "GPU를 쓰지 않는 잡"
+      alone read as a CPU-only job. Its definition is kept once, in the user docs'' GPU
+      session rules (every GPU the job was allocated sat idle the whole time).'
   - use: a job leaving its GPUs idle
     not:
       - (?i:\bidle[- ](?:GPU )?(?:jobs?|rule)\b)
@@ -109,6 +110,96 @@ terms:
     code: {title: DOWN_TITLE}
     why: A drained or down node in a title is 중단 노드 (owner, 2026-11-27); not 장애 노드,
       since a drain is no failure. Sentences say what it means.
+  # Wording a native reader trips on (sweep of every Korean text, 2026-11-27): each
+  # pattern seen in several places, refused so it cannot come back.
+  - use: 실행 중인 잡, 실행됩니다
+    not:
+      - 잡이 (?:도는|돈|돌고 있)
+      - 돌고 있는 내 잡
+      - 도는 (?:모든|긴) 잡
+      - (?:[가이]|계속|다시|그대로|자동으로|까지|에서) 돕니다
+      - 처음부터 (?:다시 )?돌
+      - 배포가 돈
+    why: 돌다 is spoken Korean, and its 돕니다 reads first as 돕다 (to help); the
+      reports and the glossary say 실행.
+  - use: 적더라도
+    not:
+      - (?:에|까지|되고,) 적어도
+    why: '"적어도" after a place or a list reads first as "at least".'
+  - use: 할당
+    not:
+      - 배정(?:된|받아|됩니다|해)
+      - 독점 배정
+    why: Slurm's allocation is 할당 everywhere else; 배정 crept in beside it.
+  - use: 환경 변수
+    not:
+      - 환경변수
+    why: One spacing, the one the environment pages use.
+  - use: 명부
+    not:
+      - 명단
+    why: The roster is 명부 in the bot, the reports and the user docs.
+  - use: 노드에서 실행
+    not:
+      - 노드에 (?:먼저 )?실행
+      - master에 실행
+      - 노드에 돌리
+      - \)에 먼저 실행
+    why: A command runs on (에서) a node; 에 reads as running it into the node.
+  - use: 팀 QoS, 기본 QoS
+    not:
+      - 높은 우선순위 QoS
+      - 낮은 QoS
+    why: The two QoS kinds are 팀 QoS and 기본 QoS on every page.
+  - use: 첫 비밀번호
+    not:
+      - 처음 비밀번호
+    why: 처음 is no modifier of a noun here.
+  - use: 관리자가 PR을 병합하면
+    not:
+      - 관리자가 반영하면
+    why: What is applied was left unsaid; a request PR is merged.
+  - use: 사용률, 사용량
+    not:
+      - GPU(?:가|의) (?:실제로 )?한 일
+    why: '"What the GPU did" is a calque; say what is measured.'
+  - use: 우선순위 구성
+    not:
+      - 우선순위 분해
+    why: '"Breakdown" calqued.'
+  - use: 자리표시자
+    not:
+      - 자리 표시(?!자)
+    why: The pages' word for a <...> stand-in.
+  - use: 파일시스템
+    not:
+      - 파일\s+시스템
+    why: One spacing, the one every page uses.
+  - use: 디스크 한도
+    not:
+      - (?:용량|파일 수) 상한
+      - 상한에 이르면
+    why: The disk limit is 한도 (상한 is the GPU power cap's word).
+  - use: 태스크 하나의 몫
+    not:
+      - 작업자 하나의 몫
+    why: '"작업자" (worker) is defined nowhere; the knobs are per task.'
+  - use: 가장 최근 공지
+    not:
+      - 가장 새 공지
+    why: '"가장 새" is no Korean.'
+  - use: 사용자에게 보낸
+    not:
+      - 사람에게 보낸
+    why: The DMs go to the cluster's users.
+  - use: 헬스 체크
+    not:
+      - 헬스체크
+    why: One spacing, the one the admin docs use.
+  - use: 구제
+    not:
+      - 불이익은 도(?:움받기|와드리기)
+    why: A penalty is not "helped"; it is remedied.
   # Title idioms (owner, 2026-11-27): a verb phrase that names a thing has a noun for
   # it in a title; refused in titles only, sentences keep them.
   - title: 역할

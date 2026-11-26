@@ -60,11 +60,10 @@ from .slurm import (
 from .vocab import job_holds, node_unavailable
 
 # The one name, in every text this tool sends, for a job whose allocated GPUs all sat
-# idle the whole window (the rule is in the text beside it). Without "allocated" it
-# reads as a CPU-only job (owner, 2026-11-27); tests/slack-text/test_terms.py guards it.
-IDLE_JOB = "할당받은 GPU를 쓰지 않는 잡"
-# Its title form, in a card field or a section heading: titles are nouns (owner, 2026-11-27).
-IDLE_JOB_TITLE = "GPU 유휴 잡"
+# idle the whole window (the rule is in the text beside it): a noun, in titles and
+# sentences alike (owner, 2026-11-27); tests/slack-text/test_terms.py holds it to the
+# glossary.
+IDLE_JOB = "GPU 유휴 잡"
 # A drained or down node: in sentences what it means, in a title its noun.
 DOWN_TITLE = "중단 노드"
 NOTIFY = {"mention", "dm"}
@@ -203,7 +202,7 @@ def render_week(rows, who, threshold, days=WEEK_DAYS, top=WEEK_TOP):
         lines.append(f"{name}: {r['held']:,.0f} GPU시간 중 {r['idle']:,.0f} GPU시간 쉼 ({part:.0%})")
     body = "\n".join(lines) or "GPU 잡이 없었습니다."
     note = (
-        f"쉼: 잡이 할당받은 GPU의 사용률이 그 1분 동안 {threshold:g}% 이하였다는 뜻입니다. "
+        f"쉼: 잡이 할당받은 GPU의 사용률이 {threshold:g}% 이하였던 시간입니다 (1분 단위로 셉니다). "
         "쓰지 않는 GPU는 `scancel <JOBID>`로 반납해 주세요."
     )
     return head, [{"type": "header", "text": {"type": "plain_text", "text": head[:150]}}] + sections(body) + [
@@ -318,7 +317,7 @@ def summary_card(report):
     fields = [
         f"**할당된 GPU**\n{alloc} / {total}장 ({100 * alloc / total:.0f}%)",
         f"**평균 사용률**\n{avg}",
-        f"**{IDLE_JOB_TITLE}**\n{len(idle)}개" + (" :zzz:" if idle else ""),
+        f"**{IDLE_JOB}**\n{len(idle)}개" + (" :zzz:" if idle else ""),
         f"**대기 중인 잡**\n{pend_jobs}개, GPU {pend_gpus}장",
         f"**{DOWN_TITLE} (drain, down)**\n{len(report['reasons'])}대"
         + (" :warning:" if report["reasons"] else ""),
@@ -337,8 +336,10 @@ def idle_section(idle, cfg, due, who):
     """The jobs leaving their GPUs idle, per owner, each owner mentioned when told this run (DUE)."""
     if not idle:
         return []
-    rule = f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게"
-    lines = [f":zzz: **{IDLE_JOB_TITLE}**  _{rule}_"]
+    rule = (
+        f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게 이어진 잡"
+    )
+    lines = [f":zzz: **{IDLE_JOB}**  _{rule}_"]
     owners = by_owner(idle)
     for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
         told = "mention" in cfg["notify"] and user in due
@@ -380,7 +381,7 @@ def pending_section(pending):
     ]
     return sections(
         ":hourglass_flowing_sand: **대기 중인 잡**\n"
-        + table(("사용자", "잡", "GPU", "가장 오래", "사유"), rows)
+        + table(("사용자", "잡", "GPU", "최장 대기", "사유"), rows)
     )
 
 

@@ -94,8 +94,8 @@ def dm_text(item, rank, advice):
     lead = "가장 많이" if rank == 0 else f"{rank + 1}번째로 많이"
     return (
         f"지난 {item['minutes']}분 동안 `{item['host']}` 노드가 `{item['mount']}`{did} 있습니다. "
-        f"{rate(item['rate'])}로, 그 뒤의 디스크가 클러스터 전체에 내주는 양의 {share_of(item)}%라 "
-        f"모두의 `{item['mount']}` 작업이 느려집니다. 그 노드에서 {lead} {what} 잡이 `{job}`입니다 "
+        f"{rate(item['rate'])}로, `{item['mount']}` 디스크가 클러스터 전체에 낼 수 있는 속도의 {share_of(item)}%를 "
+        f"차지해 모두의 `{item['mount']}` 작업이 느려집니다. 그 노드에서 {lead} {what} 잡이 `{job}`입니다 "
         f"({rate(job_rate)}: 그 노드가 공유 스토리지와 주고받은 양을 노드 안 잡들의 읽기, 쓰기 호출 양에 비례해 나눈 추정치입니다)."
         f"\n{advice}"
     )

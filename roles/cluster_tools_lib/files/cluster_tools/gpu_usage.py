@@ -94,7 +94,7 @@ COMMAND = Command(
     usage="gpu-usage [OPTIONS] JOB",
     machine="--json",
     notes=NOTES,
-    summary_ko="잡의 GPU가 실제로 한 일: 사용률, SM 활동, 메모리, 전력 (실행 중이거나 끝난 잡)",
+    summary_ko="잡이 GPU를 실제로 얼마나 썼는지: 사용률, SM 활동, 메모리, 전력 (실행 중이거나 끝난 잡)",
 )
 
 
