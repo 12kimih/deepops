@@ -100,5 +100,43 @@ class Forward(unittest.TestCase):
         self.assertIn("has commits", sync.forward(self.clone, dry_run=False)[0])
 
 
+class WritesTheExpectedState(unittest.TestCase):
+    """After a move, the expected component state goes where this machine's node_exporter
+    reads it; where that directory is not, it is said and the sync goes on."""
+
+    def module(self, where):
+        sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+        import component_expected
+
+        class Here:
+            State, textfile, write = (
+                component_expected.State,
+                component_expected.textfile,
+                component_expected.write,
+            )
+
+            @staticmethod
+            def expected_path(config):
+                return where
+
+        return Here
+
+    def test_written_into_the_directory_and_said(self):
+        with tempfile.TemporaryDirectory() as d:
+            where = Path(d) / "component-expected.prom"
+            mod = self.module(where)
+            said = sync.write_expected(mod, Path(d), mod.State({"n1": {"a": "1"}}, {"n1": {"a": "d"}}), {})
+            self.assertEqual(said, f"expected component state: written to {where}")
+            self.assertIn('for_host="n1",component="a",source="d"', where.read_text())
+
+    def test_no_directory_is_said_and_nothing_fails(self):
+        with tempfile.TemporaryDirectory() as d:
+            mod = self.module(Path(d) / "absent" / "component-expected.prom")
+            said = sync.write_expected(mod, Path(d), mod.State({}, {}), {})
+            self.assertIn("not written", said)
+            self.assertIn("the next prometheus.yml run writes it", said)
+            self.assertFalse((Path(d) / "absent").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

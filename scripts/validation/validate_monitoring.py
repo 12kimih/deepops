@@ -67,6 +67,8 @@ ABSENT_OK = {
     ),
     # A backup's results; until then its configured time stands in (rules/backup.yml).
     "after the first run": r"slurm_backup_(restore_test_)?(status|last_\w+)",
+    # A component's source digest, recorded by its first whole deploy since digests were.
+    "after the first whole deploy": r"os_updates_component_source_info",
     "optional component": r".+_tls_cert_not_after_seconds",  # a service that serves TLS (rules/tls.yml)
     # Usage is counted from the start; limits exist once the site sets some, and project
     # series only where it declares projects (roles/disk_quota).
@@ -102,9 +104,9 @@ SOURCES = {
     "scratch_space": r"scratch_space_\w+",  # the scratch cleanup (roles/scratch_space)
     # Folders worth cleaning (cluster_tools.cleanup), from disk_quota's scan and the scratch cleanup.
     "disk_cleanup": r"disk_cleanup_\w+",
-    # Each host's expected component versions, rendered at each prometheus.yml run
-    # (scripts/deepops/component_pins.py).
-    "component_pins": r"deepops:component_pin:info",
+    # Each host's expected component versions and sources, the textfile written at each
+    # prometheus.yml run and sync.py move (scripts/deepops/component_expected.py).
+    "component_expected": r"deepops:component_(pin|source):info|deepops_component_expected_\w+",
     "shared_data": r"shared_data_\w+",  # the shared data's export, the bot's rounds (roles/shared_space)
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)
     "gpu_diag_idle": r"gpu_diag_idle_\w+",  # the weekly GPU diagnostics (roles/gpu_diag_idle)

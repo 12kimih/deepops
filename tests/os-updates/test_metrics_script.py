@@ -122,7 +122,9 @@ class ComponentTests(unittest.TestCase):
                 env["OS_UPDATES_COMPONENT_RECORD"] = str(record)
             subprocess.run(["sh", str(SCRIPT), str(textfile)], env=env, check=True, capture_output=True)
             text = (textfile / "os-updates.prom").read_text()
-            return [line for line in text.splitlines() if "_component_info{" in line]
+            return [
+                line for line in text.splitlines() if "_component_info{" in line or "_source_info{" in line
+            ]
 
     def test_present_components_and_each_packages_components(self):
         self.assertEqual(
@@ -133,6 +135,19 @@ class ComponentTests(unittest.TestCase):
                 'os_updates_package_component_info{package="enroot",component="enroot"} 1',
                 'os_updates_package_component_info{package="enroot+caps",component="enroot"} 1',
                 'os_updates_package_component_info{package="enroot+caps",component="pyxis"} 1',
+            ],
+        )
+
+    def test_recorded_sources_follow_the_versions_one_group_each(self):
+        record = json.loads(json.dumps(self.RECORD))
+        record["components"]["enroot"]["source"] = "aaaa"
+        record["components"]["half"]["source"] = "bbbb"  # installing: not current
+        record["record_source"] = "rrrr"
+        self.assertEqual(
+            self.series(json.dumps(record))[2:4],
+            [
+                'os_updates_component_source_info{component="component_record",source="rrrr"} 1',
+                'os_updates_component_source_info{component="enroot",source="aaaa"} 1',
             ],
         )
 

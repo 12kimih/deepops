@@ -76,6 +76,19 @@ options:
     description: The component's version, for C(begin) and C(present).
     type: str
     default: ""
+  source:
+    description:
+      - The digest of what decides the component on this host
+        (scripts/deepops/component_source.py), recorded with C(present). Empty keeps the
+        one recorded before: a run that may have skipped part of the role (--tags,
+        --check, failed hosts) must not mark the component current.
+    type: str
+    default: ""
+  record_source:
+    description: The digest of component_record itself, kept beside the components
+      (C(record_source)); empty keeps the one recorded before.
+    type: str
+    default: ""
 """
 
 RETURN = r"""
@@ -149,11 +162,38 @@ def adoptable(items, owned, exclusive=(), evidence=lambda kind, ident: False):
     return taken
 
 
-def apply(data, name, action, items, version, exclusive=(), evidence=lambda kind, ident: False):
-    """The new record and the orphans (a pure function, for the tests)."""
+def _with_source(entry, source):
+    return {**entry, "source": source} if source else entry
+
+
+def bookkeeping(record):
+    """RECORD without its source digests: what a change to the host is judged by (a new
+    digest alone is bookkeeping, as roles/deploy_record's is, never a change)."""
+    return {
+        "components": {
+            n: {k: v for k, v in e.items() if k != "source"} for n, e in record["components"].items()
+        },
+        "items": record["items"],
+    }
+
+
+def apply(
+    data,
+    name,
+    action,
+    items,
+    version,
+    exclusive=(),
+    evidence=lambda kind, ident: False,
+    source="",
+    record_source="",
+):
+    """The new record and the orphans (a pure function, for the tests). SOURCE and
+    RECORD_SOURCE, when given, replace the recorded digests; otherwise they are kept."""
     components = dict(data["components"])
     owners = {item: set(names) for item, names in data["items"].items()}
     before = components.get(name, {})
+    kept = before.get("source", "")
     if action == "begin":
         # A converged rerun (present at this version, every item already its own) leaves
         # the record as it is; new items or another version go through installing. A
@@ -165,11 +205,11 @@ def apply(data, name, action, items, version, exclusive=(), evidence=lambda kind
             and all(name in owners.get(item, ()) for item in items)
         )
         if not converged:
-            components[name] = {"state": "installing", "version": version}
+            components[name] = _with_source({"state": "installing", "version": version}, kept)
         for item in items:
             owners.setdefault(item, set()).add(name)
     elif action == "present":
-        components[name] = {"state": "present", "version": version}
+        components[name] = _with_source({"state": "present", "version": version}, source or kept)
         for item, names in owners.items():
             if item not in items:
                 names.discard(name)
@@ -187,6 +227,8 @@ def apply(data, name, action, items, version, exclusive=(), evidence=lambda kind
         "components": components,
         "items": {item: sorted(names) for item, names in sorted(owners.items()) if names},
     }
+    if record_source or data.get("record_source"):
+        record["record_source"] = record_source or data["record_source"]
     grouped = {kind: [] for kind in KINDS}
     for item in orphans:
         kind, _, ident = item.partition(":")
@@ -209,6 +251,8 @@ def main():
             "legacy": {"type": "dict", "default": {}},
             "write": {"type": "bool", "default": True},
             "role": {"type": "str", "default": ""},
+            "source": {"type": "str", "default": ""},
+            "record_source": {"type": "str", "default": ""},
         },
         supports_check_mode=True,
     )
@@ -248,10 +292,18 @@ def main():
         return rc == 0 and bool(out.strip()) and made_by(out.strip(), p["role"])
 
     record, orphans, before = apply(
-        data, p["name"], p["action"], p["items"], p["version"], set(p["exclusive_packages"]), evidence
+        data,
+        p["name"],
+        p["action"],
+        p["items"],
+        p["version"],
+        set(p["exclusive_packages"]),
+        evidence,
+        p["source"],
+        p["record_source"],
     )
-    changed = record != data
-    if changed and p["write"] and not module.check_mode:
+    changed = bookkeeping(record) != bookkeeping(data)
+    if record != data and p["write"] and not module.check_mode:
         os.makedirs(os.path.dirname(p["path"]), mode=0o755, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p["path"]))
         with os.fdopen(fd, "w") as f:

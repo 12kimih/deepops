@@ -216,9 +216,10 @@ tests:
         values: '1x40'
       - series: 'os_updates_component_info{host="n2", instance="n2:9100", component="enroot", version="4.2.1-1"}'
         values: '1x40'
-      - series: 'deepops:component_pin:info{host="n1", component="enroot", version="4.2.2-1"}'
+      # the expected state, from the textfile on the Prometheus host m (for_host: whose)
+      - series: 'deepops_component_expected_version_info{host="m", instance="m:9100", for_host="n1", component="enroot", version="4.2.2-1"}'
         values: '1x40'
-      - series: 'deepops:component_pin:info{host="n2", component="enroot", version="4.2.1-1"}'
+      - series: 'deepops_component_expected_version_info{host="m", instance="m:9100", for_host="n2", component="enroot", version="4.2.1-1"}'
         values: '1x40'
       # n2 pins it at what it has; a component with no pin (unchecked) never alerts
       - series: 'os_updates_component_info{host="n1", instance="n1:9100", component="dcgm", version="datacenter-gpu-manager-4-cuda12"}'
@@ -234,6 +235,51 @@ tests:
             exp_annotations:
               summary: "n1 has enroot 4.2.1-1, not the version the repository and config pin"
               description: "Expected 4.2.2-1. `ansible-playbook -K playbooks/container/enroot.yml -l n1` installs it."
+
+  - name: a fix that only limited runs since reached warns on the hosts it missed, after 3 days
+    interval: 1h
+    input_series:
+      # 2026-11-26: a role fix landed; since then only n3 had a whole run of it. All three
+      # report the same version, so only the source digest tells n1 and n2 apart.
+      - series: 'os_updates_component_source_info{host="n1", instance="n1:9100", component="nvidia_power_limit", source="aaaa"}'
+        values: '1x80'
+      - series: 'os_updates_component_source_info{host="n2", instance="n2:9100", component="nvidia_power_limit", source="aaaa"}'
+        values: '1x80'
+      - series: 'os_updates_component_source_info{host="n3", instance="n3:9100", component="nvidia_power_limit", source="aaaa"}'
+        values: '1x10 _x70'
+      - series: 'os_updates_component_source_info{host="n3", instance="n3:9100", component="nvidia_power_limit", source="bbbb"}'
+        values: '_x10 1x70'
+      # an unrelated component, deployed from what the checkouts hold: quiet
+      - series: 'os_updates_component_source_info{host="n1", instance="n1:9100", component="chrony", source="cccc"}'
+        values: '1x80'
+      # n4 has no digest yet (deployed before digests were recorded): not compared
+      - series: 'os_updates_component_info{host="n4", instance="n4:9100", component="nvidia_power_limit", version="1"}'
+        values: '1x80'
+      - series: 'deepops_component_expected_source_info{host="m", instance="m:9100", for_host="n1", component="nvidia_power_limit", source="bbbb", playbook="playbooks/nvidia-software/nvidia-power-limit.yml"}'
+        values: '1x80'
+      - series: 'deepops_component_expected_source_info{host="m", instance="m:9100", for_host="n2", component="nvidia_power_limit", source="bbbb", playbook="playbooks/nvidia-software/nvidia-power-limit.yml"}'
+        values: '1x80'
+      - series: 'deepops_component_expected_source_info{host="m", instance="m:9100", for_host="n3", component="nvidia_power_limit", source="bbbb", playbook="playbooks/nvidia-software/nvidia-power-limit.yml"}'
+        values: '1x80'
+      - series: 'deepops_component_expected_source_info{host="m", instance="m:9100", for_host="n4", component="nvidia_power_limit", source="bbbb", playbook="playbooks/nvidia-software/nvidia-power-limit.yml"}'
+        values: '1x80'
+      - series: 'deepops_component_expected_source_info{host="m", instance="m:9100", for_host="n1", component="chrony", source="cccc"}'
+        values: '1x80'
+    alert_rule_test:
+      - eval_time: 71h
+        alertname: ComponentNotDeployed
+        exp_alerts: []
+      - eval_time: 78h
+        alertname: ComponentNotDeployed
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, component: nvidia_power_limit, source: aaaa}
+            exp_annotations:
+              summary: "n1 runs nvidia_power_limit as deployed from older code or config"
+              description: "The checkouts now decide nvidia_power_limit differently on n1 than its last whole deploy there. `ansible-playbook -K playbooks/nvidia-software/nvidia-power-limit.yml -l n1` deploys it (scripts/deepops/component_expected.py changes --from REV says what moved)."
+          - exp_labels: {severity: warning, host: n2, component: nvidia_power_limit, source: aaaa}
+            exp_annotations:
+              summary: "n2 runs nvidia_power_limit as deployed from older code or config"
+              description: "The checkouts now decide nvidia_power_limit differently on n2 than its last whole deploy there. `ansible-playbook -K playbooks/nvidia-software/nvidia-power-limit.yml -l n2` deploys it (scripts/deepops/component_expected.py changes --from REV says what moved)."
 
   - name: a broken dpkg or apt warns after an hour
     interval: 1h

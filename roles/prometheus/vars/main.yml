@@ -10,6 +10,8 @@ prometheus_items:
   - "dir:{{ prometheus_cfg_endpoint_dir }}"
   - "dir:{{ prometheus_config_dir }}/rules"
   - "dir:{{ prometheus_config_dir }}"
+  - "file:{{ component_expected_dir }}/{{ component_expected_file }}"
+  - "dir:{{ component_expected_dir }}"
   - package:python3-docker
 # The alert rule files this run installs.
 prometheus_rule_items: >-
