@@ -394,5 +394,38 @@ class PinLatest(unittest.TestCase):
             self.assertEqual(slack.pins, {"3.0"})
 
 
+class Main(Base):
+    """The owner's run (python -m cluster_bot.notices CONFIG): it ran silent when the
+    channel already matched, which read as if it did nothing at all."""
+
+    def main(self, *args):
+        token = os.path.join(self.dir.name, "bot.token")
+        Path(token).write_text("xoxb-test")
+        cfg = os.path.join(self.dir.name, "config.json")
+        Path(cfg).write_text(json.dumps({"bot_token_file": token, "notices": {
+            "url": "https://docs.example.org/notices.json", "channel": CHANNEL,
+            "seen": self.seen, "pinned": self.pinned}}))  # fmt: skip
+        out = []
+        with mock.patch.object(notices, "Slack", return_value=self.slack), \
+                mock.patch.object(notices, "fetch_json", return_value=self.doc), \
+                mock.patch("builtins.print", lambda line, **kw: out.append(line)):  # fmt: skip
+            notices.main([cfg, *args])
+        return out
+
+    def test_a_run_that_changes_nothing_says_so(self):
+        self.run_round("2026-01-01")
+        self.run_round()
+        out = self.main()
+        self.assertEqual(out[-1], "notices: the channel already shows notices.json: nothing changed")
+        self.assertTrue(out[0].startswith("notices: missing"), "the notice seeded unposted is said")
+
+    def test_a_run_says_the_posts_it_leaves(self):
+        self.run_round("2026-01-01")
+        self.run_round()
+        self.slack.add("9.0", "theirs", notice("old", "")["blocks"], bot="B9", app="A9")
+        out = self.main()
+        self.assertTrue(any(line.startswith("notices: foreign 9.0") for line in out), out)
+
+
 if __name__ == "__main__":
     unittest.main()
