@@ -89,7 +89,7 @@ class HardWrap(unittest.TestCase):
     def test_the_rule_tells_a_wrap_from_a_deliberate_break(self):
         self.assertTrue(WRAP.search("your jobs have had idle GPUs for long, and\nwill be cancelled"))
         for fine in (
-            "Idle jobs:\n{jobs}\nPlease free them.",
+            "Jobs leaving their GPUs idle:\n{jobs}\nPlease free them.",
             "- one\n- two",
             "Done.\nNext line",
             "```\ncode\n```",

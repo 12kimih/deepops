@@ -308,7 +308,7 @@ def sections(text):
     """Rich text blocks holding all of TEXT (cluster_tools.rich): a longer text is split at
     lines into several within Slack's limits, a code block closed at the end of one and
     reopened in the next. Nothing is cut: a line left out could be the mention that tells
-    an owner about their idle job."""
+    an owner about a job leaving its GPUs idle."""
     return rich.blocks(text)
 
 
