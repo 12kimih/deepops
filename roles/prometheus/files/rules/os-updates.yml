@@ -110,9 +110,9 @@ groups:
       # Every host at the same version can still be behind the repository: a pin bumped,
       # the checkout synced, the component's playbook not run. The expected versions are
       # each role's own record expression resolved per host from the role defaults and the
-      # site config, rendered at each prometheus.yml run (component-pins.yml, from
-      # scripts/deepops/component_pins.py; sync.py names the hosts and playbooks when the
-      # checkout moves). A component whose version only the host can work out is named
+      # site config (deepops:component_pin:info, below, from the expected component state
+      # scripts/deepops/component_expected.py writes at each prometheus.yml run and each
+      # sync.py move). A component whose version only the host can work out is named
       # unchecked, with the reason, at the head of that file.
       - alert: ComponentVersionNotPinned
         expr: |
@@ -128,6 +128,30 @@ groups:
             {{- "" }}Expected {{ .Labels.version }}. {{ end -}}
             {{ range printf "deepops:component_playbook:info{component=%q}" $labels.component | query }}
             {{- "" }}`ansible-playbook -K {{ .Labels.playbook }} -l {{ $labels.host }}` installs it.{{ end }}
+      # The same version can still run older code: a role fix (a7e5b259, 2026-11-20) never
+      # reached the hosts that only limited runs touched since, and their single deploy
+      # commit made them look current. Each whole deploy of a component records on the
+      # host a digest of what decides it there (its roles, playbook, plugins and config:
+      # scripts/deepops/component_source.py; a --tags, --check or partly failed run keeps
+      # the old one); the checkouts' digest is deepops:component_source:info. A host with
+      # no digest yet is not compared. Three days: a sync is not an emergency, and a
+      # fresh deploy shows at the host's next os-updates run (daily).
+      - alert: ComponentNotDeployed
+        expr: |
+          max by (host, component, source) (os_updates_component_source_info)
+          unless on (host, component, source) deepops:component_source:info
+          and on (host, component) deepops:component_source:info
+        for: 3d
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} runs {{ $labels.component }} as deployed from older code or config"
+          description: >-
+            The checkouts now decide {{ $labels.component }} differently on {{ $labels.host }}
+            than its last whole deploy there.
+            {{ range printf "deepops:component_source:info{host=%q, component=%q}" $labels.host $labels.component | query }}
+            {{- if .Labels.playbook }}`ansible-playbook -K {{ .Labels.playbook }} -l {{ $labels.host }}` deploys it
+            {{- else }}The playbook that applies its role deploys it{{ end }}
+            (scripts/deepops/component_expected.py changes --from REV says what moved).{{ end }}
       - alert: OsKernelsDiffer
         expr: count(count by (release) (max by (host, release) (node_uname_info))) > 1
         for: 26h
@@ -139,3 +163,18 @@ groups:
             {{- .Labels.host }}: {{ .Labels.release }}; {{ end }}
             A node left out of the last maintenance reboot runs the old one.
             `ansible-playbook -K playbooks/utilities/apt-upgrade.yml` reboots each into the installed kernel.
+  # What each host should have, as the checkouts are now: the textfile
+  # scripts/deepops/component_expected.py writes on the Prometheus host (for_host names
+  # the host it is about; the scrape's own host label is the Prometheus host's).
+  - name: component-expected
+    rules:
+      - record: deepops:component_pin:info
+        expr: |
+          max by (host, component, version) (
+            label_replace(deepops_component_expected_version_info, "host", "$1", "for_host", "(.+)")
+          )
+      - record: deepops:component_source:info
+        expr: |
+          max by (host, component, source, playbook) (
+            label_replace(deepops_component_expected_source_info, "host", "$1", "for_host", "(.+)")
+          )

@@ -11,9 +11,13 @@ while any deploy runs, and no deploy can start while it moves the checkouts.
 
 Each checkout moves only forward (git merge --ff-only) and only when its tracked files
 are unchanged; anything else is said and left as it is. When one moves, it says which
-hosts' expected component versions changed and which playbooks install them, prometheus.yml
-among them so the ComponentVersionNotPinned alert expects them (component_pins.py): a pin
-bump cannot pass unseen.
+hosts' expected component versions and sources changed and which playbooks deploy them,
+and writes the expected component state where the Prometheus host's node_exporter reads
+it (component_expected.py; roles/textfile_keep makes the directory on that host), so
+ComponentVersionNotPinned and ComponentNotDeployed expect what the checkouts now hold: a
+pin bump or a fix cannot pass unseen. Where that directory is not (another machine runs
+Prometheus, or prometheus.yml has not run since) it says so and moves on; the next
+prometheus.yml run writes it.
 
   sync.py            fast-forward this clone and its config to origin's branch
   sync.py --dry-run  say what would move, move nothing
@@ -60,21 +64,44 @@ def forward(repo: Path, dry_run: bool) -> tuple[str, str, str]:
     return f"{name}: moved {head[:8]} -> {new[:8]}", head, new
 
 
-def pins_report(config: Path, revs: dict, dry_run: bool) -> list[str]:
-    """What the move changes in each host's expected component versions, and the
-    playbooks that install them. REVS: {repo: (old, new)}. After a move the new side is
-    the working trees; a dry run reads the commits it would move to."""
+def expected_report(config: Path, revs: dict, dry_run: bool) -> list[str]:
+    """What the move changes in each host's expected component versions and sources,
+    the playbooks that deploy them, and (unless DRY_RUN) the expected state written for
+    the alerts. REVS: {repo: (old, new)}. After a move the new side is the working
+    trees; a dry run reads the commits it would move to."""
     try:
-        import component_pins
+        import component_expected
         import component_playbooks
     except ImportError as e:  # run without the repository's environment (uv run)
-        return [f"component versions: not worked out ({e}; run it as uv run {Path(__file__).name})"]
+        return [f"components: not worked out ({e}; run it as uv run {Path(__file__).name})"]
     (old, new), (cold, cnew) = revs[ROOT], revs.get(config, (None, None))
-    before = component_pins.state(config, old, cold)
-    after = component_pins.state(
+    before = component_expected.state(config, old, cold)
+    after = component_expected.state(
         config, new if dry_run else None, (cnew if dry_run else None) if cold else None
     )
-    return component_pins.describe(component_pins.changes(before, after), component_playbooks.playbooks())
+    playbooks = component_playbooks.playbooks()
+    lines = component_expected.report(before, after, playbooks)
+    if not dry_run:
+        lines.append(write_expected(component_expected, config, after, playbooks))
+    return lines
+
+
+def write_expected(component_expected, config: Path, current, playbooks) -> str:
+    """Write CURRENT where this machine's node_exporter reads it, or say why not. Never
+    fails the sync: the alerts keep the last state written until prometheus.yml runs."""
+    where = component_expected.expected_path(config)
+    if where is None:
+        return "expected component state: not written (component_expected_dir does not resolve)"
+    if not where.parent.is_dir():
+        return (
+            f"expected component state: not written ({where.parent} is not on this machine: "
+            "the next prometheus.yml run writes it on the Prometheus host)"
+        )
+    try:
+        component_expected.write(where, component_expected.textfile(current, playbooks))
+    except OSError as e:
+        return f"expected component state: not written ({e}; the next prometheus.yml run writes it)"
+    return f"expected component state: written to {where}"
 
 
 def main(argv: list[str]) -> int:
@@ -97,7 +124,7 @@ def main(argv: list[str]) -> int:
             print(said)
             revs[repo] = (old, new)
         if any(old != new for old, new in revs.values()):
-            print("\n".join(pins_report(ROOT / "config", revs, opts.dry_run)))
+            print("\n".join(expected_report(ROOT / "config", revs, opts.dry_run)))
         return 0
     finally:
         for fd in held:

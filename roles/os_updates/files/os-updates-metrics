@@ -80,7 +80,7 @@ packages=$( { apt list --installed 2>/dev/null | awk -F/ '/\[installed,local\]/ 
         printf "os_updates_package_info{package=\"%s\",version=\"%s\",source=\"%s\"} 1\n", $2, $3,
                (name in local) ? "local" : "repo" }')
 # What deepops installed, from the host's component record (roles/component_record): each
-# component's recorded version, and which component installed each package, so an alert
+# component's recorded version and source digest, and which component installed each package, so an alert
 # on a package or a component names the playbook that brings its hosts level. The units
 # name the record (deepops_component_record); none there, no series.
 record=${OS_UPDATES_COMPONENT_RECORD:-}
@@ -96,6 +96,13 @@ except (OSError, ValueError):
 for name, entry in sorted((data.get("components") or {}).items()):
     if isinstance(entry, dict) and entry.get("state") == "present":
         print(f'os_updates_component_info{{component="{esc(name)}",version="{esc(entry.get("version", ""))}"}} 1')
+# one metric's lines together, as the text format requires
+sources = {name: entry["source"] for name, entry in (data.get("components") or {}).items()
+           if isinstance(entry, dict) and entry.get("state") == "present" and entry.get("source")}
+if data.get("record_source"):
+    sources["component_record"] = data["record_source"]
+for name, source in sorted(sources.items()):
+    print(f'os_updates_component_source_info{{component="{esc(name)}",source="{esc(source)}"}} 1')
 for item, owners in sorted((data.get("items") or {}).items()):
     kind, _, package = item.partition(":")
     if kind == "package":
@@ -129,6 +136,8 @@ os_updates_apt_ok $apt_ok
 $packages
 # HELP os_updates_component_info A component deepops installed and its recorded version (value always 1).
 # TYPE os_updates_component_info gauge
+# HELP os_updates_component_source_info The source digest a component's last whole deploy recorded (value always 1).
+# TYPE os_updates_component_source_info gauge
 # HELP os_updates_package_component_info A package and the component that installed it (value always 1).
 # TYPE os_updates_package_component_info gauge
 $components

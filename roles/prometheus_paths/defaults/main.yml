@@ -33,6 +33,15 @@ prometheus_cfg_scrape_interval: 15s
 slurm_metrics_interval: 60s
 # node_exporter's textfile collector directory, which every textfile writer fills.
 node_exporter_prom_dir: /run/prometheus
+# On a Prometheus host, a second textfile directory: what each host should have of each
+# component as the checkouts are now (scripts/deepops/component_expected.py), written by
+# roles/prometheus at each run and by scripts/deepops/sync.py after each move of the
+# checkouts. Persistent (it changes only then), and writable by component_expected_group,
+# the group of the controller's user, so sync.py writes it without root: data only, no
+# code anything runs from it (roles/textfile_keep, tasks_from: expected).
+component_expected_dir: "{{ deepops_state_dir }}/expected"
+component_expected_file: component-expected.prom
+component_expected_group: "{{ lookup('ansible.builtin.pipe', 'id -gn') }}"
 # A textfile that changes only when a role runs (a fact the deploy knows, roles/
 # textfile_keep): kept here and copied into node_exporter_prom_dir at every boot,
 # since that directory is a tmpfs.

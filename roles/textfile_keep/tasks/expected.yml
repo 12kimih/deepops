@@ -1,0 +1,20 @@
+---
+# The directory of the expected component state, on a Prometheus host (prometheus_paths:
+# component_expected_dir): made by its reader (roles/prometheus-node-exporter, which a
+# missing directory gives a textfile error) and its writer (roles/prometheus), the same
+# way. Group-writable by component_expected_group when the host has that group (the
+# controller's user's, for scripts/deepops/sync.py), root's otherwise.
+- name: Look up the group that writes the expected component state
+  ansible.builtin.getent:
+    database: group
+    key: "{{ component_expected_group }}"
+  failed_when: false
+  register: _textfile_keep_expected_group
+
+- name: Create the directory of the expected component state
+  ansible.builtin.file:
+    path: "{{ component_expected_dir }}"
+    state: directory
+    owner: root
+    group: "{{ component_expected_group if _textfile_keep_expected_group is succeeded and _textfile_keep_expected_group.msg is undefined else 'root' }}"
+    mode: "2775"

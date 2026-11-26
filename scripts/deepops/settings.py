@@ -22,6 +22,7 @@ for every host instead. Nothing is decrypted (a vaulted value is compared as its
 ciphertext) and nothing connects to a host.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -78,6 +79,26 @@ class Tree:
         if not base.is_dir():
             return []
         return sorted(p.relative_to(self.root).as_posix() for p in base.rglob("*") if p.is_file())
+
+    def blob_ids(self, prefix=""):
+        """{path: git blob id} of the files under PREFIX: the commit's at a revision, the
+        content on disk otherwise (the id git would give it), so the two agree whenever
+        the content does."""
+        if self.rev:
+            out = self._git("ls-tree", "-r", "-z", self.rev, "--", prefix or ".").stdout
+            found = {}
+            for record in filter(None, out.split("\0")):
+                meta, path = record.split("\t", 1)
+                kind, ident = meta.split()[1:3]
+                if kind == "blob":
+                    found[path] = ident
+            return found
+        found = {}
+        for rel in self.files(prefix):
+            path = self.root / rel
+            data = os.fsencode(os.readlink(path)) if path.is_symlink() else path.read_bytes()
+            found[rel] = hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+        return found
 
     def text(self, rel):
         """REL's text, or None when it does not exist."""

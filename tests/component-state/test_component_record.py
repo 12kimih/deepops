@@ -158,6 +158,28 @@ PLAY = """
 """
 
 
+class Sources(unittest.TestCase):
+    """The source digest present records (component_source.py), and when it is kept."""
+
+    def test_present_records_it_and_begin_and_a_bare_present_keep_it(self):
+        first, _, _ = mod.apply(EMPTY, "c", "present", [], "1", source="aaaa", record_source="rrrr")
+        self.assertEqual(first["components"]["c"], {"state": "present", "version": "1", "source": "aaaa"})
+        self.assertEqual(first["record_source"], "rrrr")
+        begun, _, _ = mod.apply(first, "c", "begin", ["file:/x"], "2")
+        self.assertEqual(begun["components"]["c"]["source"], "aaaa", "an unfinished run keeps the old one")
+        again, _, _ = mod.apply(begun, "c", "present", ["file:/x"], "2")
+        self.assertEqual(again["components"]["c"]["source"], "aaaa", "a partial run records no new one")
+        self.assertEqual(again["record_source"], "rrrr")
+        newer, _, _ = mod.apply(again, "c", "present", ["file:/x"], "2", source="bbbb")
+        self.assertEqual(newer["components"]["c"]["source"], "bbbb")
+
+    def test_a_new_digest_alone_is_no_change(self):
+        first, _, _ = mod.apply(EMPTY, "c", "present", [], "1", source="aaaa")
+        newer, _, _ = mod.apply(first, "c", "present", [], "1", source="bbbb", record_source="r")
+        self.assertNotEqual(newer, first)
+        self.assertEqual(mod.bookkeeping(newer), mod.bookkeeping(first))
+
+
 class UnitOrder(unittest.TestCase):
     def test_what_starts_a_service_stops_before_it(self):
         _, orphans, _ = run(
@@ -252,6 +274,78 @@ class Run(unittest.TestCase):
         self.assertTrue(edited.exists(), "a file edited by hand is the site's")
         # present writes and records as before; the shape matters only to absent.
         self.assertGreater(self.play("present", [f"file:{edited}"], legacy={str(edited): shape}), 0)
+
+
+SOURCE_PLAY = """
+- hosts: all
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Fail a host first, when asked
+      ansible.builtin.fail:
+      when: inventory_hostname in (fail_hosts | default([]))
+    - ansible.builtin.include_role:
+        name: component_record
+      vars:
+        component_record_path: "{{ record }}-{{ inventory_hostname }}"
+        component_record_name: chrony
+        component_record_action: present
+      tags: [always]
+"""
+
+
+class RunSources(unittest.TestCase):
+    """A whole run records the digest component_source.py gives for the host; --tags, a
+    failed host or --check keep the one recorded before."""
+
+    def play(self, *extra, ok=True):
+        argv = ["ansible-playbook", "-i", str(self.config / "inventory"), str(self.playbook),
+                "-e", json.dumps({"record": str(self.record)}), *extra]  # fmt: skip
+        done = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, env=unrecorded.env(),
+                              timeout=unrecorded.TIMEOUT)  # fmt: skip
+        if ok:
+            self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-2000:])
+        return done
+
+    def recorded(self, host="a"):
+        return json.loads(Path(f"{self.record}-{host}").read_text())["components"]["chrony"].get("source")
+
+    def expected(self, host="a"):
+        import component_source
+
+        return component_source.sources(self.config)[host]["chrony"]
+
+    def setUp(self):
+        import local_scratch
+
+        self.base = local_scratch.directory("record-sources")
+        self.addCleanup(local_scratch.remove, self.base)
+        self.config = self.base / "config"
+        (self.config / "group_vars").mkdir(parents=True)
+        (self.config / "inventory").write_text("a\nb\n")
+        self.playbook = self.base / "play.yml"
+        self.playbook.write_text(SOURCE_PLAY)
+        self.record = self.base / "record"
+
+    def set_upstream(self, value):
+        (self.config / "group_vars" / "all.yml").write_text(f"chrony_upstream: [{value}]\n")
+
+    def test_only_a_whole_run_records_a_new_digest(self):
+        self.set_upstream("ntp.example.invalid")
+        self.play()
+        first = self.recorded()
+        self.assertEqual(first, self.expected())
+        self.set_upstream("other.example.invalid")
+        self.assertNotEqual(self.expected(), first, "the config value is part of it")
+        self.play("--tags", "never-a-tag")
+        self.assertEqual(self.recorded(), first, "--tags")
+        self.play("--check")
+        self.assertEqual(self.recorded(), first, "--check")
+        self.play("-e", json.dumps({"fail_hosts": ["b"]}), ok=False)
+        self.assertEqual(self.recorded(), first, "a host failed in the play")
+        self.play()
+        self.assertEqual(self.recorded(), self.expected())
+        self.assertEqual(self.recorded("b"), self.expected("b"))
 
 
 if __name__ == "__main__":

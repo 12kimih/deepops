@@ -24,6 +24,12 @@
     name: textfile_keep
     tasks_from: directory
 
+- name: Make the directory of the expected component state
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: expected
+  when: node_exporter_expected
+
 - name: Pull the image
   ansible.builtin.include_role:
     name: container_image
@@ -59,6 +65,7 @@
         {{ ['--path.rootfs=' ~ node_exporter_rootfs, '--path.procfs=' ~ node_exporter_rootfs ~ '/proc',
             '--path.sysfs=' ~ node_exporter_rootfs ~ '/sys', '--path.udev.data=' ~ node_exporter_rootfs ~ '/run/udev/data', '--web.listen-address=:' ~ node_exporter_port,
             '--collector.textfile.directory=' ~ node_exporter_prom_dir]
+           + (['--collector.textfile.directory=' ~ node_exporter_rootfs ~ component_expected_dir] if node_exporter_expected else [])
            + node_exporter_extra_collectors | map('regex_replace', '^', '--collector.') | list
            + node_exporter_disabled_collectors | map('regex_replace', '^', '--no-collector.') | list
            + (["--collector.systemd.unit-include='" ~ node_exporter_systemd_unit_include ~ "'"] if _systemd else []) }}

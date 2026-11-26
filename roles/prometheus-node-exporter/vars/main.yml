@@ -1,4 +1,8 @@
 ---
+# A Prometheus host also reads the expected component state (prometheus_paths), seen
+# through the host's root mount.
+node_exporter_expected: >-
+  {{ inventory_hostname in deepops_component_registry | component_hosts(groups, 'prometheus', deepops_component_removals) }}
 # What this component installs, for its record (roles/component_record).
 node_exporter_items:
   - "unit:{{ node_exporter_svc_name }}"

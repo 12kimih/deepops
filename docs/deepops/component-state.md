@@ -82,16 +82,37 @@ or a run from another operator's machine.
   across its hosts (a run limited to some of them) or a local package at two versions
   alerts with each host's version and the playbook that brings them level.
 - **Behind the repository.** Hosts can agree and still be behind: a pin bumped, the
-  checkout synced, the playbook not run. `scripts/deepops/component_pins.py` reads each
-  role's own `component_record_version` expression and resolves it per host from the
-  role defaults and the site config (the settings.py model), and every prometheus.yml
-  run installs the result (`component-pins.yml`, the site's resolved state on its own
-  host, never in the repository). `ComponentVersionNotPinned` names each host whose
-  recorded version is another, with the playbook that installs it. A component whose
-  version only the host can work out (a fact, a value set at run time) is named in the
-  head of that file, unchecked, with the reason. `scripts/deepops/sync.py` prints which
-  hosts' expected versions a move of the checkouts changed, and the playbooks to run,
-  prometheus.yml among them, so a pin bump never passes unseen.
+  checkout synced, the playbook not run. `scripts/deepops/component_expected.py` reads
+  each role's own `component_record_version` expression and resolves it per host from
+  the role defaults and the site config (the settings.py model). The result is the
+  expected component state, a node_exporter textfile on the Prometheus host
+  (`component_expected_dir`, the site's resolved state on its own host, never in the
+  repository): every prometheus.yml run writes it, and so does `scripts/deepops/sync.py`
+  after each move of the checkouts, so it follows the checkouts without a playbook run.
+  `ComponentVersionNotPinned` names each host whose recorded version is another, with
+  the playbook that installs it. A component whose version only the host can work out
+  (a fact, a value set at run time) is named in the head of that file, unchecked, with
+  the reason.
+- **Fixed but never deployed.** The same version can still run older code: a role fix
+  that only limited runs reached since leaves the other hosts on the old one, and their
+  deploy record looks current. Each whole deploy of a component records on the host a
+  source digest (`scripts/deepops/component_source.py`): its role's files; of the roles
+  it pulls in, what of them runs (the tasks files reached, their handlers, templates,
+  files and modules) and the defaults that code reads, of the component map only the
+  entries it names; the playbook that applies it; the in-tree plugins and repository
+  files those name; and the host's config values of the settings it reads and the config
+  files it names. Files count by git blob id, so an unrelated commit changes nothing and
+  a working tree with uncommitted changes counts as it is. A run that may have skipped
+  part of the role (`--tags`, `--skip-tags`, `--check`, a host failed in the play)
+  keeps the digest recorded before. component_record itself is left out of every
+  closure and has its own digest (`record_source`). `ComponentNotDeployed` names each
+  host, after three days, whose recorded digest is not what the checkouts give now, with
+  the playbook; a host with no digest yet is not compared. A shared plugin is code of
+  every component that uses it, so a change there flags them all at once (one
+  notification, grouped by alert): the whole deploy brings them level.
+  `scripts/deepops/sync.py` prints which hosts' expected versions and sources a move
+  changed and the playbooks to run; `component_expected.py changes --from REV` says the
+  same for any revision.
 
 ## One desired-state map
 
