@@ -29,6 +29,7 @@ import time
 from collections import namedtuple
 from pathlib import Path
 
+from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 from cluster_tools.slack import (  # the cluster's library (PYTHONPATH, roles/cluster_bot)
     Error,
     Slack,
@@ -39,6 +40,7 @@ from cluster_tools.slack import (  # the cluster's library (PYTHONPATH, roles/cl
     own,
     own_user,
     replies,
+    unmentioning,
 )
 
 from . import notices, state
@@ -65,8 +67,9 @@ def _alert_by_webhook(m, ctx):
 
 
 def _old_ban_notice(m, ctx):
-    """A new-bans notice whose list was cut in the message ("외 N개"), with no thread."""
-    text = m.get("text") or ""
+    """A new-bans notice whose list was cut in the message ("외 N개"), with no thread; its
+    text after the admin mention (cluster_tools.slack.mentioning) names it."""
+    text = unmentioning(m.get("text"))[1]
     shown = json.dumps(m.get("blocks") or [], ensure_ascii=False)
     return text.startswith("새로 차단된 주소") and bool(CUT_LIST.search(shown)) and not m.get("metadata")
 
@@ -113,6 +116,20 @@ def poster(m):
     return tuple(m.get(k) or "" for k in ("bot_id", "app_id", "user")) + (name, m.get("subtype") or "")
 
 
+def title(m):
+    """What M says first, to name it: the first line of its blocks, else of an attachment's
+    title, fallback or text (an incoming webhook's, Alertmanager's), else of its text; a
+    leading mention left out. "" only for a message that shows nothing."""
+    attachments = m.get("attachments") or []
+    for said in (rich.read(m.get("blocks")), *(a.get(k) for k in ("title", "fallback", "text") for a in attachments),
+                 m.get("text")):  # fmt: skip
+        for line in (said or "").splitlines():
+            line = unmentioning(line.strip())[1].strip()
+            if line:
+                return line
+    return ""
+
+
 def day(ts):
     return time.strftime("%Y-%m-%d", time.localtime(float(ts)))
 
@@ -147,7 +164,7 @@ def plan(role, messages, ctx):
             continue
         a = {"do": "delete", "ts": m["ts"], "what": rule.what, "why": rule.why, "by": poster(m),
              "replies": m.get("reply_count") or 0, "day": day(m["ts"]),
-             "text": (m.get("text") or "")[:80]}  # fmt: skip
+             "text": title(m)[:80]}  # fmt: skip
         if not ctx.ours(m):
             a.update(do="left", why="not the app's (a person's or another app's): never touched")
         elif rule.match is _retired_notice and ctx.notice(m) not in ctx.seen:

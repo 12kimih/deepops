@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
 from cluster_bot import notices, tidy  # noqa: E402
+from cluster_tools.slack import mentioning, unmentioning  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "tests/lib"))
 from fake_slack import FakeChannel  # noqa: E402
@@ -23,19 +24,23 @@ WEBHOOK = ("B9", "A1")  # the app's incoming webhook: its own bot_id, the app's 
 RETIRED = ("BOLD", "AOLD")  # an older integration the config names
 OTHER = ("BX", "AX")  # another app
 SITE = "https://docs.example.org/news/"
+ADMINS = "<!subteam^S0123ABCD>"  # the admin mention bans.py puts first
 
 
 def alert(slack, title="[FIRING:1] DiskFull", bot=WEBHOOK, footer=None):
-    """An Alertmanager message: through the webhook (subtype bot_message), or the bot's."""
+    """An Alertmanager message: through the webhook (subtype bot_message), or the bot's. As
+    Slack shows a webhook's, its text is empty: what it says is in the attachment."""
     attachment = {"title": title, "fallback": title, **({"footer": footer} if footer else {})}
     shown = {} if bot == FakeChannel.BOT else {"subtype": "bot_message"}
-    return slack.add(title, ALERTS, bot=bot, attachments=[attachment], **shown)
+    return slack.add("", ALERTS, bot=bot, attachments=[attachment], **shown)
 
 
 def old_bans(slack, n=57, shown=40):
     blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": f"*새로 차단된 주소 {n}개*"}},
               {"type": "section", "text": {"type": "mrkdwn", "text": f"`192.0.2.1` h (sshd)\n외 {n - shown}개"}}]  # fmt: skip
-    return slack.add(f"새로 차단된 주소 {n}개", ALERTS, blocks=blocks)
+    # As bans.py posted it: the admin mention first (cluster_tools.slack.mentioning).
+    text, blocks = mentioning(ADMINS, f"새로 차단된 주소 {n}개", blocks)
+    return slack.add(text, ALERTS, blocks=blocks)
 
 
 def notice_post(slack, nid, bot=RETIRED):
@@ -150,6 +155,22 @@ class Tidy(unittest.TestCase):
         self.assertNotIn("post", [a["do"] for a in actions])
         self.assertIn(("missing", f"{SITE}b/"), [(a["do"], a["id"]) for a in actions])
 
+    def test_every_line_names_its_message(self):
+        actions, lines, _ = run(self.slack, dry_run=True)
+        self.assertTrue(actions)
+        for a in actions:
+            self.assertTrue(a["text"], a)
+            self.assertNotIn(" '':", tidy.describe(a))
+        self.assertEqual(next(a for a in actions if a["ts"] == self.webhook)["text"], "[FIRING:1] DiskFull")
+        self.assertEqual(next(a for a in actions if a["ts"] == self.bans)["text"], "*새로 차단된 주소 57개*")
+
+    def test_the_title_reads_blocks_then_attachments_then_text(self):
+        self.assertEqual(tidy.title({"text": "t", "attachments": [{"fallback": "f"}]}), "f")
+        self.assertEqual(tidy.title({"text": "t", "attachments": [{"title": "a", "fallback": "f"}]}), "a")
+        self.assertEqual(tidy.title({"text": f"{ADMINS} t"}), "t")
+        self.assertEqual(tidy.title({"text": "", "blocks": [{"type": "header", "text": {"text": "h"}}]}), "h")
+        self.assertEqual(tidy.title({}), "")
+
     def test_every_rule_names_a_channel_role_and_why(self):
         for rule in tidy.RULES:
             self.assertIn(rule.channel, ("status", "admin", "help", "announce"))
@@ -177,6 +198,19 @@ class Tidy(unittest.TestCase):
             slack.add("x", channel)
         _, lines, _ = run(slack, dry_run=True)
         self.assertTrue(any("not readable" in line for line in lines))
+
+
+class Unmentioning(unittest.TestCase):
+    def test_it_is_the_inverse_of_mentioning(self):
+        for who in (ADMINS, "<@U0123ABCD>", "<!here>", "<!channel>", "<!subteam^S0123ABCD|admins>"):
+            with self.subTest(who=who):
+                self.assertEqual(
+                    unmentioning(mentioning(who, "새로 차단된 주소 3개")[0]), (who, "새로 차단된 주소 3개")
+                )
+        self.assertEqual(unmentioning(mentioning("", "x")[0]), ("", "x"))
+        self.assertEqual(
+            unmentioning("<https://example.org|a link> x"), ("", "<https://example.org|a link> x")
+        )
 
 
 class Config(unittest.TestCase):
