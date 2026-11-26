@@ -44,3 +44,10 @@ export DEEPOPS_CONFIG_DIR="${site}" DEEPOPS_SITE_REV="${tree}"
 "${deepops}/.venv/bin/python" scripts/docs/generate.py --check --site
 # The Korean glossary over the site's own files as staged (deepops checks its own).
 "${deepops}/.venv/bin/python" scripts/deepops/terms.py --site
+# The user docs site copies the site's values too (scripts/docs/docs_site.py): a change
+# here that leaves it stale is refused here, not at deepops' next commit.
+# Its checkout is the one beside deepops' main checkout (the export here is no checkout).
+docs="$(dirname "$(git -C "${deepops}" rev-parse --path-format=absolute --git-common-dir)")/../cluster-docs"
+if [ -e "${docs}/.git" ] && [ -f scripts/docs/docs_site.py ]; then
+    "${deepops}/.venv/bin/python" scripts/docs/docs_site.py --docs "${docs}" check
+fi
