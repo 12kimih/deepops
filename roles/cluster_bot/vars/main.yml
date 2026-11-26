@@ -51,6 +51,9 @@ _cluster_bot_cfg:
   app_token_file: "{{ _cluster_bot_tokens.app }}"
   channels: {help: "{{ slack_channels.help }}", admin: "{{ slack_channels.admin }}"}
   command: "{{ cluster_bot_command }}"
+  # The cluster commands the help and the Home tab list, each with its own definition's
+  # summary (cluster_bot.commands.cluster_lines): what the bot host publishes.
+  cluster_commands: "{{ cluster_tools_commands }}"
   admin_group: "{{ slack_admin_group }}"
   admin_mention: "{{ slack_admin_mention }}"
   members: "{{ dict(cluster_bot_members.values() | zip(cluster_bot_members.keys())) }}"

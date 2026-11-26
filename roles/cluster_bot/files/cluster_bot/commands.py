@@ -3,6 +3,9 @@
     SUBCOMMANDS                    (name, feature, Korean help, English help) in order
     parse(text)                    -> (subcommand, rest): "join", "", or "help" for none
     help_lines(command, features)  -> the help a person sees (also the Home tab's list)
+    cluster_lines(names)           -> the cluster commands a login has (cluster_commands:
+                                   the bot host's cluster_tools_commands), each with what
+                                   its own definition says (COMMAND.summary_ko)
     manifest(command, name)        -> the Slack app manifest (python -m cluster_bot.commands)
     SCOPES, API_SCOPES             the bot token's scopes, each with why, from the Web API
                                    methods the repository calls (a test scans for them)
@@ -116,11 +119,28 @@ def offered(features):
     return [s for s in SUBCOMMANDS if s.feature is None or s.feature in features]
 
 
-def help_lines(command, features, footer=""):
-    """The help a person sees, one line a subcommand, then FOOTER (home_blocks.help_text:
-    how to ask for help, with the help channel's example)."""
+def cluster_lines(names):
+    """One line per cluster command a login has (NAMES: cluster_tools_commands), with
+    what its definition says (cluster_tools.<name, - as _>.COMMAND.summary_ko), under a
+    heading; none, no lines. The bot's help listed only its own subcommands, never sq or
+    disk-usage (2026-11-27)."""
+    if not names:
+        return []
+    import importlib
+
+    lines = ["**로그인 노드의 명령** (`<명령> --help`로 자세히)"]
+    for name in names:
+        command = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}").COMMAND
+        lines.append(f"`{name}`: {command.summary_ko or command.summary}")
+    return lines
+
+
+def help_lines(command, features, footer="", cluster=()):
+    """The help a person sees, one line a subcommand, then the cluster commands
+    (CLUSTER: cluster_lines) and FOOTER (home_blocks.help_text: how to ask for help, with
+    the help channel's example)."""
     lines = [f"`{command} {s.name}`: {s.ko}" for s in offered(features)]
-    return "\n".join(lines + ([footer] if footer else []))
+    return "\n".join(lines + cluster_lines(cluster) + ([footer] if footer else []))
 
 
 def manifest(command, name="cluster-bot", extra_scopes=()):

@@ -41,6 +41,9 @@ SPACE = (
     ("file_hard", "disk_quota_limit_inodes", "hard"),
 )
 FOLDERS = (("bytes", "disk_cleanup_candidate_bytes"), ("unused_days", "disk_cleanup_candidate_unused_days"))
+# When each filesystem's folders were last weighed (cluster_tools.cleanup): the folders
+# are as of then, and each filesystem is scanned on its own schedule.
+SCANNED = "max by (host, filesystem) (disk_cleanup_scan_timestamp_seconds)"
 # (who, direction): (counter, the labels a row keeps)
 IO = {
     ("job", "read"): ("io_usage_job_read_bytes_total", "host, job_id"),
@@ -77,7 +80,8 @@ NOTES = [
     "           level (a notice) and the limit (the kernel refuses the write past it).\n"
     "           The host itself answers `quota -s` with the live figures.\n"
     "  folders  the folders worth cleaning: unused past the stale period, the largest and\n"
-    "           longest unused first, from the last daily scan.\n"
+    "           longest unused first, from each filesystem's last scan (its time shown; the\n"
+    "           scans run on their own schedules, not daily everywhere).\n"
     "  I/O      each job's reads and writes through system calls over the window (page\n"
     "           cache and pipes included: a ranking of your jobs, not their disk or NFS\n"
     "           bytes) and each login's block I/O on the node's own disks, outside jobs.\n"
@@ -138,7 +142,12 @@ def collect(api, user, hours, top):
         for (h, fs, p), f in found.items()
     ]
     kept.sort(key=lambda c: (-(c["bytes"] * c["unused_days"]), c["path"]))
-    out = {"user": user, "hours": hours, "space": rows, "folders": kept[:top], "jobs": [], "logins": []}
+    scans = [
+        {"where": where(h, fs), "time": int(v)}
+        for (h, fs), v in sorted(_series(api, SCANNED, ("filesystem",)).items())
+    ]
+    out = {"user": user, "hours": hours, "space": rows, "folders": kept[:top], "scans": scans,
+           "jobs": [], "logins": []}  # fmt: skip
     for who, label in (("job", "job_id"), ("login", "device")):
         moved = {}
         for direction in ("read", "written"):
@@ -165,6 +174,11 @@ def _count(n):
 
 def _bytes(n):
     return "-" if not n else size(n)
+
+
+def _when(seconds):
+    """A scan's time, local, to the minute."""
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(seconds))
 
 
 def _heading(theme, title, tally):
@@ -201,7 +215,12 @@ def render(data, theme):
         for c in data["folders"]:
             grid.row([(c["path"], "text"), (size(c["bytes"]), "text"),
                       (f"{c['unused_days']}d", "text"), (c["where"], "muted")])  # fmt: skip
-        out.append(grid.render("folders worth cleaning", [("unused the longest and largest first", "sub")]))
+        shown = {c["where"] for c in data["folders"]}
+        scanned = [f"{s['where']} {_when(s['time'])}" for s in data.get("scans", []) if s["where"] in shown]
+        tally = [("unused the longest and largest first", "sub")]
+        if scanned:
+            tally.append(("scanned " + ", ".join(scanned), "muted"))
+        out.append(grid.render("folders worth cleaning", tally))
     for who_, label, heading, title_ in (
         ("jobs", "job_id", "JOB", "I/O of jobs"),
         ("logins", "device", "DISK", "I/O of logins"),
