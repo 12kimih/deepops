@@ -3,8 +3,9 @@
 bot posts each one once, on its date, through the cluster's own Slack app. The docs
 repository holds no Slack credential.
 
-    notices.json  {"notices": [{"id", "date" (YYYY-MM-DD), "text" (the fallback),
-                                "title", "markdown", "link": {"text", "url"}, "context"}]}
+    notices.json  {"pins_max", "notices": [{"id", "date" (YYYY-MM-DD), "text" (the
+                   fallback), "title", "markdown", "link": {"text", "url"}, "context",
+                   "pin_until" (YYYY-MM-DD, absent: not pinned)}]}
 
 The notice is Markdown, rendered here by cluster_tools.rich, the one renderer of Slack
 text: render(notice) is the message, a header (TITLE), the lead (MARKDOWN), a button to
@@ -14,8 +15,10 @@ commit (scripts/deepops/notice_render.py, the notice-render hook). A notice publ
 before the docs sent Markdown carries its own "blocks", posted as they are.
 
 The channel is kept like notices.json, every round (round_, plan): each notice due (its
-date today or before) has one post, the newest pinned, and each post shows the notice
-as today's code renders it. A notice reworded on the site, or rendered differently by a
+date today or before) has one post, and each post shows the notice as today's code
+renders it. The pins are what people must know now: every notice whose pin_until has not
+passed, the newest pins_max of them, pinned, and the bot's other notice posts unpinned;
+the docs decide both (their notice format), the bot only applies them. A notice reworded on the site, or rendered differently by a
 newer rich, edits its post in place, once (the digest of the rendered post); a notice the
 site dropped has its post deleted; a second post of one notice goes too. Each post
 carries Slack message metadata (event_type cluster_notice, the notice's id), so the
@@ -94,16 +97,21 @@ def render(notice):
 
 def check(document):
     """What of DOCUMENT (a notices.json) the bot could not post as written: ["what"], empty
-    when every notice renders within Slack's limits and shows no marker left as typed."""
+    when every notice renders within Slack's limits and shows no marker left as typed, and
+    its pins (pins_max, each pin_until) read as the bot reads them."""
     notices = (document or {}).get("notices") if isinstance(document, dict) else None
     if not isinstance(notices, list):
         return ['notices.json: no "notices" list']
     out = []
+    if "pins_max" in document and not pins_max(document):
+        out.append(f"notices.json: pins_max {document['pins_max']!r} is not a positive count")
     for i, n in enumerate(notices):
         where = f"notice {n.get('id', i) if isinstance(n, dict) else i}"
         if not isinstance(n, dict) or not _complete(n):
             out.append(f"{where}: needs id, date, text and markdown (or blocks)")
             continue
+        if "pin_until" in n and not _day(n["pin_until"]):
+            out.append(f"{where}: pin_until {n['pin_until']!r} is not a YYYY-MM-DD day")
         msg = render(n)
         header = msg["blocks"][0]["text"]["text"] if msg["blocks"][0].get("type") == "header" else ""
         if len(header) > HEADER_MAX:
@@ -118,15 +126,41 @@ def _complete(n):
     return all(n.get(k) for k in ("id", "date", "text")) and bool(n.get("markdown") or n.get("blocks"))
 
 
+def _day(value):
+    """VALUE when it is a YYYY-MM-DD day, else None."""
+    try:
+        return date.fromisoformat(value).isoformat() if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
 def notices_of(document):
     """{id: notice as the bot posts it} of DOCUMENT: {"id", "date", "text", "blocks",
-    "digest"}; one missing what it needs is left out."""
+    "digest", "pin_until" (a day, or None)}; one missing what it needs is left out."""
     out = {}
     for n in (document or {}).get("notices", []):
         if isinstance(n, dict) and _complete(n):
             msg = render(n)
-            out[n["id"]] = {"id": n["id"], "date": n["date"], **msg, "digest": digest(n["id"], msg)}
+            out[n["id"]] = {"id": n["id"], "date": n["date"], **msg, "digest": digest(n["id"], msg),
+                            "pin_until": _day(n.get("pin_until"))}  # fmt: skip
     return out
+
+
+def pins_max(document):
+    """How many notices DOCUMENT lets stand pinned at once (its pins_max; none: 0)."""
+    n = (document or {}).get("pins_max")
+    return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 0
+
+
+def pinned_notices(notes, shown, today, most):
+    """The notices of SHOWN (ids with a post) to stand pinned TODAY: pin_until not passed,
+    the newest MOST of them (NOTES, notices_of)."""
+    live = [
+        nid
+        for nid in shown
+        if notes[nid]["pin_until"] and notes[nid]["date"] <= today <= notes[nid]["pin_until"]
+    ]
+    return sorted(live, key=lambda nid: (notes[nid]["date"], nid), reverse=True)[:most]
 
 
 def digest(nid, msg):
@@ -173,20 +207,22 @@ EXACT = ("metadata", "record")
 LEFT = ("foreign", "missing")
 
 
-def plan(messages, notes, seen, mine, today, adopt):
+def plan(messages, notes, seen, mine, today, adopt, most=0, pinned=()):
     """What makes the channel's notice posts what NOTES (notices_of) says, in order:
     [{"do", "id", "ts", "how", ...}]. MESSAGES are the channel's (history), SEEN the record,
     MINE the bot's own (bot_id, app_id): its posts are the ones it may edit or delete. A post
     found only by its button or title (from before metadata) is changed with ADOPT alone,
     the owner's run after reading the dry run; otherwise it is left and counts as posted.
+    MOST: the pins at once (pins_max); PINNED: the ts the record says the bot pinned, what
+    it unpins when the history cannot be read.
 
       update   a post whose notice is in NOTES: its text, blocks and metadata today's
       delete   a post whose notice NOTES no longer has, and a second post of one notice
       post     a notice due (TODAY or before) with no post and none recorded
       missing  a notice recorded as posted whose post is gone (deleted by hand): not again
       foreign  a notice post of another app or a person: left, said
-      pin      the newest notice's post, the channel's one pinned notice
-      unpin    another post of the bot's pinned (a pin whose record was lost): taken off
+      pin      a post of a notice to stand pinned (pinned_notices)
+      unpin    another post of the bot's that stands pinned (in the history, or recorded)
     """
     bot_id, app_id = mine
     recorded = {e["ts"]: nid for nid, e in seen.items() if isinstance(e, dict) and e.get("ts")}
@@ -228,17 +264,28 @@ def plan(messages, notes, seen, mine, today, adopt):
             continue
         do = "missing" if n["id"] in seen else "post"
         out.append({"do": do, "id": n["id"], "title": _header(n["blocks"])})
+    if not messages:  # the history unread: the record says which posts stand
+        kept = {
+            nid: e["ts"] for nid, e in seen.items() if nid in notes and isinstance(e, dict) and e.get("ts")
+        }
     shown = set(kept) | {a["id"] for a in out if a["do"] == "post"}
-    newest = max(shown, key=lambda nid: (notes[nid]["date"], nid)) if shown else None
+    want = pinned_notices(notes, shown, today, most)
+    stays = {kept[nid] for nid in want if nid in kept}
     deleted = {a["ts"] for a in out if a["do"] == "delete"}
     for nid, posts in sorted(found.items()):
         for p in posts:
-            if p["pinned"] and p["ts"] != kept.get(newest) and p["ts"] not in deleted:
+            if p["pinned"] and p["ts"] not in stays and p["ts"] not in deleted:
                 if adopt or p["how"] in EXACT:
                     out.append({"do": "unpin", "id": nid, "ts": p["ts"], "title": p["title"]})
-    if newest is not None:
-        pin = {"do": "pin", "id": newest, "title": _header(notes[newest]["blocks"])}
-        target = next((p for p in found.get(newest, []) if p["ts"] == kept.get(newest)), None)
+    if not messages:  # the history unread: the record says what the bot pinned
+        for ts in sorted(set(pinned) - stays):
+            nid = recorded.get(ts, "")
+            out.append(
+                {"do": "unpin", "id": nid, "ts": ts, "title": _header((notes.get(nid) or {}).get("blocks"))}
+            )
+    for nid in sorted(want, key=lambda nid: (notes[nid]["date"], nid)):
+        pin = {"do": "pin", "id": nid, "title": _header(notes[nid]["blocks"])}
+        target = next((p for p in found.get(nid, []) if p["ts"] == kept.get(nid)), None)
         if target is not None and messages:
             pin["pinned"] = target["pinned"]
         out.append(pin)
@@ -292,11 +339,13 @@ def apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log):
                     seen[nid] = {"date": n["date"], "ts": ts, "digest": n["digest"]}
             elif a["do"] == "pin":
                 ts = (state.read(seen_path, {}).get(nid) or {}).get("ts")
-                if ts and (ts != (state.read(pinned_path, {}) or {}).get("ts") or a.get("pinned") is False):
-                    pin_latest(slack, channel, pinned_path, ts)
+                if ts and (ts not in pins(pinned_path) or a.get("pinned") is False):
+                    pin_message(slack, channel, ts)
+                    _record_pin(pinned_path, ts, True)
                     log(describe(a, f" ({ts})"))
             elif a["do"] == "unpin":
                 unpin_message(slack, channel, a["ts"])
+                _record_pin(pinned_path, a["ts"], False)
                 log(describe(a))
             elif a["do"] in LEFT:
                 pass  # said by the dry run; nothing to do
@@ -312,7 +361,8 @@ def round_(fetch, slack, channel, seen_path, pinned_path, today, log, dry_run=Fa
     none again. DRY_RUN says each action (LOG) and changes nothing, the record neither. A
     notices.json with no notice changes nothing: an empty export is a broken one, never
     "delete every post"."""
-    notes = notices_of(fetch())
+    document = fetch()
+    notes = notices_of(document)
     if not notes:
         log("notices.json lists no notice: nothing changed")
         return []
@@ -336,7 +386,7 @@ def round_(fetch, slack, channel, seen_path, pinned_path, today, log, dry_run=Fa
                 raise
             log(f"the channel's history is not readable ({e}): import the app manifest; posting only")
             messages = []
-        actions = plan(messages, notes, seen, ids, today, adopt)
+        actions = plan(messages, notes, seen, ids, today, adopt, pins_max(document), pins(pinned_path))
         if dry_run:
             for a in actions:
                 theirs = ""
@@ -368,22 +418,36 @@ def _entries(seen, pinned_path):
     old = sorted((day, nid) for nid, day in seen.items() if isinstance(day, str))
     for day, nid in old:
         seen[nid] = {"date": day}
-    ts = (state.read(pinned_path, {}) or {}).get("ts") if pinned_path and old else None
+    ts = _old_pin(state.read(pinned_path, {})) if pinned_path and old else None
     if ts:
         seen[old[-1][1]]["ts"] = ts
 
 
-def pin_latest(slack, channel, path, ts):
-    """Pin the message TS in CHANNEL and unpin the one pinned before it (kept at PATH): the
-    channel keeps one pinned notice, the newest. A previous pin someone already removed is
-    no error, and so is a pin Slack already has (its record lost). CHANNEL is a name (#...)
-    or an ID."""
-    channel = channel_id(slack, channel)
-    with state.locked(path, {}) as pinned:
-        pin_message(slack, channel, ts)
-        old, pinned["ts"] = pinned.get("ts"), ts
-        if old and old != ts:
-            unpin_message(slack, channel, old)
+def _old_pin(record):
+    """The one pin of a record from before several ({"ts": ts}), else None."""
+    ts = (record or {}).get("ts") if isinstance(record, dict) else None
+    return ts if isinstance(ts, str) else None
+
+
+def pins(path):
+    """The ts of the notice posts the bot pinned (PATH: {"pins": [ts, ...]}; a record from
+    before several pins, {"ts": ts}, is its one)."""
+    record = state.read(path, {}) if path else {}
+    if isinstance(record, dict) and isinstance(record.get("pins"), list):
+        return set(record["pins"])
+    return {ts} if (ts := _old_pin(record)) else set()
+
+
+def _record_pin(path, ts, on):
+    with state.locked(path, {}) as record:
+        now = (
+            set(record.get("pins", []))
+            if isinstance(record.get("pins"), list)
+            else ({_old_pin(record)} - {None})
+        )
+        now = now | {ts} if on else now - {ts}
+        record.clear()
+        record["pins"] = sorted(now)
 
 
 def main(argv=None):
