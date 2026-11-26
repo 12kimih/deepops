@@ -135,7 +135,8 @@ figures and the same "at a hard limit" as the daily disk report) and writes
 `/etc/slurm/submit-holds`; the rendered `job_submit.lua` reads that file at most once a
 minute. A file not refreshed for `submit_holds_max_age` seconds, a missing one or one that cannot be read
 holds no one, so a monitoring outage never stops everyone's jobs nor keeps someone held
-who has freed space; `SubmitHoldsStale` warns at half of it without a run. A site's
+who has freed space; `SubmitHoldsStale` warns at half of it without a run, and
+`SubmitHoldsMaxAgeNotReported` when the writer's config predates the setting. A site's
 own `job_submit.lua` (not the role's template) does not read the holds.
 
 Turning them on: set the switch and the date, run
