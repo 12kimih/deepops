@@ -141,6 +141,11 @@
    use), never ansible_facts.processor_nproc or processor_vcpus, which count the CPUs
    and no quota, and never a bare `make -j`, which starts a job for every target: on a
    login node, the operator's capped slice and the logins beside it crawled.
+34. A systemd_unit task that only looks a unit up (no state, enabled, masked or
+   daemon_reload) never sets failed_when: false. A unit that is not installed is no
+   failure there (its status says LoadState not-found); what failed_when false hides is
+   a lookup that failed, read as not installed, so the step it guards is skipped in
+   silence (roles/textfile_keep refresh, review of 2026-11-27).
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -1433,6 +1438,21 @@ class TaskRules(unittest.TestCase):
                 if hit:
                     offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}: {', '.join(hit)}")
         self.assertEqual(offenders, [], "decide in a task before the block (rule 32)")
+
+    def test_a_unit_lookup_fails_on_an_error(self):
+        acting = ("state", "enabled", "masked", "daemon_reload")
+        offenders = []
+        for path in ansible_files():
+            for task in tasks(path):
+                name, args = module(task)
+                if (
+                    name == "systemd_unit"
+                    and isinstance(args, dict)
+                    and not any(k in args for k in acting)
+                    and str(task.get("failed_when", "")).lower() == "false"
+                ):
+                    offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "a missing unit is not-found, no failure: drop failed_when (rule 34)")
 
     def test_a_block_condition_set_inside_it_is_found(self):
         block = yaml.safe_load("""

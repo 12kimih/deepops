@@ -16,8 +16,7 @@
     name: "{{ item }}"
   loop: "{{ textfile_keep_producers }}"
   register: _textfile_keep_producers
-  check_mode: true  # read-only: no state requested
-  failed_when: false
+  check_mode: true  # read-only; a unit not installed is LoadState not-found, no failure
 
 # A producer that keeps running (or stays active after its run) would not run again on a
 # start: a timer's service is a oneshot that ends.

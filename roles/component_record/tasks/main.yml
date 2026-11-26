@@ -88,8 +88,7 @@
         name: "{{ item }}"
       loop: "{{ component_record_orphans.unit }}"
       register: component_record_units
-      check_mode: true  # read-only: no state requested
-      failed_when: false
+      check_mode: true  # read-only; a unit not installed is LoadState not-found, no failure
 
     # A unit that refuses a manual stop does its work when stopped (it detaches the NFS
     # mounts): disabled only, it stops at the next shutdown.
@@ -219,22 +218,20 @@
 # What exports the record runs now (deepops_component_record_readers), so the deploy
 # shows in Prometheus at once, not at the next daily measurement. Only for the record
 # this role keeps: one at another path (a test's) has no readers.
-# Resolved here: deepops_paths is this role's dependency, not textfile_keep's.
-- name: Name what exports the record
-  ansible.builtin.set_fact:
-    _component_record_readers: "{{ deepops_component_record_readers }}"
-  when:
-    - component_record_action != 'begin'  # what is there until the deploy ends stays shown
-    - component_record_recorded.written | default(false)
-    - component_record_path == deepops_component_record
-
 - name: Export the record now
-  ansible.builtin.include_role:
-    name: textfile_keep
-    tasks_from: refresh
-  vars:
-    textfile_keep_producers: "{{ _component_record_readers }}"
   when:
     - component_record_action != 'begin'  # what is there until the deploy ends stays shown
     - component_record_recorded.written | default(false)
     - component_record_path == deepops_component_record
+  block:
+    # Resolved here: deepops_paths is this role's dependency, not textfile_keep's.
+    - name: Name what exports the record
+      ansible.builtin.set_fact:
+        _component_record_readers: "{{ deepops_component_record_readers }}"
+
+    - name: Run what exports the record
+      ansible.builtin.include_role:
+        name: textfile_keep
+        tasks_from: refresh
+      vars:
+        textfile_keep_producers: "{{ _component_record_readers }}"
