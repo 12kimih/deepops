@@ -55,7 +55,8 @@
 
     # Right away, so a new certificate shows up without waiting a day.
     - name: Publish the certificate expiry now
-      systemd_unit:
-        name: open-ondemand-tls-metrics.service
-        state: started
-      changed_when: false
+      ansible.builtin.include_role:
+        name: textfile_keep
+        tasks_from: refresh
+      vars:
+        textfile_keep_producers: [open-ondemand-tls-metrics.service]

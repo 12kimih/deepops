@@ -75,8 +75,11 @@ or a run from another operator's machine.
   (`end_role`). After removal the component's entry goes.
 - **Check mode.** absent previews (host_baseline already lists what apt would purge)
   and nothing writes the record under `--check`.
-- **Seen by Prometheus.** roles/os_updates publishes each record daily
-  (`os_updates_component_info`, `os_updates_package_component_info`), and
+- **Seen by Prometheus.** roles/os_updates publishes each record
+  (`os_updates_component_info`, `os_updates_package_component_info`,
+  `os_updates_component_source_info`) as soon as a deploy writes it: component_record
+  then runs what exports the record (`deepops_component_record_readers`, through
+  roles/textfile_keep `tasks_from: refresh`), and the daily measurement does too. And
   `scripts/deepops/component_playbooks.py` generates each component's playbook as a
   series (`roles/prometheus/files/rules/components.yml`): a component at two versions
   across its hosts (a run limited to some of them) or a local package at two versions

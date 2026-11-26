@@ -101,6 +101,11 @@ before:
   description: The component's entry before this call (empty when it had none).
   type: dict
   returned: always
+written:
+  description: Whether the record file was written (a new source digest alone too,
+    which is not a change).
+  type: bool
+  returned: always
 """
 
 import json
@@ -303,7 +308,9 @@ def main():
         p["record_source"],
     )
     changed = bookkeeping(record) != bookkeeping(data)
-    if record != data and p["write"] and not module.check_mode:
+    # Written, a source digest alone too: what exports the record runs again (its readers).
+    written = record != data and p["write"] and not module.check_mode
+    if written:
         os.makedirs(os.path.dirname(p["path"]), mode=0o755, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p["path"]))
         with os.fdopen(fd, "w") as f:
@@ -311,7 +318,9 @@ def main():
         os.chmod(tmp, 0o644)
         os.replace(tmp, p["path"])
     diff = deepops_diff.text(p["path"], dump(data), dump(record))
-    module.exit_json(changed=changed, orphans=orphans, before=before, diff=diff if changed else {})
+    module.exit_json(
+        changed=changed, written=written, orphans=orphans, before=before, diff=diff if changed else {}
+    )
 
 
 if __name__ == "__main__":

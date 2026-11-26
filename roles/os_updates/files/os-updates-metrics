@@ -4,8 +4,13 @@
 # so held-back packages count too. Also every installed package and its version, so
 # Prometheus sees hosts drift apart the day it happens, not at the next maintenance.
 #
-#   os-updates-metrics <textfile-dir>            measure, keep, publish
-#   os-updates-metrics --publish <textfile-dir>  publish the kept file only (at boot)
+#   os-updates-metrics <textfile-dir>               measure, keep, publish
+#   os-updates-metrics --publish <textfile-dir>     publish the kept files only (at boot)
+#   os-updates-metrics --components <textfile-dir>  the component record's series only
+#
+# The component record's series are a file of their own (os-updates-components.prom):
+# the record changes with every deploy, and component_record refreshes them as soon as
+# it writes it (os-updates-components.service), without measuring the packages again.
 #
 # The metrics are kept in /var/lib/os-updates (the textfile directory is usually
 # tmpfs and empty after a reboot, and an absent series never alerts), together with
@@ -14,8 +19,11 @@
 # kept copy from before the reboot would report the reboot it just had as pending.
 set -eu
 state=${OS_UPDATES_STATE:-/var/lib/os-updates}  # overridable for the tests
-publish_only=false
-[ "${1:-}" = "--publish" ] && { publish_only=true; shift; }
+mode=measure
+case "${1:-}" in
+    --publish) mode=publish; shift ;;
+    --components) mode=components; shift ;;
+esac
 dir=${1:?textfile directory}
 mkdir -p "$dir" "$state"
 
@@ -36,17 +44,77 @@ reboot_state() {
     fi
 }
 
+# The packages' file first: a kept copy an older version of this command wrote still has
+# the component series, and they leave it before their own file brings them back (a
+# series in two files makes node_exporter refuse both).
 publish() {
-    [ -f "$state/os-updates.prom" ] || return 0
-    reboot_state
-    tmp=$(mktemp "$dir/.os-updates.XXXXXX")
-    sed -e "s/^os_updates_reboot_required .*/os_updates_reboot_required $reboot/" \
-        -e "s/^os_updates_reboot_required_since_seconds .*/os_updates_reboot_required_since_seconds $reboot_since/" \
-        "$state/os-updates.prom" > "$tmp"
-    chmod 0644 "$tmp"
-    mv "$tmp" "$dir/os-updates.prom"
+    if [ -f "$state/os-updates.prom" ]; then
+        reboot_state
+        tmp=$(mktemp "$dir/.os-updates.XXXXXX")
+        sed -e "s/^os_updates_reboot_required .*/os_updates_reboot_required $reboot/" \
+            -e "s/^os_updates_reboot_required_since_seconds .*/os_updates_reboot_required_since_seconds $reboot_since/" \
+            "$state/os-updates.prom" > "$tmp"
+        chmod 0644 "$tmp"
+        mv "$tmp" "$dir/os-updates.prom"
+    fi
+    if [ -f "$state/os-updates-components.prom" ]; then
+        tmp=$(mktemp "$dir/.os-updates-components.XXXXXX")
+        cat "$state/os-updates-components.prom" > "$tmp"
+        chmod 0644 "$tmp"
+        mv "$tmp" "$dir/os-updates-components.prom"
+    fi
 }
-if $publish_only; then publish; exit 0; fi
+
+# What deepops installed, from the host's component record (roles/component_record): each
+# component's recorded version and source digest, and which component installed each
+# package, so an alert on a package or a component names the playbook that brings its
+# hosts level. The units name the record (deepops_component_record); none there, no
+# series. Kept; publish puts it out.
+components() {
+    record=${OS_UPDATES_COMPONENT_RECORD:-}
+    series=$([ -n "$record" ] && python3 - "$record" 2>/dev/null <<'PY' || true
+import json, sys
+def esc(s):
+    return str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+except (OSError, ValueError):
+    sys.exit(0)
+for name, entry in sorted((data.get("components") or {}).items()):
+    if isinstance(entry, dict) and entry.get("state") == "present":
+        print(f'os_updates_component_info{{component="{esc(name)}",version="{esc(entry.get("version", ""))}"}} 1')
+# one metric's lines together, as the text format requires
+sources = {name: entry["source"] for name, entry in (data.get("components") or {}).items()
+           if isinstance(entry, dict) and entry.get("state") == "present" and entry.get("source")}
+if data.get("record_source"):
+    sources["component_record"] = data["record_source"]
+for name, source in sorted(sources.items()):
+    print(f'os_updates_component_source_info{{component="{esc(name)}",source="{esc(source)}"}} 1')
+for item, owners in sorted((data.get("items") or {}).items()):
+    kind, _, package = item.partition(":")
+    if kind == "package":
+        for name in owners:
+            print(f'os_updates_package_component_info{{package="{esc(package)}",component="{esc(name)}"}} 1')
+PY
+)
+    tmp=$(mktemp "$state/.os-updates-components.XXXXXX")
+    cat > "$tmp" <<METRICS
+# HELP os_updates_component_info A component deepops installed and its recorded version (value always 1).
+# TYPE os_updates_component_info gauge
+# HELP os_updates_component_source_info The source digest a component's last whole deploy recorded (value always 1).
+# TYPE os_updates_component_source_info gauge
+# HELP os_updates_package_component_info A package and the component that installed it (value always 1).
+# TYPE os_updates_package_component_info gauge
+$series
+METRICS
+    mv "$tmp" "$state/os-updates-components.prom"
+}
+
+case $mode in
+    publish) publish; exit 0 ;;
+    components) components; publish; exit 0 ;;
+esac
 
 # A package left half-installed or half-configured (an interrupted upgrade) makes
 # dpkg refuse every later change, security updates included, without telling anyone.
@@ -79,37 +147,6 @@ packages=$( { apt list --installed 2>/dev/null | awk -F/ '/\[installed,local\]/ 
         $1 ~ /^.i/ { name = $2; sub(/:.*/, "", name); gsub(/\\/, "\\\\", $3); gsub(/"/, "\\\"", $3);
         printf "os_updates_package_info{package=\"%s\",version=\"%s\",source=\"%s\"} 1\n", $2, $3,
                (name in local) ? "local" : "repo" }')
-# What deepops installed, from the host's component record (roles/component_record): each
-# component's recorded version and source digest, and which component installed each package, so an alert
-# on a package or a component names the playbook that brings its hosts level. The units
-# name the record (deepops_component_record); none there, no series.
-record=${OS_UPDATES_COMPONENT_RECORD:-}
-components=$([ -n "$record" ] && python3 - "$record" 2>/dev/null <<'PY' || true
-import json, sys
-def esc(s):
-    return str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-try:
-    with open(sys.argv[1]) as f:
-        data = json.load(f)
-except (OSError, ValueError):
-    sys.exit(0)
-for name, entry in sorted((data.get("components") or {}).items()):
-    if isinstance(entry, dict) and entry.get("state") == "present":
-        print(f'os_updates_component_info{{component="{esc(name)}",version="{esc(entry.get("version", ""))}"}} 1')
-# one metric's lines together, as the text format requires
-sources = {name: entry["source"] for name, entry in (data.get("components") or {}).items()
-           if isinstance(entry, dict) and entry.get("state") == "present" and entry.get("source")}
-if data.get("record_source"):
-    sources["component_record"] = data["record_source"]
-for name, source in sorted(sources.items()):
-    print(f'os_updates_component_source_info{{component="{esc(name)}",source="{esc(source)}"}} 1')
-for item, owners in sorted((data.get("items") or {}).items()):
-    kind, _, package = item.partition(":")
-    if kind == "package":
-        for name in owners:
-            print(f'os_updates_package_component_info{{package="{esc(package)}",component="{esc(name)}"}} 1')
-PY
-)
 tmp=$(mktemp "$state/.os-updates.XXXXXX")
 cat > "$tmp" <<METRICS
 # HELP os_updates_pending_packages Packages a full upgrade would install or change.
@@ -134,16 +171,10 @@ os_updates_apt_ok $apt_ok
 # HELP os_updates_package_info An installed package and its version (value always 1).
 # TYPE os_updates_package_info gauge
 $packages
-# HELP os_updates_component_info A component deepops installed and its recorded version (value always 1).
-# TYPE os_updates_component_info gauge
-# HELP os_updates_component_source_info The source digest a component's last whole deploy recorded (value always 1).
-# TYPE os_updates_component_source_info gauge
-# HELP os_updates_package_component_info A package and the component that installed it (value always 1).
-# TYPE os_updates_package_component_info gauge
-$components
 # HELP os_updates_metrics_timestamp_seconds When these metrics were measured.
 # TYPE os_updates_metrics_timestamp_seconds gauge
 os_updates_metrics_timestamp_seconds $now
 METRICS
 mv "$tmp" "$state/os-updates.prom"
+components
 publish

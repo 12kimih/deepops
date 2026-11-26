@@ -28,7 +28,12 @@ seconds (the task's settle, default below; 0 leaves it) and fails when it failed
 into a restart loop, with its last journal lines: systemd reports a simple service
 started as soon as its process is, so a program that dies a second later passed as
 started (the cluster bot restarted 40 times after a deploy that said ok, 2026-11-26). A
-oneshot's start already waits for it to finish, so it is not watched.
+oneshot's start already waits for it to finish, so it is not watched: its failure fails
+the start itself.
+
+A start or restart that failed carries the unit's last journal lines, so the run says
+why (systemctl says only "see journalctl"): a textfile producer a deploy runs at once
+(roles/textfile_keep, tasks_from: refresh) fails the deploy with what it printed.
 """
 
 from __future__ import annotations
@@ -105,6 +110,15 @@ def watched(args, result):
     )
 
 
+def start_failed(args, result):
+    """Whether the task asked to start or restart a unit and that failed."""
+    return (
+        args.get("state") in ("started", "restarted")
+        and bool(args.get("name"))
+        and bool(result.get("failed"))
+    )
+
+
 def settle_failure(rc, stdout):
     """What the watch found wrong (its first line, then the journal), or None."""
     if rc != 3:
@@ -124,6 +138,18 @@ class ActionModule(ActionBase):
                 module_name="ansible.legacy.systemd_service", module_args=args, task_vars=task_vars
             )
         )
+        if start_failed(args, result) and not self._task.check_mode:
+            journal = self._execute_module(
+                module_name="ansible.legacy.command",
+                module_args={
+                    "argv": ["journalctl", "-u", args["name"], "-n", "15", "--no-pager", "-o", "cat"]
+                },
+                task_vars=task_vars,
+            )
+            lines = (journal.get("stdout") or "").splitlines()
+            if lines:
+                result["journal"] = lines
+                result["msg"] = f"{result.get('msg', '')} Its journal: " + " | ".join(lines[-8:])
         if (
             args.get("enabled") is True
             and args.get("name")
