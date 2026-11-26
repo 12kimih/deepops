@@ -169,6 +169,8 @@ def identify(message, notes, recorded, sites):
 
 
 EXACT = ("metadata", "record")
+# What a round sees and leaves: another app's or a person's post, one deleted by hand.
+LEFT = ("foreign", "missing")
 
 
 def plan(messages, notes, seen, mine, today, adopt):
@@ -296,7 +298,7 @@ def apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log):
             elif a["do"] == "unpin":
                 unpin_message(slack, channel, a["ts"])
                 log(describe(a))
-            elif a["do"] in ("foreign", "missing"):
+            elif a["do"] in LEFT:
                 pass  # said by the dry run; nothing to do
         except Exception as e:
             if not any(code in str(e) for code in ("cant_update_message", "cant_delete_message")):
@@ -396,9 +398,21 @@ def main(argv=None):
     if not (docs.get("url") and docs.get("channel")):
         parser.error(f"{args.config}: no notices url or channel")
     slack = Slack(Path(cfg["bot_token_file"]).read_text().strip())
-    round_(lambda: fetch_json(docs["url"]), slack, docs["channel"], docs["seen"], docs["pinned"],
-           date.today().isoformat(), lambda line: print(f"notices: {line}", flush=True),
-           dry_run=args.dry_run, adopt=True)  # fmt: skip
+    said = []
+
+    def say(line):
+        said.append(line)
+        print(f"notices: {line}", flush=True)
+
+    actions = round_(lambda: fetch_json(docs["url"]), slack, docs["channel"], docs["seen"], docs["pinned"],
+                     date.today().isoformat(), say, dry_run=args.dry_run, adopt=True)  # fmt: skip
+    if not args.dry_run:  # the owner's run also says what it left, as the dry run does
+        changed = bool(said)
+        for a in actions:
+            if a["do"] in LEFT:
+                say(describe(a))
+        if not changed:
+            say("the channel already shows notices.json: nothing changed")
     return 0
 
 
