@@ -32,6 +32,9 @@ from . import slurm
 from .config import require
 
 PATH = "/etc/cluster-tools/usage.json"
+# A job leaving its GPUs idle, the glossary's idle_job: one noun in titles and sentences
+# (owner, 2026-11-27), the usage report's word (usage_report.IDLE_JOB) and this rule's title.
+IDLE_JOB = "GPU 유휴 잡"
 CONFIG_KEYS = {"prometheus_url": str}
 CONFIG_OPTIONAL = {
     "gpu_idle": dict,
@@ -71,23 +74,23 @@ class Row:
 
 
 RULES = (
-    Rule("gpu-idle", "쉬는 GPU", "notice, cancel", "usage_report",
+    Rule("gpu-idle", IDLE_JOB, "notice, cancel", "usage_report",
          ("slurm_usage_report_idle_hours", "slurm_usage_report_idle_util_threshold",
           "slurm_usage_report_cancel_after_hours", "slurm_usage_report_cancel_warn_hours"),
          "usage gpu", "policy/rules/#gpu-idle"),
     Rule("disk", "디스크 한도", "notice, hold", "disk_report",
          ("cluster_user_warn_fraction", "disk_quota_filesystems", "submit_holds_disk", "submit_holds_from_time"),
          "usage disk", "policy/rules/#disk"),
-    Rule("scratch-purge", "스크래치 정리", "purge", "scratch_space",
+    Rule("scratch-purge", "/scratch 정리", "purge", "scratch_space",
          ("scratch_space_stale_days", "scratch_space_grace_days"), "usage disk", "policy/rules/#scratch"),
-    Rule("io-heavy", "공유 스토리지 I/O", "notice", "io_report",
+    Rule("io-heavy", "공유 스토리지 부하", "notice", "io_report",
          ("slurm_usage_report_io_share", "slurm_usage_report_io_minutes", "io_fairness_models"),
          "usage io", "policy/rules/#io"),
     Rule("login-limits", "로그인 노드 한도", "limit", "user_slice",
          ("cluster_tools_user_slice_limits",), "usage login-node", "policy/rules/#login"),
-    Rule("queued-jobs", "낼 수 있는 잡 수", "refuse", "slurm",
+    Rule("queued-jobs", "제출 잡 한도", "refuse", "slurm",
          ("max_submit_jobs (accounting.yml)",), "usage submit", "policy/rules/#submit"),
-    Rule("membership-end", "구성원 기간", "hold", "submit_holds",
+    Rule("membership-end", "소속 기간 종료", "hold", "submit_holds",
          ("people (ends)", "people_leave_grace_days"), "usage submit", "policy/rules/#leave"),
 )  # fmt: skip
 BY_ID = {r.id: r for r in RULES}

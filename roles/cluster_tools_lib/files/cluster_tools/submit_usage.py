@@ -22,7 +22,7 @@ COMMAND = Command(
     usage="usage submit [OPTIONS]",
     machine="--json",
     notes=[JSON_NOTE],
-    summary_ko="새 잡이 거부될지와 그 이유: 낼 수 있는 잡 수, 제출 보류",
+    summary_ko="새 잡이 거부될지와 그 이유: 제출 잡 한도, 제출 보류",
 )
 
 

@@ -62,8 +62,8 @@ from .vocab import job_holds, node_unavailable
 # The one name, in every text this tool sends, for a job whose allocated GPUs all sat
 # idle the whole window (the rule is in the text beside it): a noun, in titles and
 # sentences alike (owner, 2026-11-27); tests/slack-text/test_terms.py holds it to the
-# glossary.
-IDLE_JOB = "GPU 유휴 잡"
+# glossary. Named once in cluster_tools.rules, whose rule of it usage shows.
+IDLE_JOB = rules.IDLE_JOB
 # A drained or down node: in sentences what it means, in a title its noun.
 DOWN_TITLE = "중단 노드"
 NOTIFY = {"mention", "dm"}
