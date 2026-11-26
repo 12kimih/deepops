@@ -13,7 +13,10 @@
 local_accounts_check returns the declarations with every default filled in, or fails
 listing every problem: a bad name, a missing or non-integer ID, an unknown key, or an
 ID two accounts share. accounts_disjoint fails when two sets of accounts share a UID or
-GID (the people roster against the service accounts).
+GID (the people roster against the service accounts). private_group says whether a
+group is one user's own (named like the user, no other member): the only group a
+directory may be writable by when what is in it stands for root's word
+(roles/textfile_keep, tasks_from: expected).
 """
 
 import re
@@ -88,6 +91,20 @@ def accounts_disjoint(first, second):
     return first
 
 
+def private_group(entry, name, user):
+    """Whether group NAME, as getent reads it (ENTRY: [password, gid, members] or None
+    when there is no such group), is USER's own: named like USER, with no member but
+    USER. A shared primary group (users, a lab's) lets every member write."""
+    if not entry or name != user or len(entry) < 3:
+        return False
+    members = {m for m in str(entry[2] or "").split(",") if m}
+    return members <= {user}
+
+
 class FilterModule:
     def filters(self):
-        return {"local_accounts_check": local_accounts_check, "accounts_disjoint": accounts_disjoint}
+        return {
+            "local_accounts_check": local_accounts_check,
+            "accounts_disjoint": accounts_disjoint,
+            "private_group": private_group,
+        }

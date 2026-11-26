@@ -75,6 +75,20 @@ class Check(unittest.TestCase):
         )
 
 
+class PrivateGroup(unittest.TestCase):
+    """Only a user's own group may write what stands for root's word (the expected
+    component state the alerts read)."""
+
+    def test_the_users_own_group_with_no_other_member(self):
+        for members in ("", "kim"):
+            self.assertTrue(accounts.private_group(["x", "1001", members], "kim", "kim"), members)
+
+    def test_a_shared_or_foreign_or_missing_group_is_not(self):
+        self.assertFalse(accounts.private_group(["x", "100", ""], "users", "kim"), "a shared primary group")
+        self.assertFalse(accounts.private_group(["x", "1001", "kim,lee"], "kim", "kim"), "another member")
+        self.assertFalse(accounts.private_group(None, "kim", "kim"), "no such group on the host")
+
+
 class Registry(unittest.TestCase):
     def test_the_service_accounts_are_valid(self):
         self.assertEqual(accounts.check(SYSTEM), [])
