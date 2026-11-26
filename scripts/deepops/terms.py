@@ -152,11 +152,13 @@ def titles(rel, lines):
 
 
 def _bare(title):
-    """TITLE as read: no generated-block markers, code, links, a closing parenthetical
-    ("(중요)" is no ending) or closing punctuation."""
+    """TITLE as read: no generated-block markers, code, links, a heading's attributes
+    ({ #id }, which keep an old anchor), a closing parenthetical ("(중요)" is no ending)
+    or closing punctuation."""
     text = re.sub(r"<!-- (?:BEGIN|END) GENERATED: \S+ -->", "", title)
     text = re.sub(r"`[^`]*`|\[([^\]]*)\]\([^)]*\)", lambda m: m.group(1) or "", text)
-    text = re.sub(r"\s*\([^()]*\)\s*$", "", text.strip())
+    text = re.sub(r"\s*\{[^}]*\}\s*$", "", text.strip())
+    text = re.sub(r"\s*\([^()]*\)\s*$", "", text)
     return text.rstrip(".:!? ").strip()
 
 

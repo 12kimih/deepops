@@ -114,6 +114,10 @@ class Glossary(unittest.TestCase):
         self.assertFalse(
             self.titled("a.md", "## 로그인 노드 사용 규칙 (중요)\n"), "a parenthetical is no ending"
         )
+        self.assertFalse(self.titled("a.md", "## GPU 유휴 잡 { #old-anchor }\n"), "an old anchor is no text")
+        self.assertTrue(
+            self.titled("a.md", "## 설정이 바뀝니다 { #old }\n"), "the title before it still counts"
+        )
         self.assertFalse(self.titled("a.md", "```bash\n# 확인합니다\n```\n"), "a comment in code is no title")
         exempt = ENTRIES.titles["exempt"][0]["path"]
         self.assertFalse(self.titled(exempt, "### 밖에서 접속이 안 돼요\n"))
