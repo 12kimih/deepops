@@ -7,12 +7,12 @@ names:
 
 - `use`: the word in a sentence, and `not`: the variants refused anywhere (regular
   expressions over a line, always phrases, so a common verb in its own sense passes);
-- `title`: its form in a title, where that differs (titles are nouns, sentences stay
-  descriptive: `GPU 유휴 잡` in a heading, `할당받은 GPU를 쓰지 않는 잡` in a sentence),
-  and `title_not`: phrases refused in titles only (`하는 일` is `역할` in a table header);
-- `code`: the constants code sends the two forms through (`usage_report.IDLE_JOB`,
-  `IDLE_JOB_TITLE`), so a title may not interpolate the sentence constant, nor a
-  sentence the title one;
+- `title`: its form in a title, where that differs (titles are nouns: `중단 노드` in a
+  heading, `쓸 수 없는 노드` in a sentence), and `title_not`: phrases refused in titles
+  only (`하는 일` is `역할` in a table header);
+- `code`: the constants code sends the forms through (`usage_report.IDLE_JOB`,
+  `DOWN_TITLE`), so a title may not interpolate a sentence constant, nor a sentence a
+  title one;
 - `why`, and optionally `scope`: path prefixes the entry applies to (the bot's
   `roles/cluster_bot/`).
 

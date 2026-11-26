@@ -64,11 +64,16 @@ class Glossary(unittest.TestCase):
 
     def test_the_variants_are_caught_and_their_words_pass(self):
         caught = {
-            "GPU를 쓰지 않는 잡": "할당받은 GPU를 쓰지 않는 잡",
+            "GPU를 쓰지 않는 잡": "GPU 유휴 잡",
+            "할당받은 GPU를 쓰지 않는 잡": "GPU 유휴 잡",
             "6시간 동안 GPU를 쓰지 않은 잡": "할당받은 GPU를 6시간 동안 쓰지 않은 잡",
             "기다리는 잡": "대기 중인 잡",
             "대기 잡의 우선순위": "대기 중인 잡의 우선순위",
-            "돌던 잡은 계속 돕니다": "실행 중이던 잡은 계속 돕니다",
+            "돌던 잡은 계속 돕니다": "실행 중이던 잡은 계속 실행됩니다",
+            "환경변수": "환경 변수",
+            "명단에 추가": "명부에 추가",
+            "한 노드에 먼저 실행": "한 노드에서 먼저 실행",
+            "`config`에 적어도": "`config`에 적더라도",
             "idle GPU jobs": "jobs leaving their GPUs idle",
             "SSH 공개 키": "SSH 공개키",
             "새 Slurm 잡은 제출되지 않습니다": "새 Slurm 잡을 제출할 수 없습니다",
@@ -93,18 +98,17 @@ class Glossary(unittest.TestCase):
         return terms.title_violations(ENTRIES, rel, text.split("\n"))
 
     def test_titles_are_nouns_and_sentences_stay_descriptive(self):
-        """Owner, 2026-11-27: GPU 유휴 잡 in a title, 할당받은 GPU를 쓰지 않는 잡 in a sentence."""
-        self.assertTrue(self.titled("a.md", "## 할당받은 GPU를 쓰지 않는 잡\n"))
-        self.assertFalse(self.titled("a.md", "## GPU 유휴 잡\n\n할당받은 GPU를 쓰지 않는 잡은 취소됩니다.\n"))
-        self.assertTrue(self.titled("a.md", "GPU 유휴 잡은 취소됩니다.\n"), "the title form in a sentence")
+        """Owner, 2026-11-27: 중단 노드 in a title, 쓸 수 없는 노드 in a sentence."""
+        self.assertTrue(self.titled("a.md", "## 쓸 수 없는 노드\n"))
+        self.assertFalse(self.titled("a.md", "## 중단 노드\n\n쓸 수 없는 노드는 잡을 받지 않습니다.\n"))
         self.assertTrue(
-            self.titled("a.py", 'x = f"**{IDLE_JOB}**\\n{n}"\n'), "the sentence constant in a title"
+            self.titled("a.md", "중단 노드는 잡을 받지 않습니다.\n"), "the title form in a sentence"
         )
         self.assertFalse(
-            self.titled("a.py", 'x = f"**{IDLE_JOB_TITLE}**\\n{n}"\nIDLE_JOB_TITLE = "GPU 유휴 잡"\n')
+            self.titled("a.py", 'x = f"**{DOWN_TITLE} (drain)**\\n{n}"\nDOWN_TITLE = "중단 노드"\n')
         )
         self.assertTrue(
-            self.titled("a.py", 'x = f"평균 {IDLE_JOB_TITLE} {n}개"\n'), "the title constant in a sentence"
+            self.titled("a.py", 'x = f"평균 {DOWN_TITLE} {n}대"\n'), "the title constant in a sentence"
         )
 
     def test_a_title_ends_no_sentence_unless_its_file_is_exempt(self):

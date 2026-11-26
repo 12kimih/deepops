@@ -61,7 +61,7 @@ slurm_usage_report_notify_repeat_hours: 0
 slurm_usage_report_dm_text: |-
   잡 {count}개가 할당받은 GPU를 {hours}시간 넘게 쓰지 않고 있습니다:
   {jobs}
-  더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요. 기다리는 분들이 쓰실 수 있습니다.
+  더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요. 반납하시면 대기 중인 잡이 그 GPU를 쓸 수 있습니다.
 # Cancel any job (batch or interactive alike) whose GPUs sat idle this long (0 = never),
 # announced in the report thread, and only once its owner was told, and warned
 # cancel_warn_hours ahead, in earlier runs: needs notify and more than idle_hours.
@@ -73,7 +73,7 @@ slurm_usage_report_cancel_warn_hours: 1
 slurm_usage_report_cancel_warn_text: |-
   아래 잡은 할당받은 GPU를 오래 쓰지 않아 {hours}시간 뒤에 취소됩니다:
   {jobs}
-  GPU를 쓰시거나, 지금 `scancel <JOBID>`로 반납해 주세요.
+  GPU를 다시 쓰기 시작하시거나, 더 쓰지 않으신다면 지금 `scancel <JOBID>`로 반납해 주세요.
 
 # The I/O notices (systemd OnCalendar, every 5 minutes): a node whose NFS traffic to a
 # measured export (io_fairness_models, roles/io_defaults) stayed above io_share of what

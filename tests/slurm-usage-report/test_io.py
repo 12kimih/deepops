@@ -74,7 +74,7 @@ class Collect(unittest.TestCase):
         item = io_report.collect(Prom(), MOUNTS, 0.4, 15, 3)[0]
         dm = io_report.dm_text(item, 0, "Use /scratch.")
         self.assertIn(
-            "`n1` 노드가 `/home`에 쓰고 있습니다. 400M/s로, 그 뒤의 디스크가 클러스터 전체에 내주는 양의 50%",
+            "`n1` 노드가 `/home`에 쓰고 있습니다. 400M/s로, `/home` 디스크가 클러스터 전체에 낼 수 있는 속도의 50%를",
             dm,
         )
         self.assertIn("그 노드에서 가장 많이 쓴 잡이 `10`입니다 (300M/s", dm)

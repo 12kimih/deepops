@@ -106,7 +106,7 @@ class JoinFeature(RosterFeature):
                 f"- SSH key: {key.kind} {key.fingerprint}\n\n"
                 "Merge, then run `slurm-cluster.yml --tags people`.")  # fmt: skip
         url = self._propose(f"join/{req['user']}", new, sha, f"people: add {req['user']}", body)
-        return f"계정 신청 PR을 열었습니다: {url} (관리자가 반영하면 계정이 생기고 안내 DM이 갑니다)", {
+        return f"계정 신청 PR을 열었습니다: {url} (관리자가 PR을 병합하면 계정이 생기고 안내 DM이 갑니다)", {
             "url": url,
             "uid": uid,
         }

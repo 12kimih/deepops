@@ -51,9 +51,11 @@ def failure(returncode, stderr, stdout=""):
         return Failed(f"SSH 접속이 실패했습니다: {_last_line(stderr)[:120]}")
     line = _last_line(stderr) or _last_line(stdout)
     if "offers no" in line:  # the dispatcher: the host offers no such service
-        return Failed("이 서비스를 제공하지 않습니다", DEPLOY)
+        return Failed("호스트가 이 서비스를 제공하지 않습니다", DEPLOY)
     # The service's own refusal, without its program's name ("cluster-bans: ...").
-    return Failed(line.split(": ", 1)[-1][:200] if line else f"거절했습니다 (종료 코드 {returncode})")
+    return Failed(
+        line.split(": ", 1)[-1][:200] if line else f"호스트가 요청을 거절했습니다 (종료 코드 {returncode})"
+    )
 
 
 class Remote:
@@ -85,7 +87,7 @@ class Remote:
             )
         except subprocess.TimeoutExpired:
             raise Failed(
-                f"{TIMEOUT}초 안에 답하지 않았습니다", "호스트가 느리거나 멈췄는지 확인해 주세요"
+                f"호스트가 {TIMEOUT}초 안에 답하지 않았습니다", "호스트가 느리거나 멈췄는지 확인해 주세요"
             ) from None
         if done.returncode != 0:
             raise failure(done.returncode, done.stderr, done.stdout)
@@ -94,7 +96,9 @@ class Remote:
         except ValueError:
             # A reply that is not the service's JSON is the host's failure, reported as
             # such, never an exception past the caller's report.
-            raise Failed(f"알아볼 수 없는 답을 보냈습니다: {_last_line(done.stdout)[:80]!r}") from None
+            raise Failed(
+                f"호스트가 알아볼 수 없는 답을 보냈습니다: {_last_line(done.stdout)[:80]!r}"
+            ) from None
 
     def __call__(self, *words):
         return self._ask(shlex.join([self.service, *(str(w) for w in words)]))

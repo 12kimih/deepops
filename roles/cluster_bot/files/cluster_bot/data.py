@@ -57,7 +57,7 @@ def check(req, kinds):
         errors["size"] = "크기를 120G, 1.5T처럼 적어 주세요"
     sha = req.get("sha256") or ""
     if sha and not re.fullmatch(r"[0-9a-f]{64}", sha):
-        errors["sha256"] = "sha256 값(16진수 64자)이거나 비워 두세요"
+        errors["sha256"] = "sha256 값(16진수 64자)을 적거나 비워 두세요"
     return errors
 
 
@@ -80,7 +80,7 @@ class DataFeature(Feature):
         free = now["budget"] - now["used"] - coming
         if int(req["size"] * SLACK) > free:
             raise Refused(
-                f"공유 데이터 예산이 모자랍니다 (남은 {human(max(free, 0))}, 요청 {human(req['size'])})"
+                f"공유 데이터 예산이 모자랍니다 (남은 공간 {human(max(free, 0))}, 요청 {human(req['size'])})"
             )
         return (
             "admin",

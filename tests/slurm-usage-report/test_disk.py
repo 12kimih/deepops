@@ -162,7 +162,7 @@ class RenderTests(unittest.TestCase):
         self.assertIn("nfs (마지막", body, "a host not reported lately is named")
         self.assertNotIn("login (last", body)
         details = text_of(thread[0][1])
-        self.assertIn("3개 계정, 많이 쓰는 순", details)
+        self.assertIn("계정 3개, 많이 쓰는 순", details)
         self.assertIn("carol", details, "every person, none cut")
         self.assertNotIn("외 ", details)
         self.assertIn("alice   18G     +3G", details)
@@ -226,11 +226,11 @@ class RenderTests(unittest.TestCase):
         self.assertIn("3명, 많이 쓰는 순", details)
         people, others = details.split("명부에 없는 계정")
         self.assertNotIn("root", people, "root is not ranked with the people")
-        self.assertIn(" (root, 서비스, 떠난 분) 2개, 모두 176G", others)
+        self.assertIn(" (root, 서비스, 떠난 분) 2개, 합계 176G", others)
         self.assertIn("root   160G", others)
         self.assertIn("mysql  16G", others)
         _, thread = disk_report.render(data, who)
-        self.assertIn("5개 계정, 많이 쓰는 순", text_of(thread[0][1]), "no roster: everyone is ranked")
+        self.assertIn("계정 5개, 많이 쓰는 순", text_of(thread[0][1]), "no roster: everyone is ranked")
 
     def test_a_hard_limit_says_what_it_means_for_slurm(self):
         data = disk_report.collect(site(), NOW)
@@ -246,7 +246,7 @@ class RenderTests(unittest.TestCase):
                       disk_report.dm_text(bob, disk_report.hold_note(0, NOW)))  # fmt: skip
 
     def test_change(self):
-        self.assertEqual(disk_report.change(5 * G, None), "새로")
+        self.assertEqual(disk_report.change(5 * G, None), "신규")
         self.assertEqual(disk_report.change(5 * G, 5 * G + 1000), "0")
         self.assertEqual(disk_report.change(4 * G, 5 * G), "-1G")
 
@@ -389,7 +389,7 @@ class RunTests(unittest.TestCase):
         posted, _, _ = self.run_disk(prom)
         dm = [p for p in posted if p[0] == "UALICE" and "스크래치 공간" in p[1]]
         self.assertIn("그중 2개는 실행 중인 잡이 있어 미뤄졌습니다", dm[0][1])
-        self.assertIn("잡이 계속 돌더라도 새 날짜에 정리되니", dm[0][1])
+        self.assertIn("잡이 계속 실행 중이어도 미뤄진 날짜에는 정리되니", dm[0][1])
 
     def test_nothing_counted_posts_nothing(self):
         posted, error, _ = self.run_disk(Prom({}))

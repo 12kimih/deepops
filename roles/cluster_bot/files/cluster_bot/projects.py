@@ -61,7 +61,7 @@ class ProjectFeature(RosterFeature):
             if mine:
                 raise Refused(f"이미 {name}의 {role_name(mine)}입니다")
             if req["role"] not in ("members", "viewers"):
-                raise Refused("멤버나 열람자로 참여를 요청할 수 있습니다")
+                raise Refused("참여 요청은 멤버나 열람자로만 할 수 있습니다")
             return ("people", list(proj["owners"])), "공동작업 폴더 소유자가 승인합니다"
         if op == "leave":
             if not mine:
@@ -104,7 +104,7 @@ class ProjectFeature(RosterFeature):
             "Merge, then run `slurm-cluster.yml --tags people` (groups, then the folder)."
         )
         url = self._propose(f"project/{name}-{op}-{secrets.token_hex(2)}", new, sha, title, body)
-        return f"PR을 열었습니다: {url} (관리자가 반영하면 알려 드립니다)", {"url": url}
+        return f"PR을 열었습니다: {url} (관리자가 PR을 병합하면 알려 드립니다)", {"url": url}
 
     def describe_en(self, req):
         op, name = req["op"], req["project"]

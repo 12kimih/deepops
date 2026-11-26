@@ -55,7 +55,7 @@ def message(lacking, before, manifest):
     if lacking:
         listed = ", ".join(f"`{s}`" for s in lacking)
         return (
-            f"봇 토큰에 이 권한이 없습니다: {listed}. 이 권한이 필요한 기능은 실패합니다"
+            f"봇 토큰에 이 권한이 없습니다: {listed}. 이 권한이 필요한 기능은 실패합니다 "
             f"(`missing_scope`). Slack 앱 설정의 App Manifest에 `{manifest}`의 내용을 넣고 "
             "앱을 다시 설치하세요."
         )

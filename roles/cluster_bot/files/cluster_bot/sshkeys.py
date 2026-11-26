@@ -54,7 +54,7 @@ def parse(line):
         )
     parts = text.split(None, 2)
     if len(parts) < 2 or parts[0] not in KINDS:
-        raise Invalid(f"받는 키 종류가 아닙니다 (가능: {', '.join(sorted(KINDS))})")
+        raise Invalid(f"받지 않는 키 종류입니다 (가능: {', '.join(sorted(KINDS))})")
     try:
         blob = base64.b64decode(parts[1], validate=True)
     except (binascii.Error, ValueError):
@@ -66,6 +66,8 @@ def parse(line):
     if parts[0] == "ssh-rsa":
         bits = int.from_bytes(fields[2], "big").bit_length() if len(fields) >= 3 else 0
         if bits < MIN_RSA_BITS:
-            raise Invalid(f"RSA 키가 {bits}비트입니다: {MIN_RSA_BITS}비트 이상이거나 ed25519여야 합니다")
+            raise Invalid(
+                f"RSA 키가 {bits}비트입니다: RSA 키는 {MIN_RSA_BITS}비트 이상이어야 합니다 (ed25519 키도 됩니다)"
+            )
     digest = base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
     return Key(parts[0], blob, parts[2] if len(parts) > 2 else "", f"SHA256:{digest}", bits)

@@ -280,12 +280,10 @@ class RenderTests(unittest.TestCase):
             for b in blocks:
                 self.assertLessEqual(len(rich.read([b])), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
-        # One name for these jobs, saying the GPUs were allocated, and in a title its noun
-        # (owner, 2026-11-27): the notification is a sentence, the card and thread titles.
-        self.assertIn(report.IDLE_JOB, text)
-        for shown in (rich.read(summary), rich.read(thread[0][1])):
-            self.assertIn(report.IDLE_JOB_TITLE, shown)
-            self.assertNotIn(report.IDLE_JOB, shown)
+        # One noun for these jobs in the notification, the card and the thread (owner,
+        # 2026-11-27).
+        for shown in (text, rich.read(summary), rich.read(thread[0][1])):
+            self.assertIn(report.IDLE_JOB, shown)
         self.assertIn(f"*{report.DOWN_TITLE} (drain, down)*", rich.read(summary))
 
     def test_every_pending_reason_is_shown(self):
