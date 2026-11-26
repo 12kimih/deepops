@@ -96,17 +96,21 @@ def watch(feature, slack, channel, mention, seen, log=None):
     every one of them in its thread. The bans now are one message kept up to date
     (cluster_tools.slack.keep: found in the channel, never posted twice, pinned): a
     summary, and every ban in its thread. SEEN ({"bans": {key: ban}, "list": the kept
-    record}, the caller keeps it) is updated. The first round only learns what is banned
-    already: nothing is new then. A host that cannot be read keeps the bans it had, on
-    the list as last seen, and the list names it."""
+    record, "read": the hosts read once}, the caller keeps it) is updated. A host's first
+    read only learns what it bans already: nothing of it is new then, whether that is the
+    watch's first round or the first since the host could be reached (a round that read no
+    host learned nothing, so the next one told every ban as new). A host that cannot be
+    read keeps the bans it had, on the list as last seen, and the list names it."""
     log = log or (lambda line: print(f"cluster-bot: ban watch: {line}", file=sys.stderr, flush=True))
     found, errors = feature.survey()
-    first = "bans" not in seen
     before = seen.get("bans", {})
+    # A record from before "read": the hosts it holds bans of were read.
+    read = set(seen.get("read", {b["host"] for b in before.values()}))
     now = {f"{h} {b['jail']} {b['ip']}": {**b, "host": h} for h, bans in found.items() for b in bans}
     now.update({k: b for k, b in before.items() if b["host"] in errors})
-    new = sorted(set(now) - set(before), key=lambda k: now[k]["since"])
-    if new and not first:
+    new = sorted((k for k in set(now) - set(before) if now[k]["host"] in read), key=lambda k: now[k]["since"])
+    seen["read"] = sorted(read | set(found))
+    if new:
         (text, blocks), thread = bans_blocks.new_bans([now[k] for k in new])
         ts = slack.post(channel, *mentioning(mention, text, blocks))
         for reply in thread:
