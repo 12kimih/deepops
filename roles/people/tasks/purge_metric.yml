@@ -24,6 +24,6 @@
       # HELP people_purge_due_timestamp_seconds When a person's files here fall due for removal: their roster ends + people_leave_keep_days (roles/people_defaults).
       # TYPE people_purge_due_timestamp_seconds gauge
       {% for t in people_purge_local %}
-      people_purge_due_timestamp_seconds{login="{{ t.login }}",path="{{ t.path }}",ends="{{ t.ends }}"} {{ ((t.due ~ ' 00:00:00') | to_datetime('%Y-%m-%d %H:%M:%S')).strftime('%s') }}
+      people_purge_due_timestamp_seconds{login="{{ t.login }}",path="{{ t.path }}",ends="{{ t.ends }}"} {{ t.due | day_start }}
       {% endfor %}
   when: people_purge_local | length > 0 or people_purge_textfile.stat.exists
