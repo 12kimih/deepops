@@ -45,9 +45,13 @@ _interval.__name__ = f"whole number of seconds, at least {MIN_INTERVAL}"
 
 def _keys():
     """The state and reason keys under --help, from the vocabulary that classifies."""
-    lines = ["Node states are sinfo's base words; a flag that closes a node to new work wins:"]
+    lines = ["A node's state is sinfo's (%t, sinfo(1) NODE STATE CODES), e.g. idle, mix-, drng, idle*;"]
+    lines += ["its colour and the partitions' states are its class, where a flag that closes a node wins:"]
     lines += [f"  {c:<6} {vocab.NODE_HELP[c]}" for c in vocab.NODE_CLASSES]
-    lines += ["  --detail prints the full state instead, e.g. mixed+drain, idle+powered_down.", ""]
+    lines += ["  A suffix is a flag: * not responding, - planned for a pending job, ~ powered off,"]
+    lines += ["  # powering up, % powering down, ! to power down, @ reboot requested, ^ rebooting,"]
+    lines += ["  $ maintenance reservation, + completing."]
+    lines += ["  --detail prints the full state instead, e.g. mixed+drain, idle+not_responding.", ""]
     lines.append("Pending jobs show Slurm's reason code, in families as job_reason_codes groups them:")
     for c in vocab.REASON_CLASSES:
         lines += [
@@ -204,7 +208,8 @@ def _read_nodes(data, gres):
         tres, used = slurm.tres_str(n["tres"]), slurm.tres_str(n["tres_used"])
         mem_t = (slurm.num(n["real_memory"]) or 0) - (slurm.num(n["specialized_memory"]) or 0)
         nodes.append({
-            "name": n["name"], "state": vocab.node_state(n["state"]), "class": vocab.node_class(n["state"]), "open": vocab.node_schedulable(n["state"]),
+            "name": n["name"], "state": vocab.node_state(n["state"]), "short": vocab.node_short(n["state"]),
+            "class": vocab.node_class(n["state"]), "open": vocab.node_schedulable(n["state"]),
             "partitions": list(n["partitions"] or []),
             "cpu_total": slurm.num(n["effective_cpus"]) or slurm.num(n["cpus"]) or 0,
             "cpu_used": slurm.num(n["alloc_cpus"]) or 0,
@@ -504,7 +509,7 @@ def build(
 
     def node_row(n, parent):
         return {
-            "kind": "node", "name": n["name"], "parent": parent, "class": n["class"], "state": n["state"],
+            "kind": "node", "name": n["name"], "parent": parent, "class": n["class"], "state": n["state"], "short": n["short"],
             "cpu_used": n["cpu_used"], "cpu_total": n["cpu_total"], "mem_used": n["mem_used"],
             "mem_total": n["mem_total"], "gres_used": n["gres_used"], "gres_total": n["gres_total"],
             "idle": None, "off": None, "free": _free(n, has_gres), "used_from": "nodes", "mine": n["name"] in mine,
@@ -974,7 +979,7 @@ def show_resources(t, model, view="grouped", split=False, detail=False):
                 name_style = "part" if prefix else t.c["part"] + t.bold
             elif kind == "node":
                 name_style = t.c["node"] + t.bold if r.get("mine") else "node"
-            state = r["state"] if detail else r["class"]
+            state = r["state"] if detail else r.get("short", r["class"])
             cells = [(r["name"], name_style), (state, NODE_ROLE.get(r["class"], "sub")),
                      count(r["idle"], "ok"), count(r["off"], "hot"),
                      figure(r["cpu_used"], r["cpu_total"], "cpu", "", barw),

@@ -90,6 +90,79 @@ def node_state(state):
     return "+".join(f.lower() for f in _flags(state))
 
 
+# sinfo's short state (%t): Slurm's node_state_string_compact (src/common/
+# slurm_protocol_defs.c, 26.05), in its order of tests, lower case as sinfo prints it.
+# A suffix names one flag (sinfo(1), NODE STATE CODES), the first that applies:
+_SUFFIXES = (
+    ("MAINTENANCE", "$"),
+    ("REBOOT_ISSUED", "^"),
+    ("REBOOT_REQUESTED", "@"),
+    ("POWERING_UP", "#"),
+    ("POWERING_DOWN", "%"),
+    ("POWERED_DOWN", "~"),
+    ("POWER_DOWN", "!"),
+    ("NOT_RESPONDING", "*"),
+)
+_BASES = frozenset(("DOWN", "IDLE", "ALLOCATED", "ERROR", "MIXED", "FUTURE", "UNKNOWN"))
+
+
+def node_short(state):
+    """The state as sinfo prints it (%t), so sq and sinfo say the same: idle*, mix-,
+    drng, down~. See sinfo(1) for the words and suffixes."""
+    flags = _flags(state)
+    base = next((f for f in flags if f in _BASES), "UNKNOWN")
+    on = set(flags) - {base}
+
+    def suffixed(word, last=()):
+        mark = next((m for f, m in _SUFFIXES if f in on), None)
+        if mark:
+            return word + mark
+        return next((word + m for f, m in last if f in on), word)
+
+    busy = base in ("ALLOCATED", "MIXED")
+    if "INVALID_REG" in on:
+        return "inval"
+    if "MAINTENANCE" in on and not ("DRAIN" in on or busy or base == "DOWN"):
+        return "maint*" if "NOT_RESPONDING" in on else "maint"
+    if on & {"REBOOT_REQUESTED", "REBOOT_ISSUED"} and not busy:
+        if "REBOOT_ISSUED" in on:
+            return "boot^"
+        return "boot*" if "NOT_RESPONDING" in on else "boot"
+    if "DRAIN" in on:
+        return suffixed("drng" if "COMPLETING" in on or busy else "drain")
+    if "FAIL" in on:
+        word = "failg" if "COMPLETING" in on or busy else "fail"
+        return word + "*" if "NOT_RESPONDING" in on else word
+    if base == "DOWN":
+        return suffixed("down")
+    if base == "ALLOCATED":
+        return suffixed("alloc", (("COMPLETING", "+"),))
+    if "COMPLETING" in on:
+        return suffixed("comp")
+    if base == "IDLE":
+        mark = next((m for f, m in _SUFFIXES if f in on), None)
+        if mark:
+            return "idle" + mark
+        return (
+            "resv"
+            if "RESERVED" in on
+            else "block"
+            if "BLOCKED" in on
+            else "plnd"
+            if "PLANNED" in on
+            else "idle"
+        )
+    if base == "MIXED":
+        return suffixed("mix", (("PLANNED", "-"),))
+    if base == "FUTURE":
+        return suffixed("futr")
+    if "RESUME" in on:
+        return "resm"
+    if base == "UNKNOWN":
+        return "unk*" if "NOT_RESPONDING" in on else "unk"
+    return "?"
+
+
 def node_unavailable(state):
     """What has taken a node out, for a list of unavailable nodes: down, fail, draining
     or drained; None for a node that is up. Only an explicit DOWN, FAIL or DRAIN counts,
