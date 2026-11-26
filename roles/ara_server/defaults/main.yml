@@ -13,6 +13,17 @@ ara_server_base_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/.ara/server"
 ara_server_venv: "{{ playbook_dir | dirname | dirname }}/.venv"
 # sqlite takes one writer at a time: workers beyond a couple only wait on its lock.
 ara_server_workers: 2
+# How the server opens its sqlite database (Django's sqlite OPTIONS, ARA's
+# DATABASE_OPTIONS): write-ahead logging, so reading the history (ara playbook list, the
+# web view, the offline client) never blocks a run recording, and a write that takes
+# its lock at once and waits for it up to timeout seconds. In sqlite's default mode a
+# read held the file and a result's write failed after 5 s: the server answered with an
+# error page, the recorder could not read it as JSON, and that result went unrecorded
+# (ARA 345, 2026-11-26). WAL stays set in the database file, for every client.
+ara_server_database_options:
+  timeout: 30
+  transaction_mode: IMMEDIATE
+  init_command: "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;"
 # One server per person who installs one: their own unit, and their own socket in a
 # directory systemd makes for them alone (0700; scripts/deepops/ara_server.py says why
 # no TCP port, and a test keeps the socket path equal to the recorder's).

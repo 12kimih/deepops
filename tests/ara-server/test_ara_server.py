@@ -2,6 +2,7 @@
 server listens on their own unix socket, which the recorder uses only when it is
 theirs, and it records over it."""
 
+import contextlib
 import os
 import socket
 import sys
@@ -14,6 +15,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import bounds  # noqa: E402
 import in_tree  # noqa: E402
 from ansible_yaml import role_defaults  # noqa: E402
 
@@ -55,6 +57,45 @@ class Database(unittest.TestCase):
         self.assertTrue(ara_server.serves_this_run({"ARA_BASE_DIR": "~/.ara/server/"}))
         self.assertFalse(ara_server.serves_this_run({"ARA_BASE_DIR": "/tmp/test-ara"}))
         self.assertFalse(ara_server.serves_this_run({"ARA_DATABASE_NAME": "/tmp/x.sqlite"}))
+
+
+class Concurrency(unittest.TestCase):
+    """ARA 345 (2026-11-26): a read of the history held sqlite's file while a run
+    recorded; the result's write failed after 5 s and the result went unrecorded."""
+
+    def test_the_unit_opens_the_database_in_wal_with_immediate_writes(self):
+        from ansible_yaml import render
+
+        unit = (ROOT / "roles/ara_server/templates/deepops-ara.service.j2").read_text()
+        line = next(x for x in unit.splitlines() if "ARA_DATABASE_OPTIONS" in x)
+        options = role_defaults("ara_server")["ara_server_database_options"]
+        rendered = render(line, {"ara_server_database_options": options})
+        self.assertTrue(
+            rendered.startswith("Environment='ARA_DATABASE_OPTIONS=@json ") and rendered.endswith("'")
+        )
+        prefix = "Environment='"
+        self.assertNotIn("'", rendered[len(prefix) : -1], "one quoted assignment for systemd")
+        self.assertIn("journal_mode=WAL", options["init_command"])
+        self.assertEqual(options["transaction_mode"], "IMMEDIATE")
+        self.assertGreaterEqual(options["timeout"], 30)
+
+    def test_ara_takes_the_options_and_the_database_turns_wal(self):
+        import json
+        import sqlite3
+        import subprocess
+
+        options = role_defaults("ara_server")["ara_server_database_options"]
+        manage = Path(sys.executable).with_name("ara-manage")
+        if not manage.exists():
+            self.skipTest("ara-manage is not installed here")
+        with tempfile.TemporaryDirectory() as base:
+            env = {**os.environ, "ARA_BASE_DIR": base, "ARA_DATABASE_OPTIONS": "@json " + json.dumps(options)}
+            done = subprocess.run(
+                [str(manage), "migrate"], env=env, capture_output=True, text=True, timeout=bounds.CHILD
+            )
+            self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+            with contextlib.closing(sqlite3.connect(Path(base) / "ansible.sqlite")) as db:
+                self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
 
 
 class Hello(BaseHTTPRequestHandler):
