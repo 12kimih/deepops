@@ -1,0 +1,15 @@
+{{ ansible_managed | comment }}
+# roles/cluster_bot: whether Slack granted the bot token every scope the bot needs
+# (cluster_bot.scopes), as node_exporter metrics and once in the administrators' channel.
+# Root: it reads the token. A oneshot the deploy runs too (roles/textfile_keep refresh).
+[Unit]
+Description=Check the cluster bot token's Slack scopes
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=2min
+Environment=PYTHONPATH={{ _cluster_bot_pythonpath }}
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _cluster_bot_python }} -m cluster_bot.scopes {{ _cluster_bot_config }} {{ node_exporter_prom_dir }} {{ _cluster_bot_scopes_state }}

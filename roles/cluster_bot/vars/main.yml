@@ -31,6 +31,10 @@ _cluster_bot_known_hosts: "{{ _cluster_bot_etc }}/known_hosts"
 # (cluster_bot.commands): what the owner imports into the app (docs: cluster-bot.md).
 _cluster_bot_manifest: "{{ _cluster_bot_etc }}/slack-app-manifest.json"
 _cluster_bot_ready: "{{ slack_bot_token | length > 0 and slack_app_token | length > 0 }}"
+# The daily check of the token's scopes (cluster_bot.scopes) and what it last told the
+# administrators.
+_cluster_bot_scopes_unit: cluster-bot-scopes
+_cluster_bot_scopes_state: "{{ deepops_state_dir }}/cluster-bot-scopes.json"
 # The hosts the bot acts on, by the component that offers it a service there
 # (roles/cluster_bot_access), and their cluster addresses (the from= of its key).
 _cluster_bot_ban_hosts: "{{ deepops_component_registry | component_hosts(groups, 'fail2ban', deepops_component_removals) }}"
@@ -51,6 +55,8 @@ _cluster_bot_cfg:
   app_token_file: "{{ _cluster_bot_tokens.app }}"
   channels: {help: "{{ slack_channels.help }}", admin: "{{ slack_channels.admin }}"}
   command: "{{ cluster_bot_command }}"
+  # What the owner imports into the Slack app when a scope is missing (cluster_bot.scopes).
+  manifest: "{{ _cluster_bot_manifest }}"
   # The cluster commands the help and the Home tab list, each with its own definition's
   # summary (cluster_bot.commands.cluster_lines): what the bot host publishes.
   cluster_commands: "{{ cluster_tools_commands }}"
@@ -139,6 +145,12 @@ cluster_bot_items:
   - "file:{{ _cluster_bot_tokens.app }}"
   - "file:{{ _cluster_bot_known_hosts }}"
   - "file:{{ _cluster_bot_github_key }}"
+  - "unit:{{ _cluster_bot_scopes_unit }}.timer"
+  - "unit:{{ _cluster_bot_scopes_unit }}.service"
+  - "file:/etc/systemd/system/{{ _cluster_bot_scopes_unit }}.service"
+  - "file:/etc/systemd/system/{{ _cluster_bot_scopes_unit }}.timer"
+  - "file:{{ _cluster_bot_scopes_state }}"
+  - "file:{{ node_exporter_prom_dir }}/cluster-bot-scopes.prom"
   - "dir:{{ _cluster_bot_etc }}"
   - "dir:{{ _cluster_bot_prefix }}"
 # With the OS packages its venv needs (roles/python_venv).

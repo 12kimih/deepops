@@ -259,6 +259,14 @@ Slack method whose scope is missing). The same file without a deploy:
 (`cluster_bot_extra_scopes`: scopes the app keeps for other tools, incoming-webhook when
 Alertmanager posts through the app's webhook).
 
+The manifest changes the app only when it is imported, so the bot checks what Slack
+granted: `cluster-bot-scopes.service` (`cluster_bot.scopes`, as root, daily, after each
+boot and at the end of every deploy of the bot) reads the token's scopes and compares
+them with `SCOPES`. Each one missing is a series (`cluster_bot_scope_missing{scope}`, the
+ClusterBotScopeMissing alert), and the administrators' channel is told once when the
+missing set changes, with what to import; ClusterBotScopesUnchecked fires when Slack has
+not answered for two days (the check failing or not running).
+
 1. In the app's settings (api.slack.com/apps, the app, "App Manifest"), paste the
    manifest and save; reinstall the app to the workspace when Slack asks (new scopes).
    The first time, the bot is still off and no deploy has written the file: generate it

@@ -1286,3 +1286,20 @@ tests:
         exp_samples:
           - labels: 'host_mount:nfs_write_bytes:rate5m{host="n1", mountpoint="/home"}'
             value: 10
+
+  - name: a scope the bot token lacks warns, per scope
+    interval: 1m
+    input_series:
+      - series: 'cluster_bot_scope_missing{host="ctl", instance="ctl:9100", scope="pins:write"}'
+        values: '1x15'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ClusterBotScopeMissing
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: ClusterBotScopeMissing
+        exp_alerts:
+          - exp_labels: {severity: warning, host: ctl, instance: "ctl:9100", scope: "pins:write"}
+            exp_annotations:
+              summary: "The cluster bot's Slack token lacks the pins:write scope"
+              description: "What needs it fails with missing_scope. Import the manifest the deploy writes (/etc/cluster-bot/slack-app-manifest.json on ctl) into the Slack app's App Manifest and reinstall the app; the next check (`systemctl start cluster-bot-scopes` there) clears this."

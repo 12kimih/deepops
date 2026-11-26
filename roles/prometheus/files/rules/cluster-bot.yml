@@ -1,0 +1,29 @@
+---
+# The cluster bot's Slack token (roles/cluster_bot, cluster_bot.scopes): every scope the
+# bot needs, as Slack granted it, read daily and at each deploy of the bot. The app's
+# settings change only when the owner imports its manifest again, so a feature added
+# since failed with missing_scope at the first person who used it (2026-11-27).
+groups:
+  - name: cluster-bot
+    rules:
+      - alert: ClusterBotScopeMissing
+        expr: cluster_bot_scope_missing == 1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "The cluster bot's Slack token lacks the {{ $labels.scope }} scope"
+          description: >-
+            What needs it fails with missing_scope. Import the manifest the deploy writes
+            (/etc/cluster-bot/slack-app-manifest.json on {{ $labels.host }}) into the Slack
+            app's App Manifest and reinstall the app; the next check (`systemctl start
+            cluster-bot-scopes` there) clears this.
+      # Slack not answering, or the daily check not running: the alert above is blind.
+      - alert: ClusterBotScopesUnchecked
+        expr: time() - cluster_bot_scopes_last_success_timestamp_seconds > 2 * 86400
+        labels: {severity: warning}
+        annotations:
+          summary: "The cluster bot's Slack scopes on {{ $labels.host }} have not been read"
+          description: >-
+            A missing scope would go unseen: `journalctl -u cluster-bot-scopes` and
+            `systemctl list-timers cluster-bot-scopes.timer` on the host (the token, or
+            Slack unreachable).

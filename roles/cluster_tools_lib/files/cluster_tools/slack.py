@@ -170,6 +170,27 @@ class Slack:
             raise Error(f"Slack {method} failed: {body.get('error')} {body.get('response_metadata', '')}")
         return body
 
+    def granted_scopes(self):
+        """The scopes Slack granted this token: auth.test's x-oauth-scopes header. The app's
+        settings, not its manifest file, decide them, so a scope a feature needs can be
+        missing until the owner imports the manifest again (cluster_bot.scopes)."""
+        req = urllib.request.Request(
+            API + "auth.test", data=b"", headers={"Authorization": f"Bearer {self.token}"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                header, body = resp.headers.get("x-oauth-scopes"), json.load(resp)
+        except urllib.error.HTTPError as e:
+            with e:
+                raise Error(f"Slack auth.test failed: {e}") from None
+        except (OSError, ValueError) as e:
+            raise Error(f"Slack auth.test failed: {e}") from e
+        if not isinstance(body, dict) or not body.get("ok"):
+            raise Error(f"Slack auth.test failed: {body.get('error') if isinstance(body, dict) else body}")
+        if header is None:
+            raise Error("Slack auth.test answered without the token's scopes (x-oauth-scopes)")
+        return {scope.strip() for scope in header.split(",") if scope.strip()}
+
     @staticmethod
     def _print(method, params):
         print(f"--- {method} {params.get('channel', '')} thread={params.get('thread_ts', '')}")

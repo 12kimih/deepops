@@ -1,0 +1,13 @@
+{{ ansible_managed | comment }}
+# roles/cluster_bot
+[Unit]
+Description=Check the cluster bot token's Slack scopes daily
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+OnBootSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

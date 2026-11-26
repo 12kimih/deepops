@@ -27,6 +27,29 @@ class Fake(slack.Slack):
         return self.answers[method]
 
 
+class GrantedScopes(unittest.TestCase):
+    """The token's scopes as Slack granted them: auth.test's x-oauth-scopes header."""
+
+    def answer(self, body, header):
+        reply = mock.MagicMock()
+        reply.__enter__.return_value = reply
+        reply.headers = email.message.Message()
+        if header is not None:
+            reply.headers["x-oauth-scopes"] = header
+        reply.read.return_value = json.dumps(body).encode()
+        return mock.patch("urllib.request.urlopen", return_value=reply)
+
+    def test_the_header_is_the_set(self):
+        with self.answer({"ok": True}, "chat:write, commands,pins:write"):
+            self.assertEqual(slack.Slack("xoxb-t").granted_scopes(), {"chat:write", "commands", "pins:write"})
+
+    def test_a_refusal_or_no_header_is_an_error(self):
+        with self.answer({"ok": False, "error": "invalid_auth"}, "x"), self.assertRaises(slack.Error):
+            slack.Slack("xoxb-t").granted_scopes()
+        with self.answer({"ok": True}, None), self.assertRaises(slack.Error):
+            slack.Slack("xoxb-t").granted_scopes()
+
+
 class SlackTests(unittest.TestCase):
     def test_what_users_named_is_shown_as_text_and_columns_line_up(self):
         self.assertEqual(slack.escape("<!channel> & <@U1>"), "&lt;!channel&gt; &amp; &lt;@U1&gt;")

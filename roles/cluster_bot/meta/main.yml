@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: deepops_paths  # deepops_dir
+  - role: deepops_paths  # deepops_dir, deepops_state_dir (the scopes check's record)
   - role: cluster_tools_lib  # cluster_tools.slack: every DM, and its log for the administrators
   - role: deploy_defaults  # deepops_component_registry (cluster_bot_host)
   - role: slack_defaults  # tokens, channels, cluster_bot_user, cluster_bot_key
@@ -14,6 +14,7 @@ dependencies:
   - role: cluster_info_defaults  # cluster_info (login host, SSH port, guide)
   - role: open_ondemand_defaults  # open_ondemand_url, the portal in the onboarding text
   - role: cluster_tools_defaults  # cluster_tools_commands (the help lists them)
+  - role: prometheus_paths  # node_exporter_prom_dir (the scopes check's metrics)
 
 galaxy_info:
   namespace: deepops
