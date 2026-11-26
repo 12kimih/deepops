@@ -135,19 +135,22 @@ def day(ts):
 
 
 def survey(messages, ctx):
-    """The channel's MESSAGES by poster(): [line], the most first."""
+    """The channel's MESSAGES by poster(): [line], the most first, each ending with its
+    newest message's title(), so an integration nobody knows can be told by what it says."""
     groups = {}
     for m in messages:
-        g = groups.setdefault(poster(m), {"n": 0, "ts": [], "replies": 0, "ours": ctx.ours(m)})
+        g = groups.setdefault(poster(m), {"n": 0, "ts": [], "replies": 0, "ours": ctx.ours(m), "newest": m})
         g["n"] += 1
         g["ts"].append(float(m["ts"]))
         g["replies"] += m.get("reply_count") or 0
+        if float(m["ts"]) > float(g["newest"]["ts"]):
+            g["newest"] = m
     out = []
     for key, g in sorted(groups.items(), key=lambda kv: (-kv[1]["n"], kv[0])):
         who = " ".join(f"{k}={v}" for k, v in zip(("bot_id", "app_id", "user", "name", "subtype"), key) if v)
         whose = "the app's" if g["ours"] else "not the app's"
         out.append(f"{who or 'unknown'}: {g['n']} messages, {day(min(g['ts']))} to {day(max(g['ts']))}, "
-                   f"{g['replies']} replies, {whose}")  # fmt: skip
+                   f"{g['replies']} replies, {whose}, newest: {title(g['newest'])[:80]!r}")  # fmt: skip
     return out
 
 

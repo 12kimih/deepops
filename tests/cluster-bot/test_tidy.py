@@ -164,6 +164,15 @@ class Tidy(unittest.TestCase):
         self.assertEqual(next(a for a in actions if a["ts"] == self.webhook)["text"], "[FIRING:1] DiskFull")
         self.assertEqual(next(a for a in actions if a["ts"] == self.bans)["text"], "*새로 차단된 주소 57개*")
 
+    def test_every_poster_line_names_its_newest_message(self):
+        _, lines, _ = run(self.slack, dry_run=True)
+        posters = [line for line in lines if " messages, " in line and line.startswith("  ")]
+        self.assertTrue(posters)
+        for line in posters:
+            self.assertRegex(line, r", newest: '[^']+'$")
+        self.assertTrue(any(line.startswith("  bot_id=B9 ") and line.endswith("newest: ':red_circle: Critical: NodeDown'")
+                            for line in posters), posters)  # fmt: skip
+
     def test_the_title_reads_blocks_then_attachments_then_text(self):
         self.assertEqual(tidy.title({"text": "t", "attachments": [{"fallback": "f"}]}), "f")
         self.assertEqual(tidy.title({"text": "t", "attachments": [{"title": "a", "fallback": "f"}]}), "a")
