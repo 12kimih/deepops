@@ -496,7 +496,7 @@ def every(seconds, name, round_):
             try:
                 round_()
             except Exception as e:  # noqa: BLE001 - one failed round must not stop the next
-                print(f"cluster-bot: {name}: {e}", file=sys.stderr, flush=True)
+                print(f"cluster-bot: {name}: {e}", file=sys.stderr)
             time.sleep(seconds)
 
     threading.Thread(target=loop, name=name, daemon=True).start()
@@ -623,7 +623,7 @@ def main(argv=None):
                 docs["seen"],
                 docs["pinned"],
                 date.today().isoformat(),
-                lambda line: print(f"cluster-bot: docs notices: {line}", file=sys.stderr, flush=True),
+                lambda line: print(f"cluster-bot: docs notices: {line}", file=sys.stderr),
             )
 
         every(NOTICES_EVERY, "docs notices", notices_round)
@@ -637,7 +637,7 @@ def main(argv=None):
                 kept["channels"],
                 kept["state"],
                 date.today().isoformat(),
-                lambda line: print(f"cluster-bot: channel guides: {line}", file=sys.stderr, flush=True),
+                lambda line: print(f"cluster-bot: channel guides: {line}", file=sys.stderr),
                 guides.service_urls(cfg.get("connect") or {}),
             )
 

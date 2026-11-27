@@ -359,6 +359,19 @@ def swatch(theme):
     return "\n".join(out) + "\n"
 
 
+def line_output(stream=None):
+    """Write STREAM (stdout) a line at a time, as a terminal gets it, wherever it goes.
+    Under systemd it is a journald stream, which Python buffers 8 KiB at a time: a
+    long-running program's lines (cluster-bot's "dm ...") showed up late or never, and a
+    stop (SIGTERM ends Python without flushing) or a timeout kill dropped them. Every
+    program of ours calls this first: the cluster command launcher and the cluster_bot
+    package. PYTHONUNBUFFERED cannot do it: the launcher runs python -I, which ignores
+    it. stderr is line-buffered already."""
+    stream = sys.stdout if stream is None else stream
+    if hasattr(stream, "reconfigure"):
+        stream.reconfigure(line_buffering=True)
+
+
 def me():
     """Who runs the command: $USER, as the login set it, else the account of the uid;
     the uid itself when even that cannot be looked up (the directory service is down)."""

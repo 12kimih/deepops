@@ -266,7 +266,7 @@ def main(argv=None):
     if not channels:
         parser.error(f"{args.config}: no tidy channels")
     slack = Slack(Path(cfg["bot_token_file"]).read_text().strip())
-    log = lambda line: print(f"tidy: {line}", flush=True)  # noqa: E731
+    log = lambda line: print(f"tidy: {line}")  # noqa: E731
     actions = tidy(slack, channels, context(slack, cfg, log), log, dry_run=args.dry_run)
     log(summary(actions, args.dry_run))
     return 0

@@ -466,7 +466,7 @@ def main(argv=None):
 
     def say(line):
         said.append(line)
-        print(f"notices: {line}", flush=True)
+        print(f"notices: {line}")
 
     actions = round_(lambda: fetch_json(docs["url"]), slack, docs["channel"], docs["seen"], docs["pinned"],
                      date.today().isoformat(), say, dry_run=args.dry_run, adopt=True)  # fmt: skip

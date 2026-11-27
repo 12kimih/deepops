@@ -101,7 +101,7 @@ def watch(feature, slack, channel, mention, seen, log=None):
     watch's first round or the first since the host could be reached (a round that read no
     host learned nothing, so the next one told every ban as new). A host that cannot be
     read keeps the bans it had, on the list as last seen, and the list names it."""
-    log = log or (lambda line: print(f"cluster-bot: ban watch: {line}", file=sys.stderr, flush=True))
+    log = log or (lambda line: print(f"cluster-bot: ban watch: {line}", file=sys.stderr))
     found, errors = feature.survey()
     before = seen.get("bans", {})
     # A record from before "read": the hosts it holds bans of were read.

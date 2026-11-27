@@ -5,6 +5,9 @@
 import sys
 
 sys.path.insert(0, "{{ cluster_tools_lib_dir }}")
+from cluster_tools.cli import line_output  # noqa: E402
+
+line_output()  # a line at a time into the journal, never held back (cli.line_output)
 from {{ cluster_tools_lib_command.module }} import main  # noqa: E402
 
 sys.exit(main())

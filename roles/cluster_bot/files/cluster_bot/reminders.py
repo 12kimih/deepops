@@ -65,7 +65,7 @@ def remind(sources, dms, slack_of, state, now):
         try:
             items = source.deadlines()
         except Exception as e:  # noqa: BLE001 - one source's failure must not stop the rest
-            print(f"cluster-bot: {name} reminders: {e}", file=sys.stderr, flush=True)
+            print(f"cluster-bot: {name} reminders: {e}", file=sys.stderr)
             continue
         sent = state.setdefault(name, {})
         for key, left, stage in due({k: v[0] for k, v in items.items()}, source.stages, sent, now):
@@ -76,6 +76,6 @@ def remind(sources, dms, slack_of, state, now):
                     text, blocks = source.message(item, left)
                     dms.dm(slack_id, text, blocks, kind=f"{name}-reminder", login=user)
             except Exception as e:  # noqa: BLE001 - the next round tries it again
-                print(f"cluster-bot: {name} reminder {key}: {e}", file=sys.stderr, flush=True)
+                print(f"cluster-bot: {name} reminder {key}: {e}", file=sys.stderr)
                 continue
             sent[key][1] = stage

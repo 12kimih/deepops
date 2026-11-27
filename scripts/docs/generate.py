@@ -241,7 +241,11 @@ def gen_components(_arg, _page=None):
 
 
 def gen_bot_subcommands(_arg, _page=None):
-    sys.path.insert(0, str(ROOT / "roles" / "cluster_bot" / "files"))
+    # The bot's package with the cluster's library it imports, as its unit's PYTHONPATH.
+    sys.path[:0] = [
+        str(ROOT / "roles" / "cluster_bot" / "files"),
+        str(ROOT / "roles" / "cluster_tools_lib" / "files"),
+    ]
     from cluster_bot import commands
 
     command = defaults("cluster_bot")["cluster_bot_command"]
