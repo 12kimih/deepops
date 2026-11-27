@@ -93,6 +93,7 @@ class Glossary(unittest.TestCase):
             "새 Slurm 잡은 제출되지 않습니다": "새 Slurm 잡을 제출할 수 없습니다",
             "오래 쉬는 GPU": "GPU 유휴 잡",
             "로그인 노드 제한": "로그인 노드 한도",
+            "확인 없이 진행하는 모드에서도": "자동 승인 모드에서도",
         }
         for old, new in caught.items():
             self.assertTrue(any(p.search(old) for e in ENTRIES if not e["scope"] for p in e["patterns"]), old)

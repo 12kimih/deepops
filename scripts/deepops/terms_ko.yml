@@ -200,6 +200,11 @@ terms:
     not:
       - 불이익은 도(?:움받기|와드리기)
     why: A penalty is not "helped"; it is remedied.
+  - use: 자동 승인 모드
+    not:
+      - 확인 없이 (?:진행|실행)하는 모드
+    why: The agents' mode that runs without asking, as the agent rules name it; the owner
+      found the long phrase awkward (2026-11-27).
   # The rules that act on a person (usage, the bot, the docs): each title is the
   # glossary's word (owner, 2026-11-27); GPU 유휴 잡 and 디스크 한도 are above.
   - title: /scratch 정리
