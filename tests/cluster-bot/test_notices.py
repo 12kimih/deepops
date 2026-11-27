@@ -19,7 +19,7 @@ from cluster_bot import notices  # noqa: E402
 from cluster_tools.slack import Error  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "tests/lib"))
-from fake_slack import pins_call  # noqa: E402
+from fake_slack import pins_call, refuse_foreign  # noqa: E402
 
 CHANNEL = "C1"
 SITE = "https://docs.example.org/news/"
@@ -62,6 +62,8 @@ class FakeSlack:
         if method == "chat.delete":
             if p["ts"] in self.locked:
                 raise Error("Slack chat.delete failed: cant_delete_message")
+            reply = next((r for rs in self.replies.values() for r in rs if r["ts"] == p["ts"]), None)
+            refuse_foreign(method, reply or next(m for m in self.messages if m["ts"] == p["ts"]), "B1")
             self.messages = [m for m in self.messages if m["ts"] != p["ts"]]
             for ts, rs in self.replies.items():
                 self.replies[ts] = [r for r in rs if r["ts"] != p["ts"]]
@@ -80,6 +82,7 @@ class FakeSlack:
 
     def update(self, channel, ts, text, blocks=None, metadata=None):
         m = next(m for m in self.messages if m["ts"] == ts)
+        refuse_foreign("chat.update", m, "B1")
         m.update(text=text, blocks=blocks, **({"metadata": metadata} if metadata else {}))
         self.log.append(("update", text))
 

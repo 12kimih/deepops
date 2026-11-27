@@ -17,6 +17,17 @@ class FakeDM:
         return channel, ts
 
 
+def refuse_foreign(method, message, bot_id):
+    """Slack's answer to chat.delete or chat.update (METHOD) of MESSAGE by the token of
+    BOT_ID: they act on that bot's own messages alone, so another's (an incoming
+    webhook's, another app's, a person's) raises cant_delete_message or
+    cant_update_message. The one rule of every fake, so no test's Slack is kinder."""
+    from cluster_tools.slack import Error
+
+    if message.get("bot_id") != bot_id:
+        raise Error(f"Slack {method} failed: cant_{method.split('.')[1]}_message")
+
+
 def pins_call(pins, method, p):
     """pins.add and pins.remove on PINS (the set of pinned ts) as Slack answers them: a
     message pinned twice is already_pinned, one not pinned no_pin. The one pin board of
@@ -43,7 +54,9 @@ class FakeChannel:
     The bot's posts carry its user (USER), as Slack's do; another poster's carry the USER
     given (none: an incoming webhook's) and what else Slack shows (EXTRA: attachments,
     subtype, username). A post with replies shows reply_count in the history.
-    REFUSE: the ts chat.delete answers cant_delete_message."""
+    chat.delete and chat.update act on the bot's own messages alone, as Slack's do: any
+    other (an incoming webhook's, another app's, a person's) is cant_delete_message or
+    cant_update_message. REFUSE: more ts chat.delete refuses (cant_delete_message)."""
 
     BOT = ("B1", "A1")
     USER = "UBOT"
@@ -90,6 +103,11 @@ class FakeChannel:
     def call(self, method, **p):
         from cluster_tools.slack import Error
 
+        if method == "chat.getPermalink":
+            return {
+                "ok": True,
+                "permalink": f"https://slack.example/archives/{p['channel']}/p{p['message_ts']}",
+            }
         if method == "auth.test":
             return {"ok": True, "bot_id": self.BOT[0], "user_id": self.USER}
         if method == "bots.info":
@@ -114,7 +132,13 @@ class FakeChannel:
                 raise Error("Slack chat.delete failed: message_not_found")
             if p["ts"] in self.refuse:
                 raise Error("Slack chat.delete failed: cant_delete_message")
+            refuse_foreign(method, self.at(p["ts"]), self.BOT[0])
             self.messages = [m for m in self.messages if m["ts"] != p["ts"]]
+        elif method == "chat.update":
+            if not any(m["ts"] == p["ts"] for m in self.messages):
+                raise Error("Slack chat.update failed: message_not_found")
+            refuse_foreign(method, self.at(p["ts"]), self.BOT[0])
+            self.at(p["ts"]).update(text=p.get("text", ""))
         elif method in ("pins.add", "pins.remove"):
             return pins_call(self.pins, method, p)
         elif method == "chat.postMessage":  # the DM log's day message
@@ -136,5 +160,6 @@ class FakeChannel:
 
         if not any(m["ts"] == ts for m in self.messages):
             raise Error("Slack chat.update failed: message_not_found")
+        refuse_foreign("chat.update", self.at(ts), self.BOT[0])
         self.at(ts).update(text=text, blocks=blocks or [], **({"metadata": metadata} if metadata else {}))
         self.log.append(("update", text))

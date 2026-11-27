@@ -147,14 +147,17 @@ cut, a notice of a retired integration) stay until you tidy the channels
 
 The dry run surveys each channel `slack_channels` names first: its messages grouped by
 who posted them (`bot_id`, `app_id`, user, name, subtype), how many, from when to when,
-and whether they are the app's. Then it lists each message it would delete and why, one
-rule each (`RULES` in `cluster_bot.tidy`: the channel's role, what the message is, how
-it is recognized). Only the app's messages go: its bot's, or those of a bot_id you name in
-`cluster_bot_retired_bot_ids` once the survey shows it was the app's own old integration.
-A person's message or another app's is listed and left. The app's replies go after their
-message; someone else's reply stays. A delete Slack refuses (`cant_delete_message`) is
-said and left, to delete by hand. A notice post the notices round has no record of stays,
-since the round would post it again.
+and whose they are, an integration you name in `cluster_bot_known_integrations` (bot_id
+to what it is) by that name. Then it lists what becomes of each message a rule matches
+(`RULES` in `cluster_bot.tidy`: the channel's role, what the message is, how it is
+recognized), decided before anything is tried and the same in both runs. Slack's
+`chat.delete` acts on the token's bot's own messages alone, so only the bot's go, its
+replies after them; someone else's reply stays. An integration's message (the app's old
+incoming webhook, another app) is listed once per channel as "by hand", with a link to
+each, for an admin to delete in the Slack client; tidy never tries it. A person's
+message is left. A notice an integration posted is recorded as announced in the notices
+round's record (the real run only), so the round never posts or pins it again once it is
+deleted by hand.
 
 The channels' guides: each channel `slack_channels` names gets its purpose, topic, a
 canvas (the channel's README tab) and bookmarks from `<docs_url>/channels.json` (the docs

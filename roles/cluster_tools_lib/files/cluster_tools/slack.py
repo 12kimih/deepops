@@ -404,11 +404,13 @@ def own_user(slack):
 
 
 def is_own(message, ids):
-    """MESSAGE was posted by the bot of IDS (own())."""
-    bot_id, app_id = ids
-    return bool(bot_id and message.get("bot_id") == bot_id) or bool(
-        app_id and message.get("app_id") == app_id
-    )
+    """MESSAGE was posted by the bot of IDS (own()): the only messages the token may edit
+    or delete. Another of the app's integrations (an incoming webhook) posts with the
+    app's app_id but a bot_id of its own, and Slack refuses those (cant_delete_message,
+    cant_update_message: chat.delete and chat.update act on the token's bot's messages
+    alone); only an admin in the Slack client removes them."""
+    bot_id, _app_id = ids
+    return bool(bot_id and message.get("bot_id") == bot_id)
 
 
 def history(slack, channel):

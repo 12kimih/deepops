@@ -224,7 +224,6 @@ def plan(messages, notes, seen, mine, today, adopt, most=0, pinned=()):
       pin      a post of a notice to stand pinned (pinned_notices)
       unpin    another post of the bot's that stands pinned (in the history, or recorded)
     """
-    bot_id, app_id = mine
     recorded = {e["ts"]: nid for nid, e in seen.items() if isinstance(e, dict) and e.get("ts")}
     sites = {nid[: nid.index("/news/") + len("/news/")] for nid in notes if "/news/" in nid}
     found, out = {}, []
@@ -234,7 +233,7 @@ def plan(messages, notes, seen, mine, today, adopt, most=0, pinned=()):
         nid, how = identify(m, notes, recorded, sites)
         if nid is None:
             continue
-        own = bool(bot_id and m.get("bot_id") == bot_id) or bool(app_id and m.get("app_id") == app_id)
+        own = is_own(m, mine)
         title = _header(m.get("blocks")) or (m.get("text") or "")[:80]
         if not own:
             out.append({"do": "foreign", "id": nid, "ts": m["ts"], "how": how, "title": title,

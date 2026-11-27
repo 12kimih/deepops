@@ -6,19 +6,25 @@ posted what:
     python -m cluster_bot.tidy CONFIG             the same, and the deletes done
 
 The survey groups each channel's messages by who posted them (bot_id, app_id, user,
-name, subtype): how many, from when to when, with how many replies, and whether they are
-the app's. What goes is what RULES name, one row each: the channel (by its role in
-slack_channels), what the message is, a matcher and why it no longer belongs. A message
-goes only when it is the app's: posted by its bot (bot_id or app_id, cluster_tools.slack
-own()) or by a bot_id the config names as one of its retired integrations (tidy.retired:
-an incoming webhook, an older bot). A person's message or another app's is never
-touched, only said. The bot's replies under a message go with it, after it; someone
-else's reply stays, under Slack's "deleted" mark. A delete Slack refuses
-(cant_delete_message) is said and left, to delete by hand. The deletes are paced to
-Slack's rate for chat.delete; a call it still limits is sent again (cluster_tools.slack).
+name, subtype): how many, from when to when, with how many replies, and whose they are,
+an integration the config knows by its name (tidy.known: bot_id -> what it is). What
+goes is what RULES name, one row each: the channel (by its role in slack_channels), what
+the message is, a matcher and why it no longer belongs.
 
-A notice post that a rule would delete stays when the notices round has no record of
-it (cluster_bot.notices SEEN_PATH): the round would post it again.
+What happens to a matched message is decided before anything is tried, in the dry run
+as in the real one, by Slack's rule: chat.delete acts on the token's bot's own messages
+alone (cluster_tools.slack is_own). The bot's are deleted, with its replies after them
+(someone else's reply stays, under Slack's "deleted" mark). An integration's (an
+incoming webhook of the app, another app) is "by hand": listed once per channel with a
+link to each, for an admin to delete in the Slack client, and never attempted. A
+person's is left. A delete Slack still refuses (cant_delete_message) is said, to delete
+by hand. The deletes are paced to Slack's rate for chat.delete; a call it still limits
+is sent again (cluster_tools.slack).
+
+A notice an integration posted (a retired notice webhook's copy) is recorded as
+announced in the notices round's record (cluster_bot.notices SEEN_PATH, under its lock)
+when the round has none, with no ts: the round counts it as done ("missing" once the
+copy is deleted by hand) and never posts or pins it again. The dry run records nothing.
 """
 
 import argparse
@@ -44,6 +50,8 @@ from cluster_tools.slack import (  # the cluster's library (PYTHONPATH, roles/cl
 )
 
 from . import notices, state
+
+DELETE, BY_HAND, LEFT = "delete", "by hand", "left"
 
 # Slack's chat.delete is a Tier 3 method (about 50 a minute): one call this often.
 PAUSE = 1.2
@@ -74,7 +82,7 @@ def _old_ban_notice(m, ctx):
     return text.startswith("새로 차단된 주소") and bool(CUT_LIST.search(shown)) and not m.get("metadata")
 
 
-def _retired_notice(m, ctx):
+def _integration_notice(m, ctx):
     """A notice post (cluster_bot.notices.identify) that the bot did not post: the round
     leaves those as another's ("foreign"), and keeps its own."""
     return ctx.notice(m) is not None and not is_own(m, ctx.ids)
@@ -83,28 +91,52 @@ def _retired_notice(m, ctx):
 Rule = namedtuple("Rule", "channel what match why")
 RULES = (
     Rule("admin", "an alert", _alert_by_webhook,
-         "posted through the app's incoming webhook, never edited when it resolved; "
+         "posted through an incoming webhook, never edited when it resolved; "
          "Alertmanager now posts with the bot and edits its message in place"),
     Rule("admin", "a ban notice", _old_ban_notice,
          "the old format, its list cut; the kept ban list and its thread hold every ban"),
-    Rule("announce", "a notice", _retired_notice,
-         "posted by a retired integration; the notices round keeps the bot's own posts"),
+    Rule("announce", "a notice", _integration_notice,
+         "posted by an integration, not the bot; the notices round keeps the bot's own posts"),
 )  # fmt: skip
 
 
 class Context:
-    """What the matchers read: the bot's IDS (own()) and USER (own_user()), the RETIRED
-    bot_ids, and the notices (notices.notices_of) with the round's record SEEN."""
+    """What the matchers read: the bot's IDS (own()) and USER (own_user()), the KNOWN
+    integrations ({bot_id: what it is}), and the notices (notices.notices_of) with the
+    round's record SEEN, kept at SEEN_PATH."""
 
-    def __init__(self, ids, user, retired=(), notes=None, seen=None):
-        self.ids, self.user, self.retired = ids, user, set(retired)
-        self.notes, self.seen = notes or {}, seen or {}
+    def __init__(self, ids, user, known=None, notes=None, seen=None, seen_path=None):
+        self.ids, self.user, self.known = ids, user, dict(known or {})
+        self.notes, self.seen, self.seen_path = notes or {}, seen or {}, seen_path
         self._recorded = {e["ts"]: nid for nid, e in self.seen.items() if isinstance(e, dict) and e.get("ts")}
         self._sites = {n[: n.index("/news/") + len("/news/")] for n in self.notes if "/news/" in n}
 
     def ours(self, m):
-        """M is the app's: its bot's, or a retired integration's."""
-        return is_own(m, self.ids) or bool(m.get("bot_id") and m["bot_id"] in self.retired)
+        """M is the bot's own: the only messages the token may delete."""
+        return is_own(m, self.ids)
+
+    def fate(self, m):
+        """What becomes of M when a rule matches it: DELETE (the bot's), BY_HAND (an
+        integration's: Slack lets only an admin in its client delete it), LEFT (a
+        person's)."""
+        if self.ours(m):
+            return DELETE
+        return BY_HAND if m.get("bot_id") else LEFT
+
+    def whose(self, m):
+        """Who M is, in words: the bot, a known integration by its name, the app's other
+        integration (an incoming webhook), another app, a person."""
+        if self.ours(m):
+            return "the bot's"
+        if m.get("bot_id") in self.known:
+            return self.known[m["bot_id"]]
+        if m.get("bot_id"):
+            return (
+                "the app's, not its bot"
+                if self.ids[1] and m.get("app_id") == self.ids[1]
+                else "another app's"
+            )
+        return "a person's"
 
     def notice(self, m):
         return notices.identify(m, self.notes, self._recorded, self._sites)[0]
@@ -139,7 +171,7 @@ def survey(messages, ctx):
     newest message's title(), so an integration nobody knows can be told by what it says."""
     groups = {}
     for m in messages:
-        g = groups.setdefault(poster(m), {"n": 0, "ts": [], "replies": 0, "ours": ctx.ours(m), "newest": m})
+        g = groups.setdefault(poster(m), {"n": 0, "ts": [], "replies": 0, "whose": ctx.whose(m), "newest": m})
         g["n"] += 1
         g["ts"].append(float(m["ts"]))
         g["replies"] += m.get("reply_count") or 0
@@ -148,16 +180,16 @@ def survey(messages, ctx):
     out = []
     for key, g in sorted(groups.items(), key=lambda kv: (-kv[1]["n"], kv[0])):
         who = " ".join(f"{k}={v}" for k, v in zip(("bot_id", "app_id", "user", "name", "subtype"), key) if v)
-        whose = "the app's" if g["ours"] else "not the app's"
         out.append(f"{who or 'unknown'}: {g['n']} messages, {day(min(g['ts']))} to {day(max(g['ts']))}, "
-                   f"{g['replies']} replies, {whose}, newest: {title(g['newest'])[:80]!r}")  # fmt: skip
+                   f"{g['replies']} replies, {g['whose']}, newest: {title(g['newest'])[:80]!r}")  # fmt: skip
     return out
 
 
 def plan(role, messages, ctx):
     """What RULES make of the posts in the channel of ROLE: [{"do", "ts", "what", "why",
-    "by", "replies", "day"}], oldest first. do: delete, or left (another's, or a notice
-    the round would post again)."""
+    "by", "whose", "replies", "day", "text"}], oldest first, do as Context.fate says. A
+    notice of an integration the round has no record of carries "record": its id, to
+    record as announced (record_notices)."""
     out = []
     for m in sorted(messages, key=lambda m: float(m["ts"])):
         if m.get("thread_ts", m["ts"]) != m["ts"]:
@@ -165,20 +197,50 @@ def plan(role, messages, ctx):
         rule = next((r for r in RULES if r.channel == role and r.match(m, ctx)), None)
         if rule is None:
             continue
-        a = {"do": "delete", "ts": m["ts"], "what": rule.what, "why": rule.why, "by": poster(m),
-             "replies": m.get("reply_count") or 0, "day": day(m["ts"]),
+        a = {"do": ctx.fate(m), "ts": m["ts"], "what": rule.what, "why": rule.why, "by": poster(m),
+             "whose": ctx.whose(m), "replies": m.get("reply_count") or 0, "day": day(m["ts"]),
              "text": title(m)[:80]}  # fmt: skip
-        if not ctx.ours(m):
-            a.update(do="left", why="not the app's (a person's or another app's): never touched")
-        elif rule.match is _retired_notice and ctx.notice(m) not in ctx.seen:
-            a.update(do="left", why="the notices round has no record of it and would post it again")
+        if a["do"] == BY_HAND:
+            a["why"] += "; Slack lets only an admin delete it, in the Slack client"
+        elif a["do"] == LEFT:
+            a["why"] = "a person's: never touched"
+        if rule.match is _integration_notice and ctx.notice(m) not in ctx.seen:
+            a["record"] = ctx.notice(m)
         out.append(a)
     return out
 
 
 def describe(a, extra=""):
     by = "/".join(v for v in a["by"][:3] if v) or "?"
-    return f"{a['do']} {a['ts']} ({a['day']}, by {by}) {a['what']} {a['text']!r}: {a['why']}{extra}"
+    return (f"{a['do']} {a['ts']} ({a['day']}, by {by}, {a['whose']}) {a['what']} {a['text']!r}: "
+            f"{a['why']}{extra}")  # fmt: skip
+
+
+def permalink(slack, channel, ts):
+    """The link an admin opens to delete TS by hand; "" when Slack gives none."""
+    try:
+        return slack.call("chat.getPermalink", channel=channel, message_ts=ts).get("permalink", "")
+    except Error:
+        return ""
+
+
+def record_notices(ctx, actions, log, dry_run):
+    """Record each notice ACTIONS name (plan's "record") as announced in the round's
+    record, under its lock, with no ts: the round never posts or pins it again."""
+    todo = {}
+    for a in actions:
+        if a.get("record"):
+            todo.setdefault(a["record"], a)  # the oldest copy names it
+    for nid, a in sorted(todo.items()):
+        n = ctx.notes.get(nid) or {}
+        if dry_run or not ctx.seen_path:
+            log(f"  would record {nid} as announced: an integration's copy stands ({a['ts']})")
+            continue
+        with state.locked(ctx.seen_path, {}) as seen:
+            if nid not in seen:
+                seen[nid] = {"date": n.get("date", a["day"]), "digest": n.get("digest", ""),
+                             "copy": "an integration's copy, to delete by hand"}  # fmt: skip
+                log(f"  recorded {nid} as announced: the notices round will not post it again")
 
 
 def thread_of(slack, channel, a, ctx):
@@ -226,10 +288,12 @@ def tidy(slack, channels, ctx, log, dry_run=True, pause=time.sleep):
         actions = [a for r in roles for a in plan(r, messages, ctx)]
         for a in actions:
             a["channel"] = name
-            mine, theirs = thread_of(slack, cid, a, ctx) if a["do"] == "delete" else ([], 0)
-            extra = f", with {len(mine)} replies of the app" if mine else ""
+            if a["do"] == BY_HAND:
+                continue
+            mine, theirs = thread_of(slack, cid, a, ctx) if a["do"] == DELETE else ([], 0)
+            extra = f", with {len(mine)} replies of the bot" if mine else ""
             extra += f"; {theirs} replies of others stay" if theirs else ""
-            if dry_run or a["do"] != "delete":
+            if dry_run or a["do"] != DELETE:
                 log(f"  {describe(a, extra)}")
                 continue
             if remove(slack, cid, a["ts"], log, pause, a):
@@ -237,12 +301,19 @@ def tidy(slack, channels, ctx, log, dry_run=True, pause=time.sleep):
                     remove(slack, cid, ts, log, pause, {**a, "ts": ts, "what": "its reply"})
                 a["done"] = True
                 log(f"  {describe(a, extra).replace('delete', 'deleted', 1)}")
+        by_hand = [a for a in actions if a["do"] == BY_HAND]
+        if by_hand:
+            log(f"  by hand in the Slack client (an admin), {len(by_hand)} messages:")
+            for a in by_hand:
+                a["link"] = permalink(slack, cid, a["ts"])
+                log(f"    {a['link'] or a['ts']}  {describe(a)}")
+        record_notices(ctx, actions, log, dry_run)
         out += actions
     return out
 
 
 def context(slack, cfg, log, fetch=notices.fetch_json):
-    """The Context of the bot's config CFG: its IDs, the retired bot_ids, the notices."""
+    """The Context of the bot's config CFG: its IDs, the known integrations, the notices."""
     docs = cfg.get("notices") or {}
     notes = {}
     if docs.get("url"):
@@ -251,8 +322,8 @@ def context(slack, cfg, log, fetch=notices.fetch_json):
         except (OSError, ValueError) as e:
             log(f"notices.json not read ({e}): no notice post is deleted")
     seen = state.read(docs["seen"], {}) if docs.get("seen") else {}
-    retired = (cfg.get("tidy") or {}).get("retired") or []
-    return Context(own(slack), own_user(slack), retired, notes, seen)
+    known = (cfg.get("tidy") or {}).get("known") or {}
+    return Context(own(slack), own_user(slack), known, notes, seen, docs.get("seen"))
 
 
 def main(argv=None):
@@ -274,14 +345,16 @@ def main(argv=None):
 
 def summary(actions, dry_run):
     """The run's last line: what it would do, what it did, or that it changed nothing."""
-    deletes = [a for a in actions if a["do"] == "delete"]
-    left = len(actions) - len(deletes)
+    deletes = [a for a in actions if a["do"] == DELETE]
+    hand = sum(1 for a in actions if a["do"] == BY_HAND)
+    left = len(actions) - len(deletes) - hand
+    rest = f"{hand} to delete by hand, {left} left"
     if dry_run:
-        return f"would delete {len(deletes)} messages, leave {left}; nothing changed"
+        return f"would delete {len(deletes)} messages, {rest}; nothing changed"
     done = sum(1 for a in deletes if a.get("done"))
     if not done:
-        return f"nothing changed: {len(deletes)} to delete, {left} left"
-    return f"deleted {done} of {len(deletes)} messages, left {left}"
+        return f"nothing deleted: {len(deletes)} to delete, {rest}"
+    return f"deleted {done} of {len(deletes)} messages, {rest}"
 
 
 if __name__ == "__main__":

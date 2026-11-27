@@ -1,11 +1,14 @@
 """cluster_bot.tidy: the owner's tidy of the channels the bot posts in. A survey says who
-posted what; the messages today's code no longer manages (alerts of the retired webhook,
-ban notices of the old cut format, notices of a retired integration) are deleted, with
-the app's replies under them, and only when they are the app's. Before, they stood for
-good: nothing deleted what no round of today's code manages."""
+posted what; of the messages today's code no longer manages (alerts of the retired
+webhook, ban notices of the old cut format, notices of a retired integration) the bot's
+are deleted with its replies, an integration's are listed with a link to delete by hand
+and never tried (Slack's chat.delete acts on the token's bot's messages alone: the fake
+refuses the rest as Slack does, tests/lib/fake_slack.py), and an integration's notice
+is recorded as announced so the notices round never posts it again."""
 
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -21,7 +24,8 @@ from fake_slack import FakeChannel  # noqa: E402
 ALERTS, NEWS = "#alerts", "#news"
 CHANNELS = {"admin": ALERTS, "announce": NEWS, "help": "#help"}
 WEBHOOK = ("B9", "A1")  # the app's incoming webhook: its own bot_id, the app's app_id
-RETIRED = ("BOLD", "AOLD")  # an older integration the config names
+RETIRED = ("BOLD", "AOLD")  # an older integration the config knows by name
+KNOWN = {RETIRED[0]: "the retired notice webhook"}
 OTHER = ("BX", "AX")  # another app
 SITE = "https://docs.example.org/news/"
 ADMINS = "<!subteam^S0123ABCD>"  # the admin mention bans.py puts first
@@ -55,9 +59,10 @@ def notes(*nids):
         {"type": "header", "text": {"type": "plain_text", "text": n}}]} for n in nids]})  # fmt: skip
 
 
-def run(slack, dry_run, retired=(RETIRED[0],), seen=None, posted=("a", "b")):
-    ctx = tidy.Context(FakeChannel.BOT, FakeChannel.USER, retired, notes(*posted),
-                       {f"{SITE}{n}/": {"date": "2026-11-19"} for n in posted} if seen is None else seen)  # fmt: skip
+def run(slack, dry_run, known=KNOWN, seen=None, posted=("a", "b"), seen_path=None):
+    ctx = tidy.Context(FakeChannel.BOT, FakeChannel.USER, known, notes(*posted),
+                       {f"{SITE}{n}/": {"date": "2026-11-19"} for n in posted} if seen is None else seen,
+                       seen_path)  # fmt: skip
     lines, pauses = [], []
     actions = tidy.tidy(slack, CHANNELS, ctx, lines.append, dry_run=dry_run, pause=pauses.append)
     return actions, lines, pauses
@@ -88,37 +93,53 @@ class Tidy(unittest.TestCase):
     def deleted(self):
         return {ts for kind, ts in self.slack.did("chat.delete")}
 
-    def test_the_dry_run_surveys_and_says_each_delete_and_changes_nothing(self):
+    def test_the_dry_run_surveys_and_says_what_becomes_of_each_and_changes_nothing(self):
         actions, lines, pauses = run(self.slack, dry_run=True)
-        self.assertEqual(self.deleted(), set())
+        self.assertEqual(self.slack.did("chat.delete"), [])
         self.assertEqual(pauses, [])
         text = "\n".join(lines)
         self.assertIn("bot_id=B9 app_id=A1 subtype=bot_message: 2 messages", text)
+        self.assertIn("the app's, not its bot", text)
         self.assertIn("bot_id=BX app_id=AX subtype=bot_message: 1 messages", text)
+        self.assertIn("another app's", text)
+        self.assertIn("bot_id=BOLD app_id=AOLD: 2 messages", text)
+        self.assertIn("the retired notice webhook", text, "a known integration by its name")
         self.assertIn("user=U2: 1 messages", text)
-        self.assertIn("not the app's", text)
-        doing = {a["ts"]: a["do"] for a in actions}
-        self.assertEqual(
-            doing,
-            {self.webhook: "delete", self.webhook_old: "delete", self.bans: "delete",
-             self.person: "left", self.foreign_alert: "left", self.retired_a: "delete", self.retired_b: "delete",
-             self.other_notice: "left"},
-        )  # fmt: skip
+        self.assertEqual(self.doing(actions), self.fates())
         self.assertIn(f"delete {self.bans}", text)
-        self.assertIn("with 1 replies of the app; 1 replies of others stay", text)
+        self.assertIn("with 1 replies of the bot; 1 replies of others stay", text)
 
-    def test_it_deletes_only_the_apps_with_their_replies_and_paces_the_calls(self):
+    def doing(self, actions):
+        return {a["ts"]: a["do"] for a in actions}
+
+    def fates(self):
+        hand = (self.webhook, self.webhook_old, self.foreign_alert, self.retired_a, self.retired_b,
+                self.other_notice)  # fmt: skip
+        return {self.bans: "delete", self.person: "left", **{ts: "by hand" for ts in hand}}
+
+    def test_the_real_run_decides_the_same_and_tries_only_the_bots_own(self):
+        dry, _, _ = run(self.slack, dry_run=True)
         actions, lines, pauses = run(self.slack, dry_run=False)
-        gone = {self.webhook, self.webhook_old, self.bans, self.reply_own, self.retired_a, self.retired_b}
-        self.assertEqual(self.deleted(), gone)
+        self.assertEqual(self.doing(dry), self.fates())
+        self.assertEqual(self.doing(actions), self.fates(), "decided before acting, alike in both runs")
+        tried = [ts for _, ts in self.slack.did("chat.delete")]
+        self.assertEqual(tried, [self.bans, self.reply_own], "the parent first; nothing else tried")
         kept = {m["ts"] for m in self.slack.messages}
-        for ts in (self.bot_alert, self.new_bans, self.reply_person, self.person, self.foreign_alert,
-                   self.bot_notice, self.other_notice):  # fmt: skip
+        for ts in (self.bot_alert, self.new_bans, self.reply_person, self.person, self.webhook,
+                   self.foreign_alert, self.retired_a, self.bot_notice, self.other_notice):  # fmt: skip
             self.assertIn(ts, kept)
-        self.assertEqual(pauses, [tidy.PAUSE] * len(gone))
-        order = [ts for _, ts in self.slack.did("chat.delete")]
-        self.assertLess(order.index(self.bans), order.index(self.reply_own), "the parent first")
-        self.assertTrue(all(a.get("done") for a in actions if a["do"] == "delete"))
+        self.assertEqual(pauses, [tidy.PAUSE] * 2)
+        self.assertTrue(next(a for a in actions if a["ts"] == self.bans).get("done"))
+
+    def test_an_integrations_messages_are_listed_once_with_a_link_each(self):
+        actions, lines, _ = run(self.slack, dry_run=False)
+        heads = [line for line in lines if "by hand in the Slack client" in line]
+        self.assertEqual(heads, ["  by hand in the Slack client (an admin), 3 messages:",
+                                 "  by hand in the Slack client (an admin), 3 messages:"])  # fmt: skip
+        for a in actions:
+            if a["do"] == "by hand":
+                self.assertTrue(a["link"].endswith(f"p{a['ts']}"), a)
+                self.assertTrue(any(line.startswith(f"    {a['link']}  by hand {a['ts']}") for line in lines))
 
     def test_a_refused_delete_is_said_and_left_and_its_replies_stay(self):
         self.slack.refuse.add(self.bans)
@@ -127,33 +148,37 @@ class Tidy(unittest.TestCase):
         self.assertIn(self.bans, kept)
         self.assertIn(self.reply_own, kept)
         self.assertTrue(any("cant_delete_message" in line and "by hand" in line for line in lines))
-        self.assertNotIn(self.webhook, kept, "the others still go")
         self.assertFalse(next(a for a in actions if a["ts"] == self.bans).get("done"))
 
-    def test_a_retired_bot_the_config_does_not_name_is_left(self):
-        actions, _, _ = run(self.slack, dry_run=False, retired=())
-        kept = {m["ts"] for m in self.slack.messages}
-        self.assertIn(self.retired_a, kept)
-        self.assertEqual(next(a for a in actions if a["ts"] == self.retired_a)["do"], "left")
-
-    def test_a_notice_the_round_would_post_again_stays(self):
-        seen = {f"{SITE}a/": {"date": "2026-11-19"}}  # b was never recorded
-        actions, _, _ = run(self.slack, dry_run=False, seen=seen)
-        kept = {m["ts"] for m in self.slack.messages}
-        self.assertNotIn(self.retired_a, kept)
-        self.assertIn(self.retired_b, kept)
-        left = next(a for a in actions if a["ts"] == self.retired_b)
-        self.assertEqual(left["do"], "left")
-        self.assertIn("post it again", left["why"])
-
-    def test_the_notices_round_says_missing_not_post_for_a_deleted_retired_notice(self):
-
-        run(self.slack, dry_run=False)
-        seen = {f"{SITE}{n}/": {"date": "2026-11-19"} for n in ("a", "b")}
-        left = [m for m in self.slack.posts("CNEWS")]
-        actions = notices.plan(left, notes("a", "b"), seen, FakeChannel.BOT, "2026-11-27", adopt=True)
-        self.assertNotIn("post", [a["do"] for a in actions])
-        self.assertIn(("missing", f"{SITE}b/"), [(a["do"], a["id"]) for a in actions])
+    def test_an_integrations_notice_is_recorded_once_and_never_posted_again(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d, "notices-seen.json")
+            seen = {f"{SITE}a/": {"date": "2026-11-19", "ts": "1.0"}}  # b was never recorded
+            path.write_text(json.dumps(seen))
+            _, lines, _ = run(self.slack, dry_run=True, seen=seen, seen_path=str(path))
+            self.assertEqual(json.loads(path.read_text()), seen, "the dry run records nothing")
+            self.assertIn(f"  would record {SITE}b/ as announced: an integration's copy stands ({self.retired_b})",
+                          lines)  # fmt: skip
+            run(self.slack, dry_run=False, seen=seen, seen_path=str(path))
+            recorded = json.loads(path.read_text())
+            self.assertEqual(set(recorded), {f"{SITE}a/", f"{SITE}b/"})
+            self.assertNotIn("ts", recorded[f"{SITE}b/"])
+            self.assertEqual(recorded[f"{SITE}b/"]["digest"], notes("a", "b")[f"{SITE}b/"]["digest"])
+            for still in (True, False):  # the copy still there, then deleted by hand
+                left = [m for m in self.slack.posts("CNEWS") if still or m["ts"] != self.retired_b]
+                plan = notices.plan(left, notes("a", "b"), recorded, FakeChannel.BOT, "2026-11-27",
+                                    adopt=True, most=3)  # fmt: skip
+                about_b = [a["do"] for a in plan if a.get("id") == f"{SITE}b/"]
+                self.assertNotIn("post", about_b)
+                self.assertNotIn("pin", about_b, "a notice without a post is never pinned")
+                if not still:
+                    self.assertIn("missing", about_b)
+            plan = notices.plan(
+                [], notes("a", "b"), recorded, FakeChannel.BOT, "2026-11-27", adopt=True, most=3
+            )
+            self.assertNotIn(
+                ("pin", f"{SITE}b/"), [(a["do"], a.get("id")) for a in plan], "nor by the record"
+            )
 
     def test_every_line_names_its_message(self):
         actions, lines, _ = run(self.slack, dry_run=True)
@@ -186,20 +211,25 @@ class Tidy(unittest.TestCase):
             self.assertTrue(rule.what and rule.why and callable(rule.match))
 
     def test_with_the_bot_user_unknown_no_alert_is_taken_for_the_webhooks(self):
-        ctx = tidy.Context(FakeChannel.BOT, "", (), {}, {})
+        ctx = tidy.Context(FakeChannel.BOT, "", {}, {}, {})
         self.assertEqual(
             [a for a in tidy.plan("admin", self.slack.posts("CALERTS"), ctx) if a["what"] == "an alert"], []
         )
 
     def test_every_run_ends_saying_what_it_did_or_that_nothing_changed(self):
         actions, _, _ = run(self.slack, dry_run=True)
-        self.assertIn("nothing changed", tidy.summary(actions, True))
-        self.slack.refuse.update(a["ts"] for a in actions)
+        self.assertEqual(
+            tidy.summary(actions, True),
+            "would delete 1 messages, 6 to delete by hand, 1 left; nothing changed",
+        )
+        self.slack.refuse.add(self.bans)
         actions, _, _ = run(self.slack, dry_run=False)
-        self.assertTrue(tidy.summary(actions, False).startswith("nothing changed: 5 to delete, 3 left"))
+        self.assertEqual(
+            tidy.summary(actions, False), "nothing deleted: 1 to delete, 6 to delete by hand, 1 left"
+        )
         self.slack.refuse.clear()
         actions, _, _ = run(self.slack, dry_run=False)
-        self.assertEqual(tidy.summary(actions, False), "deleted 5 of 5 messages, left 3")
+        self.assertEqual(tidy.summary(actions, False), "deleted 1 of 1 messages, 6 to delete by hand, 1 left")
 
     def test_an_unreadable_history_is_said(self):
         slack = FakeChannel(no_history=True)
@@ -223,14 +253,16 @@ class Unmentioning(unittest.TestCase):
 
 
 class Config(unittest.TestCase):
-    def test_the_bot_config_names_the_channels_and_the_retired_integrations(self):
+    def test_the_bot_config_names_the_channels_and_the_known_integrations(self):
         sys.path.insert(0, str(ROOT / "tests/lib"))
         from ansible_yaml import load
 
         cfg = load("roles/cluster_bot/vars/main.yml")["_cluster_bot_cfg"]
         self.assertEqual(cfg["tidy"]["channels"], "{{ slack_channels }}")
-        self.assertIn("cluster_bot_retired_bot_ids", cfg["tidy"]["retired"])
-        self.assertEqual(load("roles/cluster_bot/defaults/main.yml")["cluster_bot_retired_bot_ids"], [])
+        self.assertIn("cluster_bot_known_integrations", cfg["tidy"]["known"])
+        self.assertEqual(load("roles/cluster_bot/defaults/main.yml")["cluster_bot_known_integrations"], {})
+        retired = load("roles/retired_settings/vars/main.yml")["retired_settings"]
+        self.assertIn("cluster_bot_known_integrations", retired["cluster_bot_retired_bot_ids"])
 
     def test_main_refuses_a_config_without_channels(self):
         import tempfile

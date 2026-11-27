@@ -15,6 +15,7 @@ dependencies:
   - role: open_ondemand_defaults  # open_ondemand_url, the portal in the onboarding text
   - role: cluster_tools_defaults  # cluster_tools_commands (the help lists them)
   - role: prometheus_paths  # node_exporter_prom_dir (the scopes check's metrics)
+  - role: retired_settings  # cluster_bot_retired_bot_ids
 
 galaxy_info:
   namespace: deepops
