@@ -396,9 +396,23 @@ class Closure:
             run = set(reached[r])
             run |= {p for p in self.role_files(r) if PurePosixPath(p).parts[2] == "handlers"}
             said = "\n".join(self.text(p) for p in sorted(run))
+            # Globs and directories the code installs by (a fileglob over role_path/files,
+            # with_fileglob, a src directory), also as the role's own defaults give them.
+            named = (
+                said
+                + "\n"
+                + "\n".join(
+                    self.text(p)
+                    for p in self.role_files(r)
+                    if PurePosixPath(p).parts[2] in ("defaults", "vars")
+                )
+            )
+            globs, dirs = installed_by(named)
             for p in self.role_files(r):
                 part = PurePosixPath(p).parts
-                if part[2] in ("templates", "files") and ("/".join(part[3:]) in said or part[-1] in said):
+                if part[2] in ("templates", "files") and (
+                    "/".join(part[3:]) in said or part[-1] in said or matches("/".join(part[2:]), globs, dirs)
+                ):
                     run.add(p)
                 elif part[2] == "library" and re.search(
                     rf"(?m)^[\s-]*{re.escape(PurePosixPath(p).stem)}\s*:", said
@@ -437,6 +451,40 @@ class Closure:
             dumped = json.dumps(value, sort_keys=True, default=str)
             lines.append(f"{rel}:{name} {hashlib.sha256(dumped.encode()).hexdigest()}")
         return roles, lines, names, texts
+
+
+# A path-like token of a role's code: a glob over its files (role_path ~ '/files/x/*.py',
+# with_fileglob's "*.conf") or a directory it copies whole (src: tree/).
+PATH_TOKEN = re.compile(r"[\w.*?\[\]/-]+")
+SRC_VALUE = re.compile(r"\bsrc:\s*['\"]?([\w./-]+)")
+
+
+def installed_by(text):
+    """(globs, directories) TEXT installs files by: tokens with a glob character and at
+    least two other characters (a bare * names nothing), and src values or tokens ending
+    in / (a directory copied whole); each without a leading slash."""
+    globs = {
+        tok.strip("/")
+        for tok in PATH_TOKEN.findall(text)
+        if re.search(r"[*?\[]", tok) and len(re.sub(r"[*?\[\]/]", "", tok)) >= 2
+    }
+    dirs = {v.strip("/") for v in SRC_VALUE.findall(text)} | {
+        tok.strip("/") for tok in PATH_TOKEN.findall(text) if tok.endswith("/") and len(tok.strip("/")) >= 2
+    }
+    return globs, {d for d in dirs if d and not re.search(r"[*?\[]", d)}
+
+
+def matches(path, globs, dirs):
+    """Whether PATH (files/..., templates/... of a role) is one GLOBS or DIRS install."""
+    import fnmatch
+
+    under = path.split("/", 1)[1] if "/" in path else path  # below files/ or templates/
+    for candidate in (path, under):
+        if any(fnmatch.fnmatchcase(candidate, g) for g in globs):
+            return True
+        if any(candidate.startswith(d + "/") for d in dirs):
+            return True
+    return False
 
 
 def config_files(texts):

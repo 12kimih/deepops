@@ -16,7 +16,20 @@ import local_scratch  # noqa: E402
 import settings  # noqa: E402
 
 FILES = {
-    "roles/app/meta/main.yml": "dependencies:\n  - role: check\n",
+    "roles/app/meta/main.yml": "dependencies:\n  - role: check\n  - role: globs\n",
+    # a role app pulls in that installs its files by a glob and a whole directory
+    "roles/globs/tasks/main.yml": """\
+- ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: /opt/mods/
+  loop: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/mods/*.py') | sort }}"
+- ansible.builtin.copy:
+    src: tree/
+    dest: /opt/tree/
+""",
+    "roles/globs/files/mods/a.py": "A = 1\n",
+    "roles/globs/files/tree/conf/b.conf": "b\n",
+    "roles/globs/files/unused.txt": "u\n",
     "roles/app/defaults/main.yml": (
         'app_version: "1"\napp_setting: plain\napp_key_file: "{{ inventory_dir }}/files/app/key"\n'
     ),
@@ -147,6 +160,11 @@ class Digest(unittest.TestCase):
             ),  # another's entry
             ("roles/helper/vars/main.yml", "app: {group: all}", "app: {group: g}", True),  # its own entry
             ("roles/component_record/tasks/main.yml", "record", "record2", False),  # its own digest
+            # 2026-11-28: cluster_tools_lib installs its modules by a fileglob, so no fix
+            # to one ever moved a digest
+            ("roles/globs/files/mods/a.py", "A = 1", "A = 2", True),  # installed by a fileglob
+            ("roles/globs/files/tree/conf/b.conf", "b", "b2", True),  # in a directory copied whole
+            ("roles/globs/files/unused.txt", "u", "u2", False),  # named by nothing
         ]
         for rel, old, new, counts in cases:
             with self.subTest(rel=rel, change=new):
