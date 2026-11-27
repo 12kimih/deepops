@@ -2,7 +2,9 @@
 
     SUBCOMMANDS                    (name, feature, Korean help, English help) in order
     parse(text)                    -> (subcommand, rest): "join", "", or "help" for none
-    help_lines(command, features)  -> the help a person sees (also the Home tab's list)
+    help_lines(command, features)  -> the help a person sees (the /cluster help reply)
+    groups(command, features)      -> [(title, list)] of the commands, the help's and the
+                                   Home tab's parts
     cluster_lines(names)           -> the cluster commands a login has (cluster_commands:
                                    the bot host's cluster_tools_commands), each with what
                                    its own definition says (COMMAND.summary_ko)
@@ -137,22 +139,43 @@ def cluster_lines(names):
         return []
     import importlib
 
-    lines = ["**로그인 노드의 명령** (`<명령> --help`로 자세히)"]
+    lines = []
     for name in names:
         module = importlib.import_module(f"cluster_tools.{name.replace('-', '_')}")
-        lines.append(f"`{name}`: {module.COMMAND.summary_ko or module.COMMAND.summary}")
+        lines.append(f"- `{name}`: {module.COMMAND.summary_ko or module.COMMAND.summary}")
         group = getattr(module, "GROUP", None)
         for sub, sub_command in group.commands()[1:] if group else ():
-            lines.append(f"`{name} {sub}`: {sub_command.summary_ko or sub_command.summary}")
+            lines.append(f"  - `{name} {sub}`: {sub_command.summary_ko or sub_command.summary}")
     return lines
 
 
+# The two groups of commands, each a list under its title (a noun): the bot's own, in
+# Slack, and the cluster's, in a login node's shell.
+BOT_GROUP = "Slack 명령"
+LOGIN_GROUP = "로그인 노드 명령"
+LOGIN_NOTE = "각 명령의 `--help`에 자세한 사용법이 있습니다."
+
+
+def bot_lines(command, features):
+    """One list item per subcommand of COMMAND the cluster runs (FEATURES)."""
+    return [f"- `{command} {s.name}`: {s.ko}" for s in offered(features)]
+
+
+def groups(command, features, cluster=()):
+    """[(title, Markdown list)] of the commands a person has: the bot's, then the cluster's
+    (CLUSTER: cluster_lines, with where to read more); a group with none is left out."""
+    out = [(BOT_GROUP, "\n".join(bot_lines(command, features)))]
+    if cluster:
+        out.append((LOGIN_GROUP, "\n".join(cluster_lines(cluster) + ["", LOGIN_NOTE])))
+    return [(t, text) for t, text in out if text.strip()]
+
+
 def help_lines(command, features, footer="", cluster=()):
-    """The help a person sees, one line a subcommand, then the cluster commands
-    (CLUSTER: cluster_lines) and FOOTER (home_blocks.help_text: how to ask for help, with
-    the help channel's example)."""
-    lines = [f"`{command} {s.name}`: {s.ko}" for s in offered(features)]
-    return "\n".join(lines + cluster_lines(cluster) + ([footer] if footer else []))
+    """The help a person sees (the /cluster help reply): each group of commands under its
+    bold title (groups), then FOOTER (home_blocks.help_text: how to ask for help, with the
+    help channel's example). The Home tab shows the same groups under headers."""
+    parts = [f"**{title}**\n{text}" for title, text in groups(command, features, cluster)]
+    return "\n\n".join(parts + ([footer] if footer else []))
 
 
 def manifest(command, name="cluster-bot", extra_scopes=()):

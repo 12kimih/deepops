@@ -36,8 +36,7 @@ def _people(proj):
 def home(login, projects, root):
     """LOGIN's projects with what they may do there, and how to start or join one."""
     mine = {n: p for n, p in sorted(projects.items()) if role_of(p, login)}
-    blocks = [{"type": "divider"},
-              rich.section("**공동작업 폴더**")]  # fmt: skip
+    blocks = [{"type": "divider"}, rich.header("공동작업 폴더")]
     for name, proj in mine.items():
         role = role_of(proj, login)
         ops = ["manage", "purpose", "close", "leave"] if role == "owners" else ["leave"]

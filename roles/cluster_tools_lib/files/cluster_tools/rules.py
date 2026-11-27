@@ -406,6 +406,11 @@ def as_dict(rows):
 
 
 STATE_KO = {"ok": "괜찮음", "warn": "주의", "act": "조치 대상", "off": "해당 없음", "?": "알 수 없음"}
+# Each state's mark in Slack, first on its row, so a row reads at a glance: green, yellow
+# and red for ok, warn and act, white for a rule that does not apply, a question mark for
+# a source that did not answer.
+STATE_MARK = {"ok": ":large_green_circle:", "warn": ":large_yellow_circle:", "act": ":red_circle:",
+              "off": ":white_circle:", "?": ":grey_question:"}  # fmt: skip
 
 
 def lines(rows):
@@ -413,11 +418,16 @@ def lines(rows):
     bot's /cluster usage and Home tab say what the command prints, from the same rows."""
     out = []
     for r in rows:
-        text = f"{STATE_KO[r.state]} **{r.title}**: {r.mine or '-'}"
-        if r.limit:
-            text += f" (한도: {r.limit})"
+        rest = []  # an empty figure is left out, never a bare "-"
+        if r.mine:
+            rest.append(r.mine + (f" (한도: {r.limit})" if r.limit else ""))
+        elif r.limit:
+            rest.append(f"한도: {r.limit}")
         if r.when:
-            text += f", {r.when}"
+            rest.append(r.when)
+        text = f"{STATE_MARK[r.state]} {STATE_KO[r.state]} **{r.title}**" + (
+            ": " + ", ".join(rest) if rest else ""
+        )
         if r.state not in ("ok", "off"):
             text += f" `{r.check}`"
         out.append(text)

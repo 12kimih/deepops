@@ -83,7 +83,7 @@ def render(notice):
     if "markdown" not in notice:
         return {"text": notice["text"], "blocks": notice["blocks"]}
     title = notice.get("title") or notice["text"]
-    blocks = [{"type": "header", "text": {"type": "plain_text", "text": title, "emoji": True}}]
+    blocks = [rich.header(title)]
     blocks += rich.blocks(notice["markdown"])
     link = notice.get("link") or {}
     if link.get("url"):

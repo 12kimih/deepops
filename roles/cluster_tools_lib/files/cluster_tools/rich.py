@@ -11,6 +11,7 @@ set explicitly; nothing is left for Slack to parse.
                        section's fields or a section beside a button): a style is kept
                        only where Slack would show it, never as raw markers
     message(text, blocks=None) -> {"text", "blocks"} for chat.postMessage and the like
+    header(text)    -> a header block: a part's title
     problems(message) -> what a message would show raw (a marker Slack or this module
                        did not read), empty when it shows as written
 
@@ -355,6 +356,12 @@ def context(*texts):
     if lost:
         return section("\n".join(t for t in texts if t))
     return {"type": "context", "elements": [{"type": "mrkdwn", "text": t} for t in shown]}
+
+
+def header(text):
+    """A header block: a part's title (a noun), shown large; plain text, as Slack takes it
+    (at most 150 characters: a longer one is refused, never cut, so a check names it)."""
+    return {"type": "header", "text": {"type": "plain_text", "text": plain(text), "emoji": True}}
 
 
 def fields(*texts):

@@ -96,7 +96,7 @@ roles as `shared_projects: "{{ people_roster.projects | default({}) }}"`.
 
 | Who | What | How | Decided by |
 |---|---|---|---|
-| anyone | start a project (they own it), with other owners, members and viewers | `/cluster project`, or the Home tab's "새 프로젝트" | an administrator |
+| anyone | start a project (they own it), with other owners, members and viewers | `/cluster project`, or the Home tab's "새 공동작업 폴더" | an administrator |
 | anyone | join a project as a member or a viewer | Home tab, "참여 요청" | any one of its owners (a DM with buttons) |
 | an owner | add someone, change their role, take them out | Home tab, the project's menu | at once |
 | an owner | change the purpose | the project's menu | at once |

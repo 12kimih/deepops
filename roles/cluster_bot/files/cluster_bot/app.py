@@ -319,14 +319,16 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         client.chat_postEphemeral(
             channel=body["channel_id"], user=body["user_id"],
             **rich.message(commands.help_lines(
-                command, engine.features, home_blocks.help_text(channels["help"], cfg.get("admin_group", "")),
+                command, engine.features, home_blocks.help_footer(channels["help"], cfg.get("admin_group", "")),
                 cfg.get("cluster_commands") or [],
             )),
         )  # fmt: skip
 
     def usage_command(body, client):
         login = user_of(body["user_id"])
-        text = "\n".join(usage_lines(login, cfg)) if login else "명부에 이 Slack 계정이 없습니다."
+        text = ("\n".join([f"**{login}님의 {home_blocks.USAGE_TITLE}**", *usage_lines(login, cfg), "",
+                           home_blocks.USAGE_NOTE])
+                if login else "명부에 이 Slack 계정이 없습니다.")  # fmt: skip
         client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], **rich.message(text))
 
     # The one slash command (cfg command, /cluster): every request is a subcommand, the
@@ -461,9 +463,11 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
 
 
 def usage_lines(login, cfg, path=None):
-    """LOGIN's place against every rule, the lines the CLI's usage shows (cluster_tools.rules
-    overview, one function for both), with the membership end from the bot's own roster
-    copy; the login node limits stay the CLI's (usage login-node on that node)."""
+    """LOGIN's place against every rule, one row a line, as the CLI's usage shows them
+    (cluster_tools.rules overview and lines, one function for both), with the membership
+    end from the bot's own roster copy; the login node limits stay the CLI's (usage
+    login-node on that node). The Home tab puts them under home_blocks.USAGE_TITLE, the
+    /cluster usage reply under the person's name; both end with USAGE_NOTE."""
     from cluster_tools import prometheus, rules
 
     try:
@@ -473,7 +477,7 @@ def usage_lines(login, cfg, path=None):
     url = rcfg.get("prometheus_url")
     rows = rules.overview(login, rcfg, prom=prometheus.Prometheus(url) if url else None, here=False,
                           ends=(cfg.get("leave") or {}).get("leaving") or {})  # fmt: skip
-    return [f"**{login}님의 현황** (로그인 노드에서 `usage`로 자세히)", *rules.lines(rows)]
+    return rules.lines(rows)
 
 
 def reminder_sources(cfg):

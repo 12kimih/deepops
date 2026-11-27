@@ -222,9 +222,12 @@ as one short reason per group of hosts, with what an administrator does about it
 The bot signs the App's token with the system's `openssl`; tokens last an hour.
 
 The Home tab (the bot's profile in Slack) shows each person a button for each service
-`cluster_bot_connect` gives an address (the web portal, Grafana, the user docs), whether
-job notices reach them, with a switch to turn them off or on, and their collaboration
-folders.
+`cluster_bot_connect` gives an address (the web portal, Grafana, the user docs), then one
+part per header: where they stand against each rule (the rows `usage` prints, each led
+by its state's mark), whether job notices reach them (with a switch), the commands they
+have (the bot's and the login nodes', one list each), how to ask for help and their
+collaboration folders. Every text goes through `cluster_tools.rich`; the commands are
+never small print (a context block holds only a note).
 
 Job notices (`roles/job_notice`, switch `slurm_enable_job_notices`, on by default):
 Slurm's MailProg on the controllers is `job-notice`, which sends a job's notice as a

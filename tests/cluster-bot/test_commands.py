@@ -95,7 +95,9 @@ class Commands(unittest.TestCase):
         self.assertIn("/cluster project", text)
         self.assertTrue(text.endswith("Ask in the thread"))
         home = home_blocks.home("alice", False, {"project"}, "/cl", "foot")
-        self.assertIn("`/cl project`", str(home), "the Home tab's list is the same help")
+        self.assertIn(
+            "'text': '/cl project', 'style': {'code': True}", str(home), "the Home tab lists the same"
+        )
 
     def test_help_and_home_list_the_cluster_commands_with_their_own_summaries(self):
         # 2026-11-27: the help named only /cluster subcommands, never the cluster commands
