@@ -65,7 +65,7 @@ class NoSilentRevertTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_a_stale_copy_committed_on_top_is_refused(self):
-        # 03c8ba9c's shape: B changes a file, C (built from a copy older than B) puts it back.
+        # 1465dd1a's shape: B changes a file, C (built from a copy older than B) puts it back.
         r = self.repo
         r.commit("a: add the setting", {"vars.yml": "x: 1\n"})
         b = r.commit("b: another session moves it", {"vars.yml": "x: 2\n"})
@@ -90,7 +90,7 @@ class NoSilentRevertTests(unittest.TestCase):
         self.assertIn(f"c: {name} goes back", out.stdout, "the name prints as its bytes")
 
     def test_a_stale_copy_with_own_edits_is_reported(self):
-        # 2185112b's shape with an edit of its own: the file is new as a whole, but a
+        # de9e3709's shape with an edit of its own: the file is new as a whole, but a
         # newer commit's block is gone again: reported, not refused (alone it is as often
         # a deliberate reversal).
         r = self.repo

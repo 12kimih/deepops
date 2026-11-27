@@ -128,7 +128,7 @@ groups:
             {{- "" }}Expected {{ .Labels.version }}. {{ end -}}
             {{ range printf "deepops:component_playbook:info{component=%q}" $labels.component | query }}
             {{- "" }}`ansible-playbook -K {{ .Labels.playbook }} -l {{ $labels.host }}` installs it.{{ end }}
-      # The same version can still run older code: a role fix (a7e5b259, 2026-11-20) never
+      # The same version can still run older code: a role fix (750eaf09, 2026-11-20) never
       # reached the hosts that only limited runs touched since, and their single deploy
       # commit made them look current. Each whole deploy of a component records on the
       # host a digest of what decides it there (its roles, playbook, plugins and config:

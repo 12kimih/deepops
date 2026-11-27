@@ -246,8 +246,8 @@ class NewRequiredKeys(unittest.TestCase):
         self.assertEqual(problems, [])
 
     def test_the_rule_reads_a_required_key_added_since_a_revision(self):
-        # The parse the rule rests on: 73165688 required textfile_kept, its parent did not.
-        parent, commit = _git("rev-parse", "73165688^"), _git("rev-parse", "73165688")
+        # The parse the rule rests on: 8a9387b5 required textfile_kept, its parent did not.
+        parent, commit = _git("rev-parse", "8a9387b5^"), _git("rev-parse", "8a9387b5")
         if not (parent and commit):
             self.skipTest("history not available")
         added = _required_at(commit, "cluster_tools.container_gc") - _required_at(

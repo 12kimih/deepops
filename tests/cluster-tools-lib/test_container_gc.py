@@ -293,7 +293,7 @@ class UnmanagedContainers(unittest.TestCase):
         self.assertEqual([line for line in lines if "docker" in line], [])
 
     def test_a_config_from_before_the_kept_copy_still_runs(self):
-        # textfile_kept came later (73165688): an older config lacks it and writes no kept
+        # textfile_kept came later (8a9387b5): an older config lacks it and writes no kept
         # copy, as it did; requiring it refused every host's config (ARA 262).
         out = Path(self.tmp.name, "gc.prom")
         old = {
