@@ -327,6 +327,42 @@ class Storage(unittest.TestCase):
                                          "read_iops": 1600, "write_iops": 500}})  # fmt: skip
 
 
+class RulesActive(unittest.TestCase):
+    """site.json rules[].active: the role's own gates (_cluster_tools_usage_active), the
+    ones that empty a rule's part of the rules file so usage says off (2026-11-27)."""
+
+    VARS = ROOT / "roles/cluster_tools/vars/main.yml"
+    # The rules file's part each gated rule empties (cluster_tools.rules reads it).
+    PARTS = {"gpu_idle": "gpu-idle", "disk": "disk", "scratch": "scratch-purge", "io": "io-heavy",
+             "login": "login-limits"}  # fmt: skip
+
+    def test_one_gate_per_rule_and_each_part_goes_through_its_own(self):
+        import cluster_tools.rules as registry
+
+        role = sf._yaml(self.VARS)
+        self.assertEqual(list(role["_cluster_tools_usage_active"]), [r.id for r in registry.RULES])
+        for part, rule in self.PARTS.items():
+            with self.subTest(part=part):
+                self.assertIn(
+                    f"_cluster_tools_usage_active['{rule}']", role["_cluster_tools_usage_cfg"][part]
+                )
+
+    def test_a_switch_turns_its_rule_on_and_a_narrower_groups_setting_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            active = {r["id"]: r["active"] for r in sf.facts(config)["rules"]}
+            self.assertEqual(
+                (active["disk"], active["login-limits"], active["queued-jobs"]), (False, False, True)
+            )
+            (config / "group_vars" / "all.yml").write_text('slurm_enable_disk_quota: "yes"\n')
+            (config / "group_vars" / "slurm-login.yml").write_text(
+                "cluster_tools_user_slice_limits: {TasksMax: 9}\n"
+            )
+            active = {r["id"]: r["active"] for r in sf.facts(config)["rules"]}
+            self.assertEqual((active["disk"], active["login-limits"]), (True, True))
+            self.assertTrue(all(isinstance(r["active"], bool) for r in sf.public(sf.facts(config))["rules"]))
+
+
 class LoginLimits(unittest.TestCase):
     def test_the_login_groups_user_slice_limits_as_people_read_them(self):
         """The login nodes' per-person limits (cluster_tools_user_slice_limits in

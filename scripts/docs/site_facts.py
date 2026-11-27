@@ -172,7 +172,7 @@ PUBLIC = {
     "storage": None,  # each measured mount, its fields STORAGE_FIELDS
     "terms": {"use", "title", "not", "title_not", "why", "scope", "id", "code"},  # every glossary entry
     "titles": {"endings", "exempt"},  # the glossary's title rules
-    "rules": {"id", "title", "action", "check", "anchor", "values"},  # cluster_tools.rules, each
+    "rules": {"id", "title", "action", "check", "anchor", "active", "values"},  # cluster_tools.rules, each
     # {old: new} of the retired commands (cluster_tools_retired_builtin), for the docs' and
     # the site config's checks that refuse an old name (scripts/deepops/retired_names.py)
     "commands_retired": None,
@@ -235,16 +235,20 @@ def _literal(value):
     return value
 
 
-def settings(config):
+GROUPS = ("all.yml", "slurm-cluster.yml")
+
+
+def settings(config, group=None):
     """Every setting the role defaults and the site's group_vars/all.yml and
-    group_vars/slurm-cluster.yml give, the site's over the defaults: the literal ones,
-    and each template string that renders from them (repeated while one more does)."""
+    group_vars/slurm-cluster.yml give (and GROUP's file, a narrower group's, last), the
+    site's over the defaults: the literal ones, and each template string that renders
+    from them (repeated while one more does)."""
     out = {}
     for defaults in tracked("roles/*/defaults/main.yml"):
         for key, value in _yaml(defaults).items():
             out.setdefault(key, value)
     if config:
-        for name in ("all.yml", "slurm-cluster.yml"):
+        for name in GROUPS + ((group,) if group else ()):
             out.update(_yaml(Path(config) / "group_vars" / name))
     known = {k: v for k, v in out.items() if _literal(v) is not None}
     pending = {k: v for k, v in out.items() if k not in known and isinstance(v, str)}
@@ -357,15 +361,46 @@ def _retired_pattern(retired):
     return retired_names.pattern(retired).pattern
 
 
-def rules_table(settings_):
-    """[{id, title, action, check, anchor, values}] of every rule that warns, limits or
-    cancels (cluster_tools.rules RULES, in order): what usage and the bot show, and the
-    docs' rules table. values: each of the rule's settings this site resolves to a plain
-    number, word or switch (a mapping, a site's own limits per filesystem, stays out)."""
+def rules_active(config):
+    """{rule id: bool}: whether this cluster runs each rule on some of its hosts, the
+    role's own gates (roles/cluster_tools/vars/main.yml _cluster_tools_usage_active) over
+    the settings of the cluster and of each narrower group (the login nodes' limits are
+    theirs): what empties a rule's part of the rules file, so usage says off there."""
+    gates = _yaml(ROOT / "roles/cluster_tools/vars/main.yml").get("_cluster_tools_usage_active", {})
+    env = jinja2.nativetypes.NativeEnvironment(undefined=jinja2.StrictUndefined, autoescape=False)  # noqa: S701
+    # Ansible's bool, which the switches go through: a native value or a word.
+    env.filters["bool"] = lambda v: (
+        v if isinstance(v, bool) else str(v).strip().lower() in ("yes", "on", "1", "true", "y")
+    )
+    groups = Path(config) / "group_vars" if config else None
+    others = sorted(p.name for p in groups.glob("*.yml") if p.name not in GROUPS) if groups else []
+    out = dict.fromkeys(gates, False)
+    for group in [None, *others]:
+        s = settings(config, group)
+        for rule, gate in gates.items():
+            try:
+                value = gate if isinstance(gate, bool) else env.from_string(gate).render(s)
+            except (jinja2.TemplateError, TypeError, ValueError):
+                value = None
+            if not isinstance(value, bool):
+                where = group or "the cluster"
+                raise SystemExit(f"site_facts: the usage gate of {rule} does not render ({where})")
+            out[rule] = out[rule] or value
+    return out
+
+
+def rules_table(settings_, config=None):
+    """[{id, title, action, check, anchor, active, values}] of every rule that warns,
+    limits or cancels (cluster_tools.rules RULES, in order): what usage and the bot show,
+    and the docs' rules table. active: whether this cluster runs it (rules_active, CONFIG's).
+    values: each of the rule's settings this site resolves to a plain number, word or
+    switch (a mapping, a site's own limits per filesystem, stays out)."""
     import cluster_tools.rules as registry
 
+    active = rules_active(config)
     return [
         {"id": r.id, "title": r.title, "action": r.action, "check": r.check, "anchor": r.anchor,
+         "active": active[r.id],
          "values": {n: settings_[n] for n in r.settings
                     if isinstance(settings_.get(n), (int, float, str, bool)) and settings_.get(n) != ""}}
         for r in registry.RULES
@@ -654,7 +689,7 @@ def facts(config):
     s = settings(config)
     every = {
         "commands": commands(s.get("cluster_tools_builtin") or []),
-        "rules": rules_table(s),
+        "rules": rules_table(s, config),
         "commands_retired": dict(s.get("cluster_tools_retired_builtin") or {}),
         "commands_retired_pattern": _retired_pattern(s.get("cluster_tools_retired_builtin") or {}),
         "policy": {
