@@ -19,7 +19,7 @@ from ansible_yaml import load, render  # noqa: E402
 TEMPLATES = ROOT / "roles/cluster_bot/templates"
 SITE = {"deepops_dir": "/opt/x", "cluster_tools_lib_dir": "/usr/local/lib/tools", "cluster_bot_user": "bot user",
         "system_accounts": {"bot user": {"home": "/var/lib/bot"}}, "cluster_bot_prefs_file": "/var/lib/p/p.json",
-        "ansible_managed": "Ansible managed"}  # fmt: skip
+        "node_exporter_unprivileged_dir": "/var/lib/x/textfile", "ansible_managed": "Ansible managed"}  # fmt: skip
 
 
 def rendered(name):

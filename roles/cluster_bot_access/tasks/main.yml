@@ -17,6 +17,7 @@
 - name: Note the bot's account and dispatcher
   ansible.builtin.set_fact:
     _cluster_bot_access_account: "{{ {cluster_bot_user: system_accounts[cluster_bot_user]} }}"
+    _cluster_bot_access_groups: "{{ system_groups }}"
     _cluster_bot_access_command: {dest: "{{ cluster_bot_serve_command }}", module: cluster_tools.bot_serve}
 
 - name: Create the bot's account
@@ -24,6 +25,7 @@
     name: local_accounts
   vars:
     local_accounts: "{{ _cluster_bot_access_account }}"
+    local_accounts_groups: "{{ _cluster_bot_access_groups }}"
 
 - name: Install the cluster tools library
   ansible.builtin.include_role:

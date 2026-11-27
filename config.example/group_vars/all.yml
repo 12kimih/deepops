@@ -293,6 +293,7 @@
 #    uid: 22078
 #    home: /local/slurm
 #    comment: Slurm
+#    groups: [cluster-metrics]
 #  slurmbuild:
 #    uid: 22079
 #    home: "{{ deepops_cache_dir }}/build/slurm-deb"
@@ -310,11 +311,17 @@
 #    home: /var/lib/cluster-bot
 #    shell: /bin/sh
 #    comment: Cluster bot
+#    groups: [cluster-metrics]
 #  shared:
 #    uid: 22082
 #    home: /home/shared
 #    create_home: false
 #    comment: Shared space
+# Groups several service accounts share, with GIDs fixed the same way: cluster-metrics
+# writes the textfiles of producers that do not run as root (roles/system_accounts).
+#system_groups:
+#  cluster-metrics:
+#    gid: 22083
 
 ################################################################################
 # NVIDIA                                                                       #

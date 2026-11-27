@@ -41,6 +41,16 @@ node_exporter_prom_dir: /run/prometheus
 # group is the user's own private one (whoever writes it can silence or spoof the alerts
 # that read it), root's otherwise (roles/textfile_keep, tasks_from: expected).
 component_expected_dir: "{{ deepops_state_dir }}/expected"
+# A third textfile directory, on every host: the textfiles of producers that do not run as
+# root (the cluster bot, slurmctld's MailProg), which cannot write node_exporter_prom_dir.
+# Persistent, root's and group node_exporter_unprivileged_group's, setgid and sticky
+# (3775): a member writes its own <name>.prom (atomically, through a temporary file it
+# renames), and no one renames over or deletes another's. A service account joins the
+# group through its declaration in roles/system_accounts (groups), so the role that makes
+# the account adds it (roles/textfile_keep, tasks_from: unprivileged). A producer's file
+# goes with its component (its component record lists it).
+node_exporter_unprivileged_dir: "{{ deepops_state_dir }}/textfile-unprivileged"
+node_exporter_unprivileged_group: cluster-metrics
 component_expected_file: component-expected.prom
 component_expected_user: "{{ lookup('ansible.builtin.pipe', 'id -un') }}"
 component_expected_group: "{{ lookup('ansible.builtin.pipe', 'id -gn') }}"

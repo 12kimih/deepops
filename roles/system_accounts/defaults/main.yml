@@ -8,7 +8,7 @@
 # roles/local_accounts; none sets its own IDs.
 #
 # Key = account and group name. uid (required); gid (default: uid); home; shell
-# (default /usr/sbin/nologin); comment. Accounts a package creates itself (munge,
+# (default /usr/sbin/nologin); comment; groups (the system_groups it also joins). Accounts a package creates itself (munge,
 # nvidia-persistenced) are not listed: the package owns them.
 #
 # The accounts are local on every host, never in the directory, so services start when
@@ -19,6 +19,7 @@ system_accounts:
     uid: 22078
     home: /local/slurm
     comment: Slurm
+    groups: [cluster-metrics]  # job_notice (slurmctld's MailProg) counts its DMs
   slurmbuild:
     uid: 22079
     home: "{{ deepops_cache_dir }}/build/slurm-deb"
@@ -40,6 +41,7 @@ system_accounts:
     home: /var/lib/cluster-bot
     shell: /bin/sh
     comment: Cluster bot
+    groups: [cluster-metrics]  # it counts its DMs
   # The shared space (roles/shared_space) is this account's home, /home/<name> as for any
   # login, and it alone writes the shared datasets, models and container images there:
   # what it stores counts to its own budget, not a person's quota. The role makes the
@@ -49,3 +51,12 @@ system_accounts:
     home: /home/shared
     create_home: false
     comment: Shared space
+
+# Groups several service accounts share, each with a GID fixed like theirs (none is a
+# person's: roles/people refuses a roster ID taken here). An account joins one through
+# its own declaration above (groups), so the role that creates the account adds it.
+#   cluster-metrics  writes node_exporter_unprivileged_dir (roles/prometheus_paths): the
+#                    textfiles of producers that do not run as root
+system_groups:
+  cluster-metrics:
+    gid: 22083

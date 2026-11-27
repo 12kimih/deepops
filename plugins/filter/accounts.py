@@ -9,11 +9,14 @@
         comment: Slurm        # optional
         system: true          # default: true
         create_home: true     # default: true
+        groups: [cluster-metrics]  # optional: groups it is also a member of, each one
+                              # of GROUPS (roles/system_accounts system_groups)
 
 local_accounts_check returns the declarations with every default filled in, or fails
-listing every problem: a bad name, a missing or non-integer ID, an unknown key, or an
-ID two accounts share. accounts_disjoint fails when two sets of accounts share a UID or
-GID (the people roster against the service accounts). private_group says whether a
+listing every problem: a bad name, a missing or non-integer ID, an unknown key, a group
+GROUPS does not declare, or an ID two accounts share. accounts_disjoint fails when two
+sets of accounts share a UID or GID (the people roster against the service accounts and
+their groups). private_group says whether a
 group is one user's own (named like the user, no other member): the only group a
 directory may be writable by when what is in it stands for root's word
 (roles/textfile_keep, tasks_from: expected).
@@ -22,15 +25,16 @@ directory may be writable by when what is in it stands for root's word
 import re
 
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
-KEYS = {"uid", "gid", "home", "shell", "comment", "system", "create_home"}
+KEYS = {"uid", "gid", "home", "shell", "comment", "system", "create_home", "groups"}
 
 
 def _id(value):
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
-def check(accounts):
-    """Problems in a local_accounts mapping, as a list of messages; empty means valid."""
+def check(accounts, groups=None):
+    """Problems in a local_accounts mapping, as a list of messages; empty means valid.
+    GROUPS ({name: {gid}}) are the groups an account may also be a member of."""
     if not isinstance(accounts, dict):
         return ["local_accounts must be a mapping of name -> {uid, ...}"]
     problems, uids, gids = [], {}, {}
@@ -41,6 +45,13 @@ def check(accounts):
             problems.append(f"{name}: must be a mapping")
             continue
         problems += [f"{name}.{key}: unknown key" for key in sorted(set(a) - KEYS)]
+        member = a.get("groups", [])
+        if not isinstance(member, list):
+            problems.append(f"{name}.groups: must be a list of group names")
+        else:
+            problems += [
+                f"{name}.groups: {g} is not a declared group" for g in member if g not in (groups or {})
+            ]
         uid, gid = a.get("uid"), a.get("gid", a.get("uid"))
         for key, value, seen in (("uid", uid, uids), ("gid", gid, gids)):
             if not _id(value):
@@ -58,13 +69,13 @@ def _fail(message, problems):
     raise AnsibleFilterError(message + ":\n  " + "\n  ".join(problems))
 
 
-def local_accounts_check(accounts, shell="/usr/sbin/nologin"):
+def local_accounts_check(accounts, shell="/usr/sbin/nologin", groups=None):
     """The declarations with defaults filled in, or an error listing every problem."""
-    problems = check(accounts)
+    problems = check(accounts, groups)
     if problems:
         _fail("invalid local_accounts", problems)
     return {
-        name: {"gid": a["uid"], "shell": shell, "system": True, "create_home": True, **a}
+        name: {"gid": a["uid"], "shell": shell, "system": True, "create_home": True, "groups": [], **a}
         for name, a in accounts.items()
     }
 
@@ -83,9 +94,11 @@ def overlap(first, second):
     return found
 
 
-def accounts_disjoint(first, second):
-    """FIRST unchanged, or an error when it shares a name, UID or GID with SECOND."""
+def accounts_disjoint(first, second, groups=None):
+    """FIRST unchanged, or an error when it shares a name, UID or GID with SECOND or with
+    GROUPS ({name: {gid}})."""
     problems = overlap(first, second)
+    problems += overlap(first, {g: {"uid": v["gid"]} for g, v in (groups or {}).items()})
     if problems:
         _fail("accounts share a name or an ID", problems)
     return first

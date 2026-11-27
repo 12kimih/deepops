@@ -12,12 +12,14 @@
 - name: Note the writer's account
   ansible.builtin.set_fact:
     _shared_space_account: "{{ {shared_space_writer: system_accounts[shared_space_writer]} }}"
+    _shared_space_groups: "{{ system_groups }}"
 
 - name: Create the writer's account
   ansible.builtin.include_role:
     name: local_accounts
   vars:
     local_accounts: "{{ _shared_space_account }}"
+    local_accounts_groups: "{{ _shared_space_groups }}"
 
 - name: Create the shared space
   ansible.builtin.file:

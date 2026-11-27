@@ -21,12 +21,19 @@
 - name: Note the bot's account
   ansible.builtin.set_fact:
     _cluster_bot_account: "{{ {cluster_bot_user: system_accounts[cluster_bot_user]} }}"
+    _cluster_bot_groups: "{{ system_groups }}"
 
 - name: Create the bot's account
   ansible.builtin.include_role:
     name: local_accounts
   vars:
     local_accounts: "{{ _cluster_bot_account }}"
+    local_accounts_groups: "{{ _cluster_bot_groups }}"
+
+- name: Make the textfile directory its DM counts go to
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: unprivileged
 
 - name: Create the bot's directories
   ansible.builtin.file:

@@ -23,6 +23,11 @@
     state: absent
   loop: [dm-log.json, dm-log.json.lock]
 
+- name: Make the textfile directory its DM counts go to
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: unprivileged
+
 - name: Install the report command
   ansible.builtin.include_role:
     name: cluster_tools_lib

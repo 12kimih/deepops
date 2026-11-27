@@ -16,6 +16,11 @@
     tasks_from: setup-user
     public: true  # slurm_username means the same in both roles
 
+- name: Make the textfile directory its DM counts go to
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: unprivileged
+
 # slurmctld runs MailProg as SlurmUser: the command, its configuration and the token
 # are readable by that group, writable by root alone (slurm.conf(5): MailProg).
 - name: Install the notice command

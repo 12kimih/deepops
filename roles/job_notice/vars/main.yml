@@ -9,6 +9,10 @@ _job_notice_cfg:
   state_file: "{{ _job_notice_state_dir }}/state.json"
   coalesce_seconds: "{{ job_notice_coalesce_seconds | int }}"
   prefs_file: "{{ cluster_bot_prefs_file }}"
+  dm_metrics: "{{ _job_notice_dm_metrics }}"
+# What its DMs came to, for Prometheus (cluster_tools.slack.DmCounts), written as
+# SlurmUser, a member of node_exporter_unprivileged_group (roles/system_accounts).
+_job_notice_dm_metrics: "{{ node_exporter_unprivileged_dir }}/slack-dm-job-notice.prom"
 
 # What this component installs, for its record (roles/component_record). The state (open
 # messages, looked-up member IDs) is a cache and goes with it.
@@ -18,3 +22,5 @@ job_notice_items:
   - "file:{{ cluster_tools_lib_config_records }}/job_notice.json"
   - "file:{{ _job_notice_token }}"
   - "dir:{{ _job_notice_state_dir }}"
+  - "file:{{ _job_notice_dm_metrics }}"
+  - "file:{{ _job_notice_dm_metrics }}.lock"

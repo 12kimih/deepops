@@ -48,7 +48,7 @@ from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
-from .slack import MEMBER, DmLog, Slack, bar, escape, mentioning, pages, sections, table
+from .slack import MEMBER, DmCounts, DmLog, Slack, bar, escape, mentioning, pages, sections, table
 from .slack import member as slack_member
 from .slurm import (
     Error,
@@ -443,11 +443,11 @@ def slack_id(user, cfg, slack, cache):
 def client(cfg, args):
     """The Slack client of a run: its DMs logged for the administrators in a daily thread
     of dm_log_channel (cluster_tools.slack.DmLog), the one every sender shares, read
-    from Slack; no channel, not logged."""
-    dm_log = None
-    if cfg["dm_log_channel"]:
-        dm_log = DmLog(cfg["dm_log_channel"])
-    return Slack(cfg["slack_token"], args.dry_run, dm_log=dm_log)
+    from Slack (no channel, not logged), and counted in the textfile dm_metrics
+    (cluster_tools.slack.DmCounts; none, not counted)."""
+    dm_log = DmLog(cfg["dm_log_channel"]) if cfg["dm_log_channel"] else None
+    counts = DmCounts(cfg["dm_metrics"], SENDER) if cfg.get("dm_metrics") else None
+    return Slack(cfg["slack_token"], args.dry_run, dm_log=dm_log, counts=counts)
 
 
 def preview_channel(slack, to):
@@ -465,6 +465,9 @@ def to_channel(slack, to, channel, text, blocks=None):
 
 # --- Main -----------------------------------------------------------------------
 
+# The sender label of this tool's DM counts (cluster_tools.slack.DmCounts).
+SENDER = "slurm-usage-report"
+
 CONFIG_KEYS = {
     "slack_token": str, "channel": str, "prometheus_url": str, "idle_hours": (int, float),
     "idle_util_threshold": (int, float), "notify": list, "notify_repeat_hours": (int, float),
@@ -480,12 +483,14 @@ CONFIG_KEYS = {
 # (which every host gets first) never refuses a config its role has not rewritten yet.
 # No io_mounts, no I/O notices.
 # No dm_log_channel: the DMs are not logged for the administrators (cluster_tools.slack).
+# No dm_metrics: they are not counted.
 # disk_top is retired (the disk report lists every person): accepted, read by nothing,
 # until every config is rewritten by its role.
 CONFIG_DEFAULTS = {"io_mounts": {}, "io_share": 0.4, "io_minutes": 15, "io_top_jobs": 3, "io_repeat_hours": 6,
-                   "io_advice": "", "dm_log_channel": "", "ssh_rate": False, "ssh_repeat_hours": 24}  # fmt: skip
+                   "io_advice": "", "dm_log_channel": "", "dm_metrics": "", "ssh_rate": False,
+                   "ssh_repeat_hours": 24}  # fmt: skip
 CONFIG_OPTIONAL = {"io_mounts": dict, "io_share": (int, float), "io_minutes": int, "io_top_jobs": int,
-                   "io_repeat_hours": (int, float), "io_advice": str, "dm_log_channel": str,
+                   "io_repeat_hours": (int, float), "io_advice": str, "dm_log_channel": str, "dm_metrics": str,
                    "disk_top": int, "ssh_rate": bool, "ssh_repeat_hours": (int, float)}  # fmt: skip
 
 
@@ -639,6 +644,8 @@ def report_once():
         act(report, cfg, who, slack, cache, now)
     finally:
         write_atomic(cfg["state_file"], json.dumps(state), mode=0o600)
+    if slack.counts is not None:  # the hourly run came through: SlackDmSenderStale reads it
+        slack.counts.ran(now)
 
 
 def namer(cfg, slack, cache):

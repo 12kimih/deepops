@@ -1489,3 +1489,48 @@ tests:
             exp_annotations:
               summary: "The SSH session counts of m have not been published for 10 minutes"
               description: "`systemctl status ssh-rate-metrics.timer` and `journalctl -u ssh-rate-metrics` on the host: the refusals still work, but nothing shows them."
+
+  - name: a DM a sender could not send or log warns, its first failure too
+    interval: 1m
+    input_series:
+      - series: 'slack_dm_messages_total{host="ctl", instance="ctl:9100", sender="cluster-bot", kind="welcome", result="sent"}'
+        values: '0 0 1 1 1 1'
+      - series: 'slack_dm_messages_total{host="ctl", instance="ctl:9100", sender="cluster-bot", kind="welcome", result="failed"}'
+        values: '0 0 0 1 1 1'
+      - series: 'slack_dm_messages_total{host="ctl", instance="ctl:9100", sender="job-notice", kind="job", result="log_failed"}'
+        values: '_ _ _ 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: SlackDmFailing
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: SlackDmFailing
+        exp_alerts:
+          - exp_labels: {severity: warning, host: ctl, instance: "ctl:9100", sender: cluster-bot, kind: welcome, result: failed}
+            exp_annotations:
+              summary: "cluster-bot on ctl could not send welcome DMs"
+              description: "The people it meant to tell were not told. `journalctl -u cluster-bot*` on the host names Slack's reason (a token without a scope, Slack unreachable)."
+      - eval_time: 4m
+        alertname: SlackDmLogFailing
+        exp_alerts:
+          - exp_labels: {severity: warning, host: ctl, instance: "ctl:9100", sender: job-notice, kind: job, result: log_failed}
+            exp_annotations:
+              summary: "job-notice on ctl sent job DMs it could not log"
+              description: "The DM reached the person, but the administrators' DM log thread does not show it. `journalctl -u job-notice*` on the host says why (the bot not in the log channel, the history scopes missing: ClusterBotScopeMissing)."
+
+  - name: a sender on a timer that stops running warns
+    interval: 10m
+    input_series:
+      - series: 'slack_dm_last_success_timestamp_seconds{host="ctl", instance="ctl:9100", sender="slurm-usage-report"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: SlackDmSenderStale
+        exp_alerts: []
+      - eval_time: 3h10m
+        alertname: SlackDmSenderStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: ctl, instance: "ctl:9100", sender: slurm-usage-report}
+            exp_annotations:
+              summary: "slurm-usage-report on ctl has not run for 3 hours"
+              description: "Its notices go unsent. `systemctl list-timers 'slurm-usage-report*'` and `journalctl -u slurm-usage-report` on the host."

@@ -6,6 +6,7 @@ import email.message
 import io
 import json
 import sys
+import tempfile
 import time
 import unittest
 import urllib.error
@@ -253,6 +254,72 @@ class DmLogTests(unittest.TestCase):
             channel, ts = sender.dm("U1", "x", kind="io", login="kim")
         self.assertEqual(sender.ch.at(ts)["channel"], "DU1")
         self.assertIn("the DM to kim (io) was sent; logging it failed", err.getvalue())
+
+
+class DmCountTests(unittest.TestCase):
+    """Each DM counts as sent or failed, a failed log as log_failed, per sender and kind,
+    in the sender's textfile (cluster_tools.files.count_in_textfile: read back with
+    prom.parse, written atomically): what SlackDmFailing and SlackDmLogFailing read."""
+
+    def setUp(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        self.path = str(Path(d.name) / "slack-dm-cluster-bot.prom")
+        self.out = mock.patch("sys.stdout", io.StringIO())
+        self.out.start()
+        self.addCleanup(self.out.stop)
+
+    def counts(self):
+        from cluster_tools import prom
+
+        return {(dict(k[1])["kind"], dict(k[1])["result"]): v for k, v in prom.parse(Path(self.path).read_text()).items()
+                if k[0] == "slack_dm_messages_total"}  # fmt: skip
+
+    def test_sent_failed_and_log_failed_add_up_across_senders_runs(self):
+        ch = FakeChannel()
+        ch.add("x", "#alerts", bot=("BX", "AX"))
+        for _ in range(2):  # two runs of one sender, each its own client
+            sender = Sender(ch)
+            sender.counts = slack.DmCounts(self.path, "cluster-bot")
+            sender.dm("U1", "hi", kind="welcome", login="kim")
+        broken = Sender(FakeChannel(no_history=True))
+        broken.ch.add("x", "#alerts", bot=("BX", "AX"))
+        broken.counts = slack.DmCounts(self.path, "cluster-bot")
+        with mock.patch("sys.stderr", io.StringIO()):
+            broken.dm("U2", "hi", kind="welcome", login="lee")
+        failing = Sender(ch)
+        failing.counts = slack.DmCounts(self.path, "cluster-bot")
+
+        def refuse(channel, msg, thread_ts=None, metadata=None):
+            raise slack.Error("Slack chat.postMessage failed: channel_not_found")
+
+        failing._send = refuse
+        with self.assertRaises(slack.Error):
+            failing.dm("U3", "hi", kind="idle", login="park")
+        self.assertEqual(
+            self.counts(), {("welcome", "sent"): "3", ("welcome", "log_failed"): "1", ("idle", "failed"): "1"}
+        )
+        self.assertIn('sender="cluster-bot"', Path(self.path).read_text())
+
+    def test_a_dry_run_counts_nothing_and_a_run_is_stamped(self):
+        client = slack.Slack("", dry_run=True, counts=slack.DmCounts(self.path, "slurm-usage-report"))
+        with mock.patch("urllib.request.urlopen"):
+            client.dm("U1", "x", kind="io", login="kim")
+        self.assertFalse(Path(self.path).exists())
+        client.counts.ran(1700000000)
+        self.assertIn(
+            'slack_dm_last_success_timestamp_seconds{sender="slurm-usage-report"} 1700000000',
+            Path(self.path).read_text(),
+        )
+
+    def test_counts_that_cannot_be_written_never_stop_the_dm(self):
+        ch = FakeChannel()
+        ch.add("x", "#alerts", bot=("BX", "AX"))
+        sender = Sender(ch)
+        sender.counts = slack.DmCounts("/nonexistent-dir/x.prom", "cluster-bot")
+        with mock.patch("sys.stderr", io.StringIO()) as err:
+            sender.dm("U1", "hi", kind="welcome", login="kim")
+        self.assertIn("the DM counts were not written", err.getvalue())
 
 
 class BlockTests(unittest.TestCase):

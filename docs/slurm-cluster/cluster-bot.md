@@ -46,7 +46,12 @@ which the bot imports): the notices (the decision on a request, a request held f
 project's owner, reminders, the account notice, a project's change, the shared data's
 cleanup) are logged for the administrators in `slack_dm_log_channel`, one daily thread,
 as the tools' DMs are; the answer to what a person just did (a join reply, "recorded")
-is not.
+is not. Each reply holds the DM as the person got it, under a line naming its kind, the
+login and a link; the day's message and its count are read from Slack, so the bot and
+the usage reports share them. Every sender counts its DMs as sent, failed or
+log_failed in its textfile in `node_exporter_unprivileged_dir`
+(`slack_dm_messages_total`), which `SlackDmFailing` and `SlackDmLogFailing` read; the
+usage report also stamps its hourly run (`SlackDmSenderStale`).
 
 What a newcomer needs before the first login (`cluster_bot_connect`: the SSH host and
 port and the guide from `cluster_info`, the portal's `open_ondemand_url`

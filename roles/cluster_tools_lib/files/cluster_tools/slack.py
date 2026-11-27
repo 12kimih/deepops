@@ -55,6 +55,8 @@ import urllib.parse
 import urllib.request
 
 from . import rich
+from .files import count_in_textfile
+from .prom import key
 from .render import width
 
 API = "https://slack.com/api/"
@@ -157,9 +159,42 @@ def _logged_part(message):
     return (meta.get("event_payload") or {}).get("part", 0)
 
 
+class DmCounts:
+    """What a sender's DMs came to, for Prometheus: the textfile PATH (every sender's in
+    node_exporter_unprivileged_dir, root's and the service accounts' alike) holds
+    slack_dm_messages_total{sender, kind, result} (result: sent, failed, log_failed) and,
+    for a sender that runs on a timer, slack_dm_last_success_timestamp_seconds{sender}: its last
+    run, so a sender that stops shows (SlackDmSenderStale). A count that cannot be
+    written is said on stderr and never stops the DM."""
+
+    RESULTS = ("sent", "failed", "log_failed")
+
+    def __init__(self, path, sender):
+        self.path, self.sender = path, sender
+
+    def add(self, kind, result):
+        self._write(add={key("slack_dm_messages_total", sender=self.sender, kind=kind, result=result): 1})
+
+    def ran(self, now=None):
+        self._write(
+            put={
+                key("slack_dm_last_success_timestamp_seconds", sender=self.sender): int(
+                    time.time() if now is None else now
+                )
+            }
+        )
+
+    def _write(self, **changes):
+        try:
+            count_in_textfile(self.path, **changes)
+        except OSError as e:
+            print(f"slack: the DM counts were not written to {self.path}: {e}", file=sys.stderr)
+
+
 class Slack:
-    def __init__(self, token, dry_run=False, timeout=TIMEOUT, dm_log=None):
+    def __init__(self, token, dry_run=False, timeout=TIMEOUT, dm_log=None, counts=None):
         self.token, self.dry_run, self.timeout, self.dm_log = token, dry_run, timeout, dm_log
+        self.counts = counts  # DmCounts, or None
 
     def call(self, method, **params):
         if self.dry_run and method != "users.lookupByEmail":
@@ -244,19 +279,30 @@ class Slack:
         """A direct message to MEMBER (a member ID) about KIND for LOGIN; (channel, ts).
         With log and a dm_log (DmLog), the log gets the message as sent, under a line
         naming the kind, the login and a link (dm_log_entry). The log failing is said on
-        stderr, never undoes or repeats the sent DM."""
+        stderr, never undoes or repeats the sent DM. With counts (DmCounts), each DM counts
+        as sent or failed, and a failed log as log_failed."""
         logged = log and self.dm_log is not None
-        channel = self.dm_channel(member)
         msg = rich.message(text, blocks or None)
-        ts = self._send(channel, msg)
+        try:
+            channel = self.dm_channel(member)
+            ts = self._send(channel, msg)
+        except Error:
+            self._count(kind, "failed")
+            raise
+        self._count(kind, "sent")
         print(f"dm {kind} {login} {channel} {ts}")
         if logged and not self.dry_run:
             try:
                 link = self.call("chat.getPermalink", channel=channel, message_ts=ts).get("permalink", "")
                 self.dm_log.record(self, dm_log_entry(kind, login, msg, link))
             except (Error, OSError) as e:
+                self._count(kind, "log_failed")
                 print(f"slack: the DM to {login} ({kind}) was sent; logging it failed: {e}", file=sys.stderr)
         return channel, ts
+
+    def _count(self, kind, result):
+        if self.counts is not None and not self.dry_run:
+            self.counts.add(kind, result)
 
     def update(self, channel, ts, text, blocks=None, metadata=None):
         msg = rich.message(text, blocks or None)

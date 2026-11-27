@@ -15,7 +15,7 @@ leave {remind_days, leaving (people_leaving)}, command (the one slash command, i
 subcommands cluster_bot.commands'), data {host, kinds, root, unused_days, grace_days,
 seen} (shared data requests, cluster_bot.data; no host leaves them off), connect
 {login_host, ssh_port, portal_url, dashboard_url, docs_url} and welcomed (cluster_bot.onboarding: how to
-log in, the account notice), dm_log {channel} (where the notices the bot sends a
+log in, the account notice), dm_log {channel, metrics} (where the notices the bot sends a
 person by DM are logged for the administrators, cluster_tools.slack.DmLog; no channel
 logs none), notices {url, channel, seen, pinned} (the announcement channel kept like
 the user docs' notices: each posted on its date, edited when reworded, deleted when
@@ -37,7 +37,7 @@ from datetime import date
 from pathlib import Path
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
-from cluster_tools.slack import DmLog, Slack, mentioning  # the cluster's library (PYTHONPATH)
+from cluster_tools.slack import DmCounts, DmLog, Slack, mentioning  # the cluster's library (PYTHONPATH)
 
 from . import (
     accounts_blocks,
@@ -84,9 +84,11 @@ def load(path):
 
 
 def messenger(cfg):
-    """The DMs' sender: cluster_tools.slack.Slack with the administrators' DM log."""
+    """The DMs' sender: cluster_tools.slack.Slack with the administrators' DM log and
+    the DM counts (cfg dm_log {channel, metrics})."""
     log = cfg["dm_log"]
-    return Slack(cfg["bot_token"], dm_log=DmLog(log["channel"]) if log["channel"] else None)
+    return Slack(cfg["bot_token"], dm_log=DmLog(log["channel"]) if log["channel"] else None,
+                 counts=DmCounts(log["metrics"], "cluster-bot") if log.get("metrics") else None)  # fmt: skip
 
 
 def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):

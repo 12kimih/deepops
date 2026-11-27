@@ -31,7 +31,7 @@ from pathlib import Path
 from . import config
 from .files import write_atomic
 from .slack import Error as SlackError
-from .slack import Slack, escape, member
+from .slack import DmCounts, Slack, escape, member
 
 SHOWN = 15  # lines listed in a coalesced message; the rest are counted
 USAGE = "usage: job-notice CONFIG.json -s SUBJECT RECIPIENT"
@@ -102,7 +102,9 @@ def muted(cfg, login):
 
 CONFIG_KEYS = {"token_file": str, "members": dict, "email_domain": str, "state_file": str,
                "coalesce_seconds": int, "prefs_file": str}  # fmt: skip
-CONFIG_OPTIONAL = {"dry_run": bool}
+# dm_metrics: the textfile its DMs are counted in (cluster_tools.slack.DmCounts); none,
+# not counted. Optional: a config written before it still loads.
+CONFIG_OPTIONAL = {"dry_run": bool, "dm_metrics": str}
 
 
 def load_config(path):
@@ -126,7 +128,8 @@ def main(argv=None, env=None, now=None):
     login = env.get("SLURM_JOB_USER") or recipient_login(args[-1], cfg.get("email_domain", ""))
     if not token or not login or muted(cfg, login):
         return 0
-    slack = Slack(token, dry_run=cfg.get("dry_run", False))
+    counts = DmCounts(cfg["dm_metrics"], "job-notice") if cfg.get("dm_metrics") else None
+    slack = Slack(token, dry_run=cfg.get("dry_run", False), counts=counts)
     now = time.time() if now is None else now
     try:
         with locked_state(cfg["state_file"]) as state:

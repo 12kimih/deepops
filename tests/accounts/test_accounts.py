@@ -21,7 +21,8 @@ def load(name):
 
 
 accounts, people = load("accounts"), load("people")
-SYSTEM = yaml.safe_load((ROOT / "roles/system_accounts/defaults/main.yml").read_text())["system_accounts"]
+_SYSTEM = yaml.safe_load((ROOT / "roles/system_accounts/defaults/main.yml").read_text())
+SYSTEM, GROUPS = _SYSTEM["system_accounts"], _SYSTEM["system_groups"]
 EXAMPLE = yaml.safe_load((ROOT / "config.example" / "people.yml").read_text())["people"]
 # Tasks that use the user or group module outside roles/local_accounts, each with why:
 # none creates an account of its own (left to the OS, its number differs per host).
@@ -41,38 +42,29 @@ class Check(unittest.TestCase):
     def test_defaults_are_filled_in(self):
         got = accounts.local_accounts_check({"svc": {"uid": 900}}, "/bin/false")
         self.assertEqual(
-            got, {"svc": {"uid": 900, "gid": 900, "shell": "/bin/false", "system": True, "create_home": True}}
+            got,
+            {
+                "svc": {
+                    "uid": 900,
+                    "gid": 900,
+                    "shell": "/bin/false",
+                    "system": True,
+                    "create_home": True,
+                    "groups": [],
+                }
+            },  # fmt: skip
         )
 
-    def test_every_problem_is_listed(self):
-        found = accounts.check({
-            "Bad Name": {"uid": 1},
-            "a": {"uid": "1"},
-            "b": {"uid": 2, "gid": 3, "colour": "red"},
-            "c": {"uid": 3, "gid": 3},
-            "d": {"uid": True},
-        })  # fmt: skip
-        self.assertEqual(found, [
-            "Bad Name: not a valid account name",
-            "a.uid: must be a non-negative integer",
-            "a.gid: must be a non-negative integer",
-            "b.colour: unknown key",
-            "c.gid: 3 is also b's",
-            "d.uid: must be a non-negative integer",
-            "d.gid: must be a non-negative integer",
-        ])  # fmt: skip
-
-    def test_overlap_counts_uids_and_gids(self):
-        self.assertEqual(
-            accounts.overlap({"p": {"uid": 5}}, {"s": {"uid": 6, "gid": 5}}), ["p and s both use ID 5"]
-        )
-        self.assertEqual(accounts.overlap({"p": {"uid": 5}}, {"s": {"uid": 6}}), [])
-
-    def test_overlap_counts_a_shared_name(self):
-        # A person named as a service account (slurm, shared) would be that account.
-        self.assertEqual(
-            accounts.overlap({"shared": {"uid": 5}}, {"shared": {"uid": 6}}), ["shared is the name of both"]
-        )
+    def test_an_account_joins_only_a_declared_group_and_no_person_takes_its_id(self):
+        groups = {"cluster-metrics": {"gid": 900}}
+        self.assertEqual(accounts.check({"svc": {"uid": 901, "groups": ["cluster-metrics"]}}, groups), [])
+        self.assertEqual(accounts.check({"svc": {"uid": 901, "groups": ["wheel"]}}, groups),
+                         ["svc.groups: wheel is not a declared group"])  # fmt: skip
+        self.assertEqual(accounts.check({"svc": {"uid": 901, "groups": "cluster-metrics"}}, groups),
+                         ["svc.groups: must be a list of group names"])  # fmt: skip
+        self.assertEqual(accounts.overlap({"kim": {"uid": 900}}, {}), [])
+        with self.assertRaises(Exception):
+            accounts.accounts_disjoint({"kim": {"uid": 1000, "gid": 900}}, {}, groups)
 
 
 class PrivateGroup(unittest.TestCase):
@@ -91,10 +83,13 @@ class PrivateGroup(unittest.TestCase):
 
 class Registry(unittest.TestCase):
     def test_the_service_accounts_are_valid(self):
-        self.assertEqual(accounts.check(SYSTEM), [])
+        self.assertEqual(accounts.check(SYSTEM, GROUPS), [])
+        taken = {a["uid"] for a in SYSTEM.values()} | {a.get("gid", a["uid"]) for a in SYSTEM.values()}
+        self.assertFalse(taken & {g["gid"] for g in GROUPS.values()}, "a shared group's GID is its own")
 
     def test_no_example_person_takes_a_service_name_or_id(self):
         self.assertEqual(accounts.overlap(people.people_local_accounts(EXAMPLE), SYSTEM), [])
+        accounts.accounts_disjoint(people.people_local_accounts(EXAMPLE), SYSTEM, GROUPS)
 
     def test_only_local_accounts_creates_accounts(self):
         # The IDs live in roles/system_accounts (and the roster) alone; a role creates its

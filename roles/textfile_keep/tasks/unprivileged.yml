@@ -1,0 +1,30 @@
+---
+# The textfile directory of the producers that do not run as root (prometheus_paths:
+# node_exporter_unprivileged_dir), made by its reader (roles/prometheus-node-exporter,
+# which a missing directory gives a textfile error) and by each producer's role, after
+# it made the producer's account, the same way. Group node_exporter_unprivileged_group's
+# (setgid and sticky) once the group is on the host: an account that joins it makes it
+# (roles/local_accounts, from roles/system_accounts system_groups). Root's until then,
+# with nothing but root's own producers to write it.
+- name: Look up the group of the unprivileged producers
+  ansible.builtin.getent:
+    database: group
+    key: "{{ node_exporter_unprivileged_group }}"
+    service: files
+  failed_when: false
+  register: _textfile_keep_unprivileged_group
+
+- name: Decide whose the directory of the unprivileged producers is
+  ansible.builtin.set_fact:
+    _textfile_keep_unprivileged_writer: >-
+      {{ node_exporter_unprivileged_group
+         if node_exporter_unprivileged_group in (ansible_facts.getent_group | default({}))
+         else 'root' }}
+
+- name: Create the textfile directory of the unprivileged producers
+  ansible.builtin.file:
+    path: "{{ node_exporter_unprivileged_dir }}"
+    state: directory
+    owner: root
+    group: "{{ _textfile_keep_unprivileged_writer }}"
+    mode: "{{ '3775' if _textfile_keep_unprivileged_writer != 'root' else '0755' }}"

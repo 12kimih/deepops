@@ -50,6 +50,10 @@ class MetricNames(unittest.TestCase):
         expr = 'sum by (host) (rate(node_cpu_seconds_total{mode!="idle", instance="$node"}[5m])) / on (host) count(up)'
         self.assertEqual(vm.metric_names(expr), {"node_cpu_seconds_total", "up"})
 
+    def test_an_offsets_duration_is_not_a_metric(self):
+        expr = "slack_dm_messages_total > 0 unless slack_dm_messages_total offset 1h"
+        self.assertEqual(vm.metric_names(expr), {"slack_dm_messages_total"})
+
     def test_the_repository_reads_metrics(self):
         reads, recorded = vm.repo_metrics()
         self.assertIn("DCGM_FI_DEV_GPU_UTIL_RATIO", reads)

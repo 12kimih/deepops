@@ -112,6 +112,9 @@ SOURCES = {
     # writes (prometheus_nfs_client_slow_ms, rules io-usage.yml).
     "nfs_client_slow": r"deepops_nfs_client_slow_seconds",
     "cluster_bot": r"cluster_bot_\w+",  # the bot token's Slack scopes (roles/cluster_bot, cluster_bot.scopes)
+    # Each sender's DMs and its last run (cluster_tools.slack.DmCounts), in
+    # node_exporter_unprivileged_dir.
+    "slack_dm": r"slack_dm_\w+",
     "shared_data": r"shared_data_\w+",  # the shared data's export, the bot's rounds (roles/shared_space)
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)
     "gpu_diag_idle": r"gpu_diag_idle_\w+",  # the weekly GPU diagnostics (roles/gpu_diag_idle)
@@ -154,6 +157,8 @@ def metric_names(expr):
     """The metric names an expression reads (selectors, label lists, windows, strings
     and dashboard variables aside)."""
     text = re.sub(r'\{[^}]*\}|\[[^]]*\]|"[^"]*"|\$\w+|\$\{[^}]*\}', " ", expr)
+    # an offset's duration (offset 1h): its unit is no metric
+    text = re.sub(r"\boffset\s+-?\d\w*", " ", text)
     # label lists: by (host), on (instance), group_left (state)
     text = re.sub(r"\b(by|on|without|ignoring|group_left|group_right)\s*\([^)]*\)", " ", text)
     names = set()

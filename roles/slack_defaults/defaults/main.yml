@@ -26,7 +26,7 @@ slack_channels:
 
 # Where every notice a tool or the cluster bot sends a person by DM is also logged, so the administrators
 # see what people were told and can help them (cluster_tools.slack.dm): one message a
-# day in this channel, each DM a reply in its thread, mentioning no one. A person's own
+# day in this channel, each DM whole in a reply in its thread, mentioning no one. A person's own
 # job start and end notices are not logged. Empty logs none.
 slack_dm_log_channel: "{{ slack_channels.admin }}"
 # The administrators' Slack user group. Its @handle is what people tag in the help channel,

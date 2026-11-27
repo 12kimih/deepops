@@ -70,7 +70,7 @@ _cluster_bot_cfg:
   reminders: "{{ _cluster_bot_home }}/reminders-sent.json"
   welcomed: "{{ _cluster_bot_home }}/accounts-welcomed.json"
   # The notices the bot DMs a person, logged for the administrators (cluster_tools.slack).
-  dm_log: {channel: "{{ slack_dm_log_channel }}"}
+  dm_log: {channel: "{{ slack_dm_log_channel }}", metrics: "{{ _cluster_bot_dm_metrics }}"}
   # The user docs' notices, posted in the announcement channel on their date
   # (cluster_bot.notices): the docs site publishes them as notices.json.
   notices:
@@ -136,8 +136,12 @@ _cluster_bot_cfg:
 
 # What this component installs, for its record (roles/component_record). The bot's state
 # files and key in its home stay (data).
+# What its DMs came to, for Prometheus (cluster_tools.slack.DmCounts); with the component.
+_cluster_bot_dm_metrics: "{{ node_exporter_unprivileged_dir }}/slack-dm-cluster-bot.prom"
 cluster_bot_items:
   - "unit:{{ _cluster_bot_unit }}"
+  - "file:{{ _cluster_bot_dm_metrics }}"
+  - "file:{{ _cluster_bot_dm_metrics }}.lock"
   - "file:/etc/systemd/system/{{ _cluster_bot_unit }}"
   - "file:{{ _cluster_bot_admin_command }}"
   - "file:{{ _cluster_bot_config }}"

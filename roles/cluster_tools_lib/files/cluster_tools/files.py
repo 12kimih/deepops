@@ -2,8 +2,11 @@
 Python 3.9 or newer, standard library only.
 """
 
+import fcntl
 import os
 import tempfile
+
+from . import prom
 
 
 def write_atomic(path, text, mode=0o644):
@@ -51,3 +54,23 @@ def read_textfile(path, kept=""):
             with open(source) as f:
                 return f.read()
     return ""
+
+
+def count_in_textfile(path, add=None, put=None):
+    """Add ADD ({prom.key: number}) to the counters in the textfile PATH and set PUT
+    ({prom.key: value}), the rest kept: read back with prom.parse, written with
+    write_atomic, under a lock beside it (PATH.lock), so the runs of one producer never
+    lose each other's counts. Counters start again from 0 after the file is gone (a
+    reboot of a tmpfs, a component removed), which Prometheus' rate and increase allow."""
+    with open(path + ".lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        values = prom.parse(read_textfile(path))
+        for k, n in (add or {}).items():
+            values[k] = _number(values.get(k, 0)) + n
+        values.update(put or {})
+        write_atomic(path, prom.render(values))
+
+
+def _number(value):
+    n = float(value)
+    return int(n) if n.is_integer() else n

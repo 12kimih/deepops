@@ -27,4 +27,7 @@ slurm_usage_report_items: >-
   {{ _slurm_usage_report_units | map('regex_replace', '^', 'unit:') | list
      + _slurm_usage_report_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ _slurm_usage_report_command, 'file:' ~ _slurm_usage_report_config,
-        'file:' ~ cluster_tools_lib_config_records ~ '/slurm_usage_report.json'] }}
+        'file:' ~ cluster_tools_lib_config_records ~ '/slurm_usage_report.json',
+        'file:' ~ _slurm_usage_report_dm_metrics, 'file:' ~ _slurm_usage_report_dm_metrics ~ '.lock'] }}
+# What its DMs came to, for Prometheus (cluster_tools.slack.DmCounts); with the component.
+_slurm_usage_report_dm_metrics: "{{ node_exporter_unprivileged_dir }}/slack-dm-slurm-usage-report.prom"

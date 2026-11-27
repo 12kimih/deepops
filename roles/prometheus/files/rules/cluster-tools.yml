@@ -1,0 +1,42 @@
+---
+# The cluster tools' library (component cluster_tools). The DMs the tools and the bot
+# send people (cluster_tools.slack.DmCounts): each sender's
+# textfile in node_exporter_unprivileged_dir counts them by kind as sent, failed or
+# log_failed (sent, but not logged for the administrators in slack_dm_log_channel). A
+# counter seen for the first time already above 0 (a sender's first failure since its
+# file began) counts too: increase() alone sees nothing before a series' first sample.
+groups:
+  - name: cluster-tools
+    rules:
+      - alert: SlackDmFailing
+        expr: >-
+          increase(slack_dm_messages_total{result="failed"}[1h]) > 0
+          or (slack_dm_messages_total{result="failed"} > 0
+              unless slack_dm_messages_total{result="failed"} offset 1h)
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.sender }} on {{ $labels.host }} could not send {{ $labels.kind }} DMs"
+          description: >-
+            The people it meant to tell were not told. `journalctl -u {{ $labels.sender }}*`
+            on the host names Slack's reason (a token without a scope, Slack unreachable).
+      - alert: SlackDmLogFailing
+        expr: >-
+          increase(slack_dm_messages_total{result="log_failed"}[1h]) > 0
+          or (slack_dm_messages_total{result="log_failed"} > 0
+              unless slack_dm_messages_total{result="log_failed"} offset 1h)
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.sender }} on {{ $labels.host }} sent {{ $labels.kind }} DMs it could not log"
+          description: >-
+            The DM reached the person, but the administrators' DM log thread does not show
+            it. `journalctl -u {{ $labels.sender }}*` on the host says why (the bot not in
+            the log channel, the history scopes missing: ClusterBotScopeMissing).
+      # A sender on a timer writes its last run: one that stops tells no one, silently.
+      - alert: SlackDmSenderStale
+        expr: time() - slack_dm_last_success_timestamp_seconds > 3 * 3600
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.sender }} on {{ $labels.host }} has not run for 3 hours"
+          description: >-
+            Its notices go unsent. `systemctl list-timers '{{ $labels.sender }}*'` and
+            `journalctl -u {{ $labels.sender }}` on the host.

@@ -21,8 +21,8 @@ ENV = {"SLURM_JOB_ID": "42", "SLURM_JOB_NAME": "train", "SLURM_JOB_STATE": "COMP
 class FakeSlack(FakeDM):
     calls = []
 
-    def __init__(self, token, dry_run=False):
-        self.token = token
+    def __init__(self, token, dry_run=False, counts=None):
+        self.token, self.counts = token, counts
 
     def dm_channel(self, member):
         return "D" + member
