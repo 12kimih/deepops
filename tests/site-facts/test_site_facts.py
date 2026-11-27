@@ -347,7 +347,7 @@ class RulesActive(unittest.TestCase):
                     f"_cluster_tools_usage_active['{rule}']", role["_cluster_tools_usage_cfg"][part]
                 )
 
-    def test_a_switch_turns_its_rule_on_and_a_narrower_groups_setting_counts(self):
+    def test_a_switch_and_a_limit_turn_a_rule_on_and_a_narrower_group_counts(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = site(tmp)
             active = {r["id"]: r["active"] for r in sf.facts(config)["rules"]}
@@ -358,9 +358,32 @@ class RulesActive(unittest.TestCase):
             (config / "group_vars" / "slurm-login.yml").write_text(
                 "cluster_tools_user_slice_limits: {TasksMax: 9}\n"
             )
+            (config / "people.yml").write_text("people: {bob: {}}\n")
             active = {r["id"]: r["active"] for r in sf.facts(config)["rules"]}
-            self.assertEqual((active["disk"], active["login-limits"]), (True, True))
+            self.assertEqual((active["disk"], active["login-limits"]), (False, True), "quotas only count")
+            (config / "host_vars" / "h1").write_text('disk_quota_filesystems: {"/data": {block_hard: 2T}}\n')
+            self.assertTrue(self.active(config)["disk"], "a limit on a host's filesystem")
+            (config / "host_vars" / "h1").write_text('disk_quota_filesystems: {"/data": {}}\n')
+            (config / "people.yml").write_text('people: {bob: {disk_quota: {"/": {block_hard: 1G}}}}\n')
+            self.assertTrue(self.active(config)["disk"], "their own on /, the role's default filesystem")
+            (config / "people.yml").write_text(
+                'people: {bob: {status: left, disk_quota: {"/": {block_hard: 1G}}}}\n'
+            )
+            self.assertFalse(self.active(config)["disk"], "no one active is limited")
             self.assertTrue(all(isinstance(r["active"], bool) for r in sf.public(sf.facts(config))["rules"]))
+
+    def test_loading_a_filter_leaves_sys_path_as_it_was(self):
+        """people.py puts plugins/filter on sys.path for days; left there, its secrets.py
+        shadows the standard library's for whatever imports it next (ansible, 2026-11-27)."""
+        import sys
+
+        before = list(sys.path)
+        sf._filter("people")
+        self.assertEqual(sys.path, before)
+
+    @staticmethod
+    def active(config):
+        return {r["id"]: r["active"] for r in sf.facts(config)["rules"]}
 
 
 class LoginLimits(unittest.TestCase):

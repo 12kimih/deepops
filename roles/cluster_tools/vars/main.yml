@@ -26,11 +26,16 @@ _cluster_tools_usage_file: "{{ cluster_tools_lib_config_dir }}/usage.json"
 _cluster_tools_ends_dir: "{{ cluster_tools_lib_config_dir }}/ends"
 _cluster_tools_ends: "{{ people | people_leaving(people_leave_grace_days) }}"
 # Whether this cluster runs each rule (cluster_tools.rules RULES, by id), from the
-# settings alone: a rule not run gets its part of the rules file empty, so usage says
-# off, and the docs data says active false (scripts/docs/site_facts.py rules_table).
+# settings: a rule not run gets its part of the rules file empty, so usage says off, and
+# the docs data says active false (scripts/docs/site_facts.py rules_table). The disk
+# rule runs once someone is limited on some host's filesystem (people_disk_limited, as
+# roles/disk_quota limits them; a host without its own has the role's default, "/"):
+# quotas that only count warn no one.
 _cluster_tools_usage_active:
   gpu-idle: "{{ slurm_enable_monitoring | bool }}"
-  disk: "{{ slurm_enable_disk_quota | bool }}"
+  disk: >-
+    {{ slurm_enable_disk_quota | bool and people | people_disk_limited(groups['all'] | map('extract', hostvars)
+       | map(attribute='disk_quota_filesystems', default={'/': {}}) | list) }}
   scratch-purge: "{{ slurm_enable_scratch_space | bool }}"
   io-heavy: "{{ slurm_enable_monitoring | bool and io_fairness_models | length > 0 }}"
   login-limits: "{{ cluster_tools_user_slice_limits | length > 0 }}"

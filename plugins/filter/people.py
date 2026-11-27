@@ -686,6 +686,13 @@ def people_disk_quotas(people, filesystems):
     return out
 
 
+def people_disk_limited(people, filesystems_each):
+    """Whether anyone active is limited on any filesystem of FILESYSTEMS_EACH (one
+    disk_quota_filesystems per host, as people_disk_quotas reads it): what the disk
+    rule needs before it warns or holds anyone (cluster_tools usage, the docs' rules)."""
+    return any(any(people_disk_quotas(people, fs or {}).values()) for fs in filesystems_each)
+
+
 def people_check(roster, uid_min=UID_MIN):
     """The roster unchanged, or an error listing every problem."""
     from ansible.errors import AnsibleFilterError
@@ -715,6 +722,7 @@ class FilterModule:
             "people_shells": people_shells,
             "people_subids": people_subids,
             "people_disk_quotas": people_disk_quotas,
+            "people_disk_limited": people_disk_limited,
             "people_check": people_check,
             "people_project_groups": people_project_groups,
             "people_projects_at": people_projects_at,

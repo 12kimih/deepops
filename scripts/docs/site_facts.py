@@ -110,10 +110,15 @@ from repo_files import tracked  # noqa: E402
 
 def _filter(name):
     """A filter plugin's module, loaded from its file: plugins/filter on sys.path would
-    shadow the standard library with its secrets.py."""
+    shadow the standard library with its secrets.py, so a module that puts it there for
+    its own imports (people.py, for days) has sys.path back as it was afterwards."""
     spec = importlib.util.spec_from_file_location(name, ROOT / "plugins/filter" / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    path = list(sys.path)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path[:] = path
     return module
 
 
@@ -368,15 +373,26 @@ def rules_active(config):
     theirs): what empties a rule's part of the rules file, so usage says off there."""
     gates = _yaml(ROOT / "roles/cluster_tools/vars/main.yml").get("_cluster_tools_usage_active", {})
     env = jinja2.nativetypes.NativeEnvironment(undefined=jinja2.StrictUndefined, autoescape=False)  # noqa: S701
-    # Ansible's bool, which the switches go through: a native value or a word.
+    # What the gates use of Ansible: bool (a native value or a word), extract, and the
+    # roster's filter, over the site's roster and its hosts' own vars (host_vars; one
+    # host more without any, as every host without a file has the role defaults).
     env.filters["bool"] = lambda v: (
         v if isinstance(v, bool) else str(v).strip().lower() in ("yes", "on", "1", "true", "y")
     )
+    env.filters["extract"] = lambda item, container: container[item]
+    env.filters["people_disk_limited"] = _filter("people").people_disk_limited
+    hosts = {p.name: _yaml(p) for p in sorted((Path(config) / "host_vars").glob("*"))} if config else {}
+    hosts[""] = {}
+    inventory = {
+        "people": (_yaml(Path(config) / "people.yml").get("people") or {}) if config else {},
+        "groups": {"all": list(hosts)},
+        "hostvars": hosts,
+    }
     groups = Path(config) / "group_vars" if config else None
     others = sorted(p.name for p in groups.glob("*.yml") if p.name not in GROUPS) if groups else []
     out = dict.fromkeys(gates, False)
     for group in [None, *others]:
-        s = settings(config, group)
+        s = {**settings(config, group), **inventory}
         for rule, gate in gates.items():
             try:
                 value = gate if isinstance(gate, bool) else env.from_string(gate).render(s)

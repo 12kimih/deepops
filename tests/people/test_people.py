@@ -152,6 +152,13 @@ class Derive(unittest.TestCase):
             {"/": {"alice": {"block_hard": "100G"}}},
         )
 
+    def test_limited_when_someone_is_on_some_hosts_filesystem(self):
+        self.assertTrue(people.people_disk_limited(self.p, [{}, {"/": {}}]), "alice's own on /")
+        self.assertFalse(people.people_disk_limited({}, [{"/data": {"block_hard": "2T"}}]), "no one")
+        nobody = {k: v for k, v in self.p.items() if k != "alice"}
+        self.assertFalse(people.people_disk_limited(nobody, [{"/": {}}, {}]), "counted only")
+        self.assertTrue(people.people_disk_limited(nobody, [{}, {"/data": {"block_hard": "2T"}}]))
+
 
 class Check(unittest.TestCase):
     def problems(self, mutate):
