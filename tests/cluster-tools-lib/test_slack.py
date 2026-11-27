@@ -6,7 +6,6 @@ import email.message
 import io
 import json
 import sys
-import tempfile
 import time
 import unittest
 import urllib.error
@@ -14,7 +13,9 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
 from cluster_tools import rich, slack  # noqa: E402
+from fake_slack import FakeChannel  # noqa: E402
 
 
 class Fake(slack.Slack):
@@ -81,133 +82,11 @@ class SlackTests(unittest.TestCase):
     def posts(self, client):
         return [(p["channel"], p["text"]) for m, p in client.calls if m == "chat.postMessage"]
 
-    def logged(self, d):
-        client = Fake(self.ANSWERS)
-        client.dm_log = slack.DmLog("#alerts", f"{d}/dm-log.json")
-        return client
-
-    def test_a_dm_is_logged_under_the_days_message(self):
-        with tempfile.TemporaryDirectory() as d:
-            client = self.logged(d)
-            with mock.patch("sys.stdout", io.StringIO()) as out:
-                self.assertEqual(client.dm("U1ABC", "Your disk use is high.\nMore.", kind="disk", login="kim"),
-                                 ("D9", "1.2"))  # fmt: skip
-                client.dm("U2", "Idle GPUs.", kind="idle", login="lee")
-            posts = [
-                (m, p["channel"], p["text"], p.get("thread_ts"))
-                for m, p in client.calls
-                if m in ("chat.postMessage", "chat.update")
-            ]
-            day = time.strftime("%Y-%m-%d")
-            self.assertEqual(posts[0][:2], ("chat.postMessage", "D9"))
-            self.assertEqual(posts[0][2], "Your disk use is high.\nMore.")  # the DM as written
-            self.assertEqual(posts[1], ("chat.postMessage", "C42", slack.dm_log_title(day, 0), None))
-            # Then by the ID Slack gave: chat.update takes no channel name.
-            self.assertEqual(posts[2], ("chat.postMessage", "C42",
-                                        "disk to kim: Your disk use is high.  open (https://x/p1)", "1.2"))  # fmt: skip
-            self.assertEqual(posts[3][:3], ("chat.update", "C42", slack.dm_log_title(day, 1)))
-            # The second DM of the day goes under the same message: no new one.
-            self.assertEqual([p[1] for p in posts[4:]], ["D9", "C42", "C42"])
-            self.assertEqual(posts[5][3], "1.2")
-            self.assertEqual(posts[6][2], slack.dm_log_title(day, 2))
-            self.assertIn("dm disk kim D9 1.2", out.getvalue())
-
-    def test_a_failed_count_update_keeps_the_days_message(self):
-        with tempfile.TemporaryDirectory() as d:
-            log = slack.DmLog("#alerts", f"{d}/dm-log.json")
-            client = Fake(self.ANSWERS)
-            sent = client.call
-
-            def call(method, **params):
-                if method == "chat.update":
-                    raise slack.Error("Slack chat.update failed: channel_not_found")
-                return sent(method, **params)
-
-            client.call = call
-            with mock.patch("sys.stderr", io.StringIO()) as err:
-                log.record(client, "a")
-                log.record(client, "b")
-            titles = [p for m, p in client.calls if m == "chat.postMessage" and "thread_ts" not in p]
-            self.assertEqual(len(titles), 1, "one message a day, the count failing or not")
-            self.assertIn("count was not updated", err.getvalue())
-
-    def test_a_lost_state_finds_the_days_message_again(self):
-        """A state file lost (or another process's) posted a second message for the day."""
-        with tempfile.TemporaryDirectory() as d:
-            log = slack.DmLog("#alerts", f"{d}/dm-log.json")
-            day = time.strftime("%Y-%m-%d")
-            mark = {"event_type": slack.KEPT, "event_payload": {"key": f"dm-log {day}", "part": 0}}
-            answers = {**self.ANSWERS, "conversations.history": {"ok": True, "messages": [
-                {"ts": "7.0", "bot_id": "B1", "metadata": mark},
-                {"ts": "6.0", "bot_id": "B9", "metadata": mark},  # another app's: not ours
-            ]}}  # fmt: skip
-            client = Fake(answers)
-            log.record(client, "a")
-            titles = [p for m, p in client.calls if m == "chat.postMessage" and "thread_ts" not in p]
-            self.assertEqual(titles, [], "no second message for the day")
-            line = next(p for m, p in client.calls if m == "chat.postMessage")
-            self.assertEqual((line["channel"], line["thread_ts"]), ("C42", "7.0"))
-
-    def test_a_token_without_the_read_scopes_logs_as_before(self):
-        with tempfile.TemporaryDirectory() as d:
-            log = slack.DmLog("#alerts", f"{d}/dm-log.json")
-            client = Fake(self.ANSWERS)
-            sent = client.call
-
-            def call(method, **params):
-                if method in ("conversations.list", "conversations.history"):
-                    raise slack.Error(f"Slack {method} failed: missing_scope")
-                return sent(method, **params)
-
-            client.call = call
-            log.record(client, "a")
-            titles = [p for m, p in client.calls if m == "chat.postMessage" and "thread_ts" not in p]
-            self.assertEqual([p["channel"] for p in titles], ["#alerts"])
-
-    def test_a_new_day_starts_a_new_message(self):
-        with tempfile.TemporaryDirectory() as d:
-            log = slack.DmLog("#alerts", f"{d}/dm-log.json")
-            client = Fake(self.ANSWERS)
-            log.record(client, "a", now=time.mktime((2026, 11, 24, 12, 0, 0, 0, 0, -1)))
-            log.record(client, "b", now=time.mktime((2026, 11, 25, 9, 0, 0, 0, 0, -1)))
-            titles = [p["text"] for m, p in client.calls if m == "chat.postMessage" and "thread_ts" not in p]
-            self.assertEqual(
-                titles, [slack.dm_log_title("2026-11-24", 0), slack.dm_log_title("2026-11-25", 0)]
-            )
-
-    def test_an_unlogged_dm_or_no_log_posts_the_dm_alone(self):
-        with tempfile.TemporaryDirectory() as d:
-            for client, log in ((self.logged(d), False), (Fake(self.ANSWERS), True)):
-                with self.subTest(log=log):
-                    with mock.patch("sys.stdout", io.StringIO()):
-                        client.dm("U1ABC", "Job 42 ended.", kind="job", login="kim", log=log)
-                    self.assertEqual(self.posts(client), [("D9", "Job 42 ended.")])
-
-    def test_a_failed_log_line_never_fails_the_sent_dm(self):
-        with tempfile.TemporaryDirectory() as d:
-            client = self.logged(d)
-            sent = client.call
-
-            def call(method, **params):
-                if method == "chat.postMessage" and params["channel"] == "C42":
-                    raise slack.Error("Slack chat.postMessage failed: channel_not_found")
-                return sent(method, **params)
-
-            client.call = call
-            with mock.patch("sys.stdout", io.StringIO()), mock.patch("sys.stderr", io.StringIO()) as err:
-                self.assertEqual(client.dm("U1ABC", "x", kind="io", login="kim"), ("D9", "1.2"))
-            self.assertIn("the DM to kim (io) was sent; logging it failed", err.getvalue())
-
     def test_a_message_to_a_person_is_refused_outside_dm(self):
         client = Fake(self.ANSWERS)
         with self.assertRaisesRegex(slack.Error, "a message to a person is a dm"):
             client.post("U1ABC", "x")
         self.assertEqual(client.calls, [])
-
-    def test_the_log_line_keeps_a_long_first_line_short(self):
-        line = slack.dm_log_line("io", "kim", "y" * 500)
-        self.assertLess(len(line), slack.DM_LOG_FIRST + 40)
-        self.assertTrue(line.endswith("..."))
 
     def test_dry_run_prints_and_posts_nothing(self):
         client = slack.Slack("", dry_run=True)
@@ -258,6 +137,122 @@ class SlackTests(unittest.TestCase):
         with mock.patch("urllib.request.urlopen", return_value=io.BytesIO(b"[1]")):
             with self.assertRaisesRegex(slack.Error, "not a JSON object"):
                 slack.Slack("xoxb-test").post("#c", "x")
+
+
+class Sender(slack.Slack):
+    """One sender (the bot, a usage report) on the Slack of CHANNEL (a FakeChannel), which
+    every sender of a test shares: dm() and the DM log are the real ones."""
+
+    def __init__(self, channel, log="#alerts"):
+        super().__init__("xoxb-test", dm_log=slack.DmLog(log) if log else None)
+        self.ch, self.stale = channel, 0
+
+    def call(self, method, **params):
+        if method == "conversations.open":
+            return {"ok": True, "channel": {"id": "D" + params["users"]}}
+        if method == "conversations.history" and self.stale:
+            self.stale -= 1  # a read from before another sender's post
+            return {"ok": True, "messages": []}
+        return self.ch.call(method, **params)
+
+    def _send(self, channel, msg, thread_ts=None, metadata=None):
+        return self.ch.post(channel, msg["text"], msg["blocks"], thread_ts, metadata)
+
+    def update(self, channel, ts, text, blocks=None, metadata=None):
+        return self.ch.update(channel, ts, text, blocks, metadata)
+
+
+class DmLogTests(unittest.TestCase):
+    """Each DM is logged as the person got it, under the day's one message, whose count is
+    every sender's DMs: read from Slack, never from a sender's own file."""
+
+    def setUp(self):
+        self.ch = FakeChannel()
+        self.ch.add("[FIRING:1] DiskFull", "#alerts", bot=("BX", "AX"))  # the channel's alerts
+        self.out = mock.patch("sys.stdout", io.StringIO())
+        self.out.start()
+        self.addCleanup(self.out.stop)
+
+    def days(self):
+        return [
+            m for m in self.ch.posts("CALERTS") if (m.get("metadata") or {}).get("event_type") == slack.KEPT
+        ]
+
+    def test_the_dm_is_logged_whole_under_a_line_naming_it(self):
+        text = "Your disk use is high.\n" + "y" * 500 + "\nMore."
+        channel, ts = Sender(self.ch).dm("U1", text, kind="disk", login="kim")
+        sent = self.ch.at(ts)
+        [day] = self.days()
+        [reply] = self.ch.thread(day["ts"])
+        head = rich.blocks(
+            slack.dm_log_line("disk", "kim", f"https://slack.example/archives/{channel}/p{ts}")
+        )
+        self.assertEqual(reply["blocks"], head + sent["blocks"], "the DM's own blocks, nothing cut")
+        self.assertIn("y" * 500, rich.read(reply["blocks"]))
+        self.assertEqual(day["text"], slack.dm_log_title(time.strftime("%Y-%m-%d"), 1))
+
+    def test_a_dm_past_slacks_limits_is_split_in_order(self):
+        blocks = [rich.section(f"line {i}") for i in range(70)]
+        Sender(self.ch).dm("U1", "many", blocks, kind="io", login="kim")
+        [day] = self.days()
+        parts = self.ch.thread(day["ts"])
+        self.assertEqual(len(parts), 2)
+        self.assertTrue(all(len(p["blocks"]) <= slack.MAX_BLOCKS for p in parts))
+        self.assertEqual([b for p in parts for b in p["blocks"]][-70:], blocks)
+        self.assertEqual([p["metadata"]["event_payload"]["part"] for p in parts], [0, 1])
+        self.assertEqual(day["text"], slack.dm_log_title(time.strftime("%Y-%m-%d"), 1), "one DM, two replies")
+
+    def test_two_senders_interleaving_share_one_day_message_and_its_count(self):
+        bot, report = Sender(self.ch), Sender(self.ch)
+        bot.dm("U1", "welcome", kind="welcome", login="kim")
+        report.stale = 1  # it looked before the bot's day message was there
+        report.dm("U2", "idle GPUs", kind="idle", login="lee")
+        bot.dm("U3", "reminder", kind="data-reminder", login="park")
+        [day] = self.days()
+        self.assertEqual(len(self.ch.thread(day["ts"])), 3)
+        self.assertEqual(day["text"], slack.dm_log_title(time.strftime("%Y-%m-%d"), 3))
+
+    def test_a_count_written_over_by_another_sender_is_set_right(self):
+        bot, report = Sender(self.ch), Sender(self.ch)
+        bot.dm("U1", "first", kind="welcome", login="kim")
+        update, raced = self.ch.update, []
+
+        def late(channel, ts, text, blocks=None, metadata=None):
+            if not raced:  # the report logs a DM between the bot's count and its edit
+                raced.append(True)
+                report.dm("U2", "second", kind="idle", login="lee")
+            return update(channel, ts, text, blocks, metadata)
+
+        self.ch.update = late
+        bot.dm("U3", "third", kind="project", login="park")
+        [day] = self.days()
+        self.assertEqual(day["text"], slack.dm_log_title(time.strftime("%Y-%m-%d"), 3))
+
+    def test_a_new_day_starts_a_new_message(self):
+        log, sender = slack.DmLog("#alerts"), Sender(self.ch)
+        for day in (24, 25):
+            msg = rich.message("x")
+            log.record(
+                sender,
+                slack.dm_log_entry("io", "kim", msg),
+                now=time.mktime((2026, 11, day, 12, 0, 0, 0, 0, -1)),
+            )
+        self.assertEqual([m["text"] for m in self.days()],
+                         [slack.dm_log_title("2026-11-24", 1), slack.dm_log_title("2026-11-25", 1)])  # fmt: skip
+
+    def test_an_unlogged_dm_or_no_log_posts_the_dm_alone(self):
+        for sender, log in ((Sender(self.ch), False), (Sender(self.ch, log=""), True)):
+            with self.subTest(log=log):
+                sender.dm("U1", "Job 42 ended.", kind="job", login="kim", log=log)
+                self.assertEqual(self.days(), [])
+
+    def test_a_failed_log_never_fails_the_sent_dm(self):
+        sender = Sender(FakeChannel(no_history=True))
+        sender.ch.add("x", "#alerts", bot=("BX", "AX"))
+        with mock.patch("sys.stderr", io.StringIO()) as err:
+            channel, ts = sender.dm("U1", "x", kind="io", login="kim")
+        self.assertEqual(sender.ch.at(ts)["channel"], "DU1")
+        self.assertIn("the DM to kim (io) was sent; logging it failed", err.getvalue())
 
 
 class BlockTests(unittest.TestCase):

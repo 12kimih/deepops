@@ -15,6 +15,14 @@
     path: "{{ cluster_tools_lib_dir }}/slurm_usage_report.py"
     state: absent
 
+# The DM log's day message and count are read from Slack now (cluster_tools.slack.DmLog),
+# shared with the bot; the report's own copy of them goes.
+- name: Remove the DM log's earlier state
+  ansible.builtin.file:
+    path: "/var/lib/{{ _slurm_usage_report_name }}/{{ item }}"
+    state: absent
+  loop: [dm-log.json, dm-log.json.lock]
+
 - name: Install the report command
   ansible.builtin.include_role:
     name: cluster_tools_lib

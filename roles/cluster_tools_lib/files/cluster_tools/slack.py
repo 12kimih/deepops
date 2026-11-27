@@ -1,6 +1,6 @@
 """slack: the one client for Slack's Web API, for every tool that tells people something.
 
-    slack = Slack(token, dm_log=DmLog("#alerts", state))  # dry_run=True prints instead
+    slack = Slack(token, dm_log=DmLog("#alerts"))  # dry_run=True prints instead
     slack.post("#infra-status", text, blocks=None, thread_ts=None) -> the message's ts
     slack.dm("U0123ABCD", text, kind="disk", login="kim")         -> (DM channel, ts)
     slack.dm_channel("U0123ABCD")           -> a member's DM channel, for a preview
@@ -31,9 +31,12 @@ works from the record alone and says so.
 
 Every message to a person goes through dm(), never post(), which refuses a member ID: so
 each DM is in the journal (one "dm KIND LOGIN" line) and, unless sent with log=False,
-logged for the administrators (DmLog: one reply per DM in a daily thread of their
-channel, no mention, so the channel's alerts stay on top): they see what people were
-told and can help.
+logged for the administrators (DmLog: in a daily thread of their channel, no mention,
+so the channel's alerts stay on top): they see what people were told, word for word,
+and can help. The log entry is built from the very message dm() sent (dm_log_entry), so
+the two never differ. The day's message, its count and its replies are Slack's alone,
+read from the channel, so every sender on every host (the bot, the usage reports) shares
+one day message and one count.
 
 Every failure is an Error naming the method and Slack's reason; Error is a RuntimeError.
 Each call is bounded by TIMEOUT seconds. A call Slack rate-limits (HTTP 429) is sent
@@ -42,11 +45,8 @@ Mode) are the cluster bot's (roles/cluster_bot); this module only sends and read
 Python 3.9 or newer, standard library only.
 """
 
-import contextlib
-import fcntl
 import hashlib
 import json
-import os
 import re
 import sys
 import time
@@ -55,7 +55,6 @@ import urllib.parse
 import urllib.request
 
 from . import rich
-from .files import write_atomic
 from .render import width
 
 API = "https://slack.com/api/"
@@ -78,8 +77,11 @@ KEPT = "cluster_kept"
 # What Slack says of a message that is not there any more, or that it will not edit.
 GONE = ("message_not_found", "thread_not_found", "cant_update_message")
 BAR_WIDTH = 10
-# How much of a logged DM's first line the log line keeps.
-DM_LOG_FIRST = 200
+# The metadata event_type of a logged DM's replies (payload: kind, login, part), which
+# the day message's count is read from.
+DM_LOGGED = "cluster_dm_logged"
+# How often the count is read again after an edit, while another sender's edit races it.
+DM_LOG_RECOUNT = 3
 
 
 class Error(RuntimeError):
@@ -87,59 +89,72 @@ class Error(RuntimeError):
 
 
 class DmLog:
-    """The administrators' record of the DMs: in CHANNEL, one message a day (on the first
-    DM of the day, its count kept up to date) and under it one reply per DM. STATE_FILE
-    holds today's message across runs and the processes of one tool (locked)."""
+    """The administrators' record of the DMs: in CHANNEL, one message a day, its count
+    kept up to date, and under it each DM as the person got it (dm_log_entry). Slack
+    holds it all: the day's message is the bot's one marked "dm-log DAY" (find()), the
+    count is the replies marked DM_LOGGED, so any number of senders, in any process on any
+    host, share them. Two senders that start a day at once each post a day message, see
+    both, and keep the older; a count one of them wrote over is read again and set right
+    (DM_LOG_RECOUNT). Needs the history scopes (cluster_bot.scopes reports them)."""
 
-    def __init__(self, channel, state_file):
-        self.channel, self.state_file = channel, state_file
+    def __init__(self, channel):
+        self.channel, self._cid = channel, None
 
-    @contextlib.contextmanager
-    def _today(self, now):
-        os.makedirs(os.path.dirname(os.path.abspath(self.state_file)), exist_ok=True)
-        with open(self.state_file + ".lock", "a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            try:
-                with open(self.state_file) as f:
-                    state = json.load(f)
-            except (OSError, ValueError):
-                state = {}
-            day = time.strftime("%Y-%m-%d", time.localtime(now))
-            if state.get("day") != day:
-                state = {"day": day, "ts": "", "channel": "", "count": 0}
-            yield state
-            write_atomic(self.state_file, json.dumps(state), mode=0o600)
+    def record(self, slack, entry, now=None):
+        """ENTRY (dm_log_entry: [(text, blocks)]) under today's message, in order."""
+        now = time.time() if now is None else now
+        day = time.strftime("%Y-%m-%d", time.localtime(now))
+        if self._cid is None:
+            self._cid = channel_id(slack, self.channel)
+        cid, start = self._cid, _day_start(now)
+        ts = self._day_message(slack, cid, day, start)
+        for part, (text, blocks) in enumerate(entry):
+            slack.post(cid, text, blocks, thread_ts=ts, metadata=_logged(part))
+        self._count(slack, cid, ts, day)
 
-    def record(self, slack, line, now=None):
-        """LINE under today's message (made by this call if there is none yet). The
-        message's channel is kept as Slack gave it, an ID: chat.update takes no name."""
-        with self._today(time.time() if now is None else now) as state:
-            if not state["ts"]:
-                state["channel"], state["ts"] = self._day_message(slack, state["day"])
-            slack.post(state["channel"], line, thread_ts=state["ts"])
-            state["count"] += 1
-            try:
-                slack.update(state["channel"], state["ts"], dm_log_title(state["day"], state["count"]))
-            except Error as e:  # the count is cosmetic: the line is in, and so is the state
-                print(f"slack: the day's DM count was not updated: {e}", file=sys.stderr)
-
-    def _day_message(self, slack, day):
-        """(channel ID, ts) of DAY's message: the one in the channel (marked, find()) when
-        the state lost it, else a new one, so a day never has two."""
+    def _day_message(self, slack, cid, day, start):
+        """The ts of DAY's message: the bot's oldest marked for it, posted by this call
+        when there is none. A second one posted meanwhile by another sender gives way to
+        the older, deleted before any reply is under it."""
         key = f"dm-log {day}"
-        try:
-            channel = channel_id(slack, self.channel)
-            found = find(slack, channel, key)
-        except Error as e:  # a token without the read scopes: posted as before
-            if not _no_history(e):
-                raise
-            channel, found = self.channel, []
+        found = find(slack, cid, key, oldest=start)
         if found:
-            return channel, found[0]
-        made = slack.call(
-            "chat.postMessage", channel=channel, text=dm_log_title(day, 0), metadata=json.dumps(marked(key))
-        )
-        return made["channel"], made["ts"]
+            return min(found, key=float)
+        mine = slack.call("chat.postMessage", channel=cid, text=dm_log_title(day, 0),
+                          metadata=json.dumps(marked(key)))["ts"]  # fmt: skip
+        oldest = min(find(slack, cid, key, oldest=start) + [mine], key=float)
+        if oldest != mine:
+            delete(slack, cid, mine)
+        return oldest
+
+    def _count(self, slack, cid, ts, day):
+        """Set the day message's count to the DMs logged under it, read from Slack, and
+        read it again after: a sender that counted earlier and wrote later is outdone."""
+        written = None
+        for _ in range(DM_LOG_RECOUNT):
+            n = sum(1 for r in replies(slack, cid, ts) if _logged_part(r) == 0)
+            if n == written:
+                return
+            slack.update(cid, ts, dm_log_title(day, n))
+            written = n
+
+
+def _day_start(now):
+    """The Unix time of the local midnight that starts NOW's day."""
+    t = time.localtime(now)
+    return time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1))
+
+
+def _logged(part):
+    return {"event_type": DM_LOGGED, "event_payload": {"part": part}}
+
+
+def _logged_part(message):
+    """The part of a logged DM MESSAGE is (0 its first reply), else None."""
+    meta = message.get("metadata") or {}
+    if meta.get("event_type") != DM_LOGGED:
+        return None
+    return (meta.get("event_payload") or {}).get("part", 0)
 
 
 class Slack:
@@ -208,7 +223,10 @@ class Slack:
         metadata) marks what the message is, so the bot finds it again exactly."""
         if MEMBER.fullmatch(channel):
             raise Error(f"Slack chat.postMessage: {channel} is a person; a message to a person is a dm()")
-        msg = rich.message(text, blocks or None)
+        return self._send(channel, rich.message(text, blocks or None), thread_ts, metadata)
+
+    def _send(self, channel, msg, thread_ts=None, metadata=None):
+        """Post MSG (rich.message: {"text", "blocks"}) as it is; its ts."""
         params = {"channel": channel, "text": msg["text"], "blocks": json.dumps(msg["blocks"]),
                   "unfurl_links": "false", "unfurl_media": "false"}  # fmt: skip
         if thread_ts:
@@ -224,17 +242,18 @@ class Slack:
 
     def dm(self, member, text, blocks=None, *, kind, login, log=True):
         """A direct message to MEMBER (a member ID) about KIND for LOGIN; (channel, ts).
-        With log and a dm_log (DmLog), the log gets one line: the kind, the login, the
-        message's first line and a link.
-        That line failing is said on stderr, never undoes or repeats the sent DM."""
+        With log and a dm_log (DmLog), the log gets the message as sent, under a line
+        naming the kind, the login and a link (dm_log_entry). The log failing is said on
+        stderr, never undoes or repeats the sent DM."""
         logged = log and self.dm_log is not None
         channel = self.dm_channel(member)
-        ts = self.post(channel, text, blocks)
+        msg = rich.message(text, blocks or None)
+        ts = self._send(channel, msg)
         print(f"dm {kind} {login} {channel} {ts}")
         if logged and not self.dry_run:
             try:
                 link = self.call("chat.getPermalink", channel=channel, message_ts=ts).get("permalink", "")
-                self.dm_log.record(self, dm_log_line(kind, login, text, link))
+                self.dm_log.record(self, dm_log_entry(kind, login, msg, link))
             except (Error, OSError) as e:
                 print(f"slack: the DM to {login} ({kind}) was sent; logging it failed: {e}", file=sys.stderr)
         return channel, ts
@@ -252,13 +271,17 @@ def dm_log_title(day, count):
     return f":envelope: Notices sent to people by DM on {day}: {count} (each in the thread)"
 
 
-def dm_log_line(kind, login, text, link=""):
-    """The administrators' line for one DM: what kind, to whom, its first line, a link."""
-    shown = rich.plain(text).strip()
-    first = shown.splitlines()[0] if shown else ""
-    if len(first) > DM_LOG_FIRST:
-        first = first[: DM_LOG_FIRST - 3] + "..."
-    return f"`{escape(kind)}` to **{escape(login)}**: {escape(first)}" + (f"  <{link}|open>" if link else "")
+def dm_log_line(kind, login, link=""):
+    """The line heading one logged DM: what kind, to whom, a link to it."""
+    return f"`{escape(kind)}` to **{escape(login)}**" + (f"  <{link}|open>" if link else "")
+
+
+def dm_log_entry(kind, login, msg, link=""):
+    """The log's replies [(text, blocks)] for the DM MSG (rich.message, as dm() sent it):
+    dm_log_line first, then every block of the DM unchanged, split only where Slack's
+    limits force it (pages())."""
+    head = dm_log_line(kind, login, link)
+    return pages(rich.plain(head), rich.blocks(head) + list(msg["blocks"]))
 
 
 def _retry_after(error):
@@ -413,11 +436,14 @@ def is_own(message, ids):
     return bool(bot_id and message.get("bot_id") == bot_id)
 
 
-def history(slack, channel):
-    """Every message in CHANNEL (an ID), newest first, with its metadata."""
+def history(slack, channel, oldest=None):
+    """Every message in CHANNEL (an ID), newest first, with its metadata; with OLDEST (a
+    Unix time) only those since."""
     out, cursor = [], ""
     while True:
         params = {"channel": channel, "limit": 200, "include_all_metadata": "true"}
+        if oldest is not None:
+            params["oldest"] = f"{oldest:.6f}"
         if cursor:
             params["cursor"] = cursor
         body = slack.call("conversations.history", **params)
@@ -497,13 +523,13 @@ def _key(message):
     return payload.get("key"), payload.get("part", 0)
 
 
-def find(slack, channel, key, legacy=None):
+def find(slack, channel, key, legacy=None, oldest=None):
     """The ts of the bot's own messages in CHANNEL (an ID) kept as KEY, newest first: marked
-    so, or (LEGACY(message) true, for those posted before the mark) unmarked. Raises
-    Error (missing_scope) without the history scopes."""
+    so, or (LEGACY(message) true, for those posted before the mark) unmarked; with OLDEST
+    only among those since. Raises Error (missing_scope) without the history scopes."""
     ids = own(slack)
     out = []
-    for m in history(slack, channel):
+    for m in history(slack, channel, oldest):
         k, part = _key(m)
         if is_own(m, ids) and ((k == key and not part) or (k is None and legacy is not None and legacy(m))):
             out.append(m["ts"])

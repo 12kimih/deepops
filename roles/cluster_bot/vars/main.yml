@@ -70,7 +70,7 @@ _cluster_bot_cfg:
   reminders: "{{ _cluster_bot_home }}/reminders-sent.json"
   welcomed: "{{ _cluster_bot_home }}/accounts-welcomed.json"
   # The notices the bot DMs a person, logged for the administrators (cluster_tools.slack).
-  dm_log: {channel: "{{ slack_dm_log_channel }}", state: "{{ _cluster_bot_home }}/dm-log.json"}
+  dm_log: {channel: "{{ slack_dm_log_channel }}"}
   # The user docs' notices, posted in the announcement channel on their date
   # (cluster_bot.notices): the docs site publishes them as notices.json.
   notices:

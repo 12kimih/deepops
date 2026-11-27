@@ -442,11 +442,11 @@ def slack_id(user, cfg, slack, cache):
 
 def client(cfg, args):
     """The Slack client of a run: its DMs logged for the administrators in a daily thread
-    of dm_log_channel (cluster_tools.slack.DmLog), whose state sits beside the hourly
-    run's, shared by every run of this tool; no channel, not logged."""
+    of dm_log_channel (cluster_tools.slack.DmLog), the one every sender shares, read
+    from Slack; no channel, not logged."""
     dm_log = None
     if cfg["dm_log_channel"]:
-        dm_log = DmLog(cfg["dm_log_channel"], os.path.join(os.path.dirname(cfg["state_file"]), "dm-log.json"))
+        dm_log = DmLog(cfg["dm_log_channel"])
     return Slack(cfg["slack_token"], args.dry_run, dm_log=dm_log)
 
 

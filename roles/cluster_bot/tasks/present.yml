@@ -68,6 +68,14 @@
   changed_when: true
   notify: Restart the cluster bot
 
+# The DM log's day message and count are read from Slack now (cluster_tools.slack.DmLog),
+# shared with every other sender; the bot's own copy of them goes.
+- name: Remove the DM log's earlier state
+  ansible.builtin.file:
+    path: "{{ _cluster_bot_home }}/{{ item }}"
+    state: absent
+  loop: [dm-log.json, dm-log.json.lock]
+
 # Where the first deploys wrote the pins; they live in the venv now.
 - name: Remove the pins' earlier place
   ansible.builtin.file:
