@@ -27,6 +27,11 @@
   become: true
   roles:
     - role: facts
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
 
 - hosts: slurm-cluster
   become: true
@@ -103,6 +108,13 @@
         public: true
         tasks_from: upgrade-verify
       when: not ansible_check_mode
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
+      vars:
+        component_record_sources_also: [slurm]
 
 - hosts: slurm-node
   become: true
@@ -143,6 +155,13 @@
         public: true
       vars:
         slurm_upgrade: true
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
+      vars:
+        component_record_sources_also: [slurm]
 
 
 # The check that every slurmd now runs slurm_version.

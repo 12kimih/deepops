@@ -15,3 +15,10 @@
   environment: "{{ proxy_env }}"
   tags:
     - k8s_gpu_device_plugin
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
+      vars:
+        component_record_sources_also: [nvidia-k8s-gpu-device-plugin]

@@ -11,3 +11,8 @@
     - role: submit_holds
       submit_holds_state: "{{ deepops_components.submit_holds | component_phase(deepops_phase) }}"
   tags: ['submit-holds', 'people']  # the end dates come from the roster
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

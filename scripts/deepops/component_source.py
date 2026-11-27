@@ -20,10 +20,11 @@ component calls it, and a fix there would otherwise flag every component at once
 Files are compared by git blob id, so an unrelated commit moves no digest, and a working
 tree with uncommitted changes hashes what is on disk.
 
-  component_source.py [--config DIR] digest [--hosts H1,H2]
+  component_source.py [--config DIR] digest [--hosts H1,H2] [--roles R1,R2]
       {host: {component: digest}} as JSON, for the hosts named (default: all), and
-      under "component_record" the record's own; the component_record role runs this
-      once per run (it is cached for the trees as they are)
+      under "component_record" the record's own; with --roles, only what a play that
+      applied those roles whole records, as {hosts, managed}: component_record's
+      tasks_from sources runs this at each play's end (cached for the trees as they are)
 """
 
 import ast
@@ -67,6 +68,7 @@ COMMENT = re.compile(r"(?m)^[ \t]*#[^\n]*|\{#(?s:.*?)#\}")
 # An expression that reads other hosts' settings: the names in it count for every host.
 FLEET = re.compile(r"\{\{(?:(?!\}\}).)*\bhostvars\b(?:(?!\}\}).)*\}\}", re.S)
 REGISTRY = "deepops_component_registry"
+MANAGED, MANAGED_FILE = "deepops_managed_roles", "roles/deploy_defaults/vars/main.yml"
 # Modules that change nothing on a host (a role of only these is inert).
 INERT_MODULES = {
     f"{prefix}{name}"
@@ -138,6 +140,21 @@ def component_roles(tree):
         if found.setdefault(name, role) != role:
             raise ValueError(f"{name}: recorded present by roles {found[name]} and {role}")
     return dict(sorted(found.items()))
+
+
+def managed_roles(tree):
+    """{role: kind} of every role that is no component (deepops_managed_roles in the
+    registry's file), whose source a play records at its end; operations never."""
+    data = _load(tree.text(MANAGED_FILE)) or {}
+    return {str(n): str((e or {}).get("kind")) for n, e in (data.get(MANAGED) or {}).items()}
+
+
+def recorded(tree):
+    """{name: role} of everything whose source is recorded: the components and the
+    managed roles that are no operation."""
+    out = component_roles(tree)
+    out.update({n: n for n, kind in managed_roles(tree).items() if kind != "operation"})
+    return dict(sorted(out.items()))
 
 
 class Closure:
@@ -448,7 +465,7 @@ class Sources:
     def __init__(self, tree, config, owner_map):
         self.closure = Closure(tree)
         self.config, self.owner_map = config, owner_map
-        self.components = component_roles(tree)
+        self.components = recorded(tree)
         self.components[RECORD] = RECORD
         self._code = {}
         self._config_blobs = {}
@@ -596,17 +613,36 @@ def cached(config_dir, hosts):
     return {h: data.get(h, {}) for h in hosts}
 
 
+def applied(digests, roles):
+    """Of DIGESTS ({host: {name: digest}}), what a play that applied ROLES whole records:
+    {hosts: {host: {name: digest}}, managed: [names that are no component]}, with
+    component_record's own digest kept for every host."""
+    tree = settings.Tree(ROOT)
+    names = {n for n, r in recorded(tree).items() if r in roles} | {RECORD}
+    managed = sorted(set(managed_roles(tree)) & names)
+    return {
+        "hosts": {h: {n: d for n, d in row.items() if n in names} for h, row in digests.items()},
+        "managed": managed,
+    }
+
+
 def main(argv):
     parser = cli.parser(__doc__)
     parser.add_argument("--config", default=os.environ.get("DEEPOPS_CONFIG_DIR", str(ROOT / "config")))
     sub = parser.add_subparsers(dest="command", required=True)
     dg = sub.add_parser("digest", help="each host's component digests, as JSON")
     dg.add_argument("--hosts", help="comma-separated (default: every inventory host)")
+    dg.add_argument(
+        "--roles",
+        help="comma-separated: only what these roles record, as {hosts, managed} (a play's end)",
+    )
     args = parser.parse_args(argv)
     if args.hosts:
         out = cached(args.config, [h for h in args.hosts.split(",") if h])
     else:
         out = sources(args.config)
+    if args.roles is not None:
+        out = applied(out, {r for r in args.roles.split(",") if r})
     json.dump(out, sys.stdout, sort_keys=True)
     sys.stdout.write("\n")
     return 0

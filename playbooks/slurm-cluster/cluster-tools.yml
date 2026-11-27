@@ -16,3 +16,8 @@
     - role: cluster_tools
       cluster_tools_state: "{{ deepops_components.cluster_tools | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

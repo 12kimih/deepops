@@ -13,3 +13,8 @@
     - role: prometheus-node-exporter
       node_exporter_state: "{{ deepops_components.node_exporter | component_phase(deepops_phase) }}"
   tags: ['node-exporter', 'monitoring']
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

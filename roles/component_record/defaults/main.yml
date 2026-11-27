@@ -40,9 +40,11 @@ component_record_path: "{{ deepops_component_record }}"
 # The calling role: its mark ("# Managed by roles/<role>") lets absent adopt a file it
 # wrote; it also names the role's reboot request.
 component_record_role: "{{ ansible_parent_role_names | default([]) | first | default('') }}"
-# Whether this run ran every task of the play on every host it meant to: no --tags or
-# --skip-tags, not --check, and no host failed so far. Only then does present record a
-# new source digest (ansible_run_tags is a tuple in ansible-core 2.22: compared as a list).
+# Whether this run ran every task: no --tags or --skip-tags, and not --check. Only then
+# does a play's end (tasks_from: sources) record new source digests, for the hosts still
+# in the play: one that failed left it (ansible_run_tags is a tuple in ansible-core 2.22:
+# compared as a list).
 component_record_whole_run: >-
-  {{ ansible_run_tags | list == ['all'] and ansible_skip_tags | default([]) | length == 0
-     and not ansible_check_mode and ansible_play_hosts_all | difference(ansible_play_hosts) | length == 0 }}
+  {{ ansible_run_tags | list == ['all'] and ansible_skip_tags | default([]) | length == 0 and not ansible_check_mode }}
+# The roles a play's tasks include whole (tasks_from: sources), beside its roles.
+component_record_sources_also: []

@@ -159,49 +159,11 @@
           package: >-
             {{ (host_baseline_present | default([])) if component_record_orphans.package | length > 0 else [] }}
 
-# What decides the component on each host (scripts/deepops/component_source.py: its
-# roles, playbook, plugins and config), recorded with present so ComponentNotDeployed
-# names a host a later fix has not reached. Only a run that ran all of it: under --tags,
-# --skip-tags or --check, or with a host failed in the play, part of the role may not
-# have run, and the digest recorded before is kept. Worked out once per run for every
-# host (cached for the trees as they are); a failure there keeps the old digest too.
-- name: Work out what decides each component on each host
-  ansible.builtin.command:
-    argv:
-      - "{{ ansible_playbook_python }}"
-      - "{{ role_path }}/../../scripts/deepops/component_source.py"
-      - --config
-      - "{{ inventory_dir }}"
-      - digest
-      - --hosts
-      - "{{ ansible_play_hosts_all | join(',') }}"
-  register: component_record_sources
-  changed_when: false
-  failed_when: false
-  check_mode: false  # read-only (and a --check run records nothing: whole_run)
-  run_once: true
-  delegate_to: localhost
-  become: false
-  when:
-    - component_record_action == 'present'
-    - component_record_whole_run
-    - inventory_dir is string  # a run from a config directory (not -i host,)
 
-- name: Say why the digest was not worked out
-  ansible.builtin.debug:
-    msg: >-
-      The component's source digest was not worked out ({{ component_record_sources.stderr | default('') | trim }});
-      the one recorded before is kept.
-  run_once: true
-  when:
-    - component_record_sources is not skipped
-    - component_record_sources.rc | default(0) != 0
-
+# The source digest (what decides the component on the host) is no business of this
+# call: the play that applied the component records it at its very end, after the
+# handlers (tasks_from: sources), the one path every managed role records through.
 - name: "Record the component {{ component_record_name ~ ' (' ~ component_record_action ~ ')' }}"
-  vars:
-    _digests: >-
-      {{ (component_record_sources.stdout | from_json).get(inventory_hostname, {})
-         if component_record_sources is not skipped and component_record_sources.rc | default(1) == 0 else {} }}
   component_record:
     path: "{{ component_record_path }}"
     name: "{{ component_record_name }}"
@@ -211,27 +173,8 @@
     exclusive_packages: "{{ component_record_exclusive_packages }}"
     legacy: "{{ component_record_legacy }}"
     role: "{{ component_record_role }}"
-    source: "{{ _digests.get(component_record_name, '') }}"
-    record_source: "{{ _digests.get('component_record', '') }}"
   register: component_record_recorded
 
-# What exports the record runs now (deepops_component_record_readers), so the deploy
-# shows in Prometheus at once, not at the next daily measurement. Only for the record
-# this role keeps: one at another path (a test's) has no readers.
 - name: Export the record now
-  when:
-    - component_record_action != 'begin'  # what is there until the deploy ends stays shown
-    - component_record_recorded.written | default(false)
-    - component_record_path == deepops_component_record
-  block:
-    # Resolved here: deepops_paths is this role's dependency, not textfile_keep's.
-    - name: Name what exports the record
-      ansible.builtin.set_fact:
-        _component_record_readers: "{{ deepops_component_record_readers }}"
-
-    - name: Run what exports the record
-      ansible.builtin.include_role:
-        name: textfile_keep
-        tasks_from: refresh
-      vars:
-        textfile_keep_producers: "{{ _component_record_readers }}"
+  ansible.builtin.include_tasks: export.yml
+  when: component_record_action != 'begin'  # what is there until the deploy ends stays shown

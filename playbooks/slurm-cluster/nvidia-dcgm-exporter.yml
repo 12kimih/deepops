@@ -28,3 +28,10 @@
     - role: nvidia-dcgm-exporter
       dcgm_exporter_state: "{{ deepops_components.dcgm_exporter | component_phase(deepops_phase) }}"
   tags: [dcgm-exporter, monitoring]
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
+      vars:
+        component_record_sources_also: [facts]

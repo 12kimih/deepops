@@ -20,9 +20,9 @@ options:
     type: path
     default: /etc/ansible/facts.d/deepops_components.fact
   name:
-    description: The component.
+    description: The component (not with C(sources)).
     type: str
-    required: true
+    default: ""
   action:
     description:
       - C(begin) records the component as installing and adds I(items) to what it needs,
@@ -39,9 +39,21 @@ options:
         I(exclusive_packages) (another role may install it unrecorded); an fstab entry as
         named (only explicit removals have them); a file whose whole content an earlier
         deepops version wrote unmarked, by I(legacy).
+      - C(sources) records what a whole play deployed (component_record tasks_from
+        sources): each of I(sources) for a component the record holds present, each of
+        I(managed) beside the components (C(managed), never a change), and
+        I(record_source). Nothing else changes.
     type: str
-    choices: [begin, present, absent]
+    choices: [begin, present, absent, sources]
     required: true
+  sources:
+    description: For C(sources), {component: digest} of the components the play applied.
+    type: dict
+    default: {}
+  managed:
+    description: For C(sources), {role: digest} of the roles that are no component.
+    type: dict
+    default: {}
   items:
     description: Items as KIND:ID.
     type: list
@@ -171,6 +183,22 @@ def _with_source(entry, source):
     return {**entry, "source": source} if source else entry
 
 
+def _sources(data, sources, managed, record_source):
+    """DATA with the digests a whole play deployed: a component's only while the record
+    holds it present (an absent one is never brought back), every managed role's."""
+    record = {**data, "components": dict(data["components"])}
+    for name, digest in sources.items():
+        entry = record["components"].get(name)
+        if digest and isinstance(entry, dict) and entry.get("state") == "present":
+            record["components"][name] = {**entry, "source": digest}
+    kept = {**(data.get("managed") or {}), **{n: d for n, d in managed.items() if d}}
+    if kept:
+        record["managed"] = dict(sorted(kept.items()))
+    if record_source:
+        record["record_source"] = record_source
+    return record
+
+
 def bookkeeping(record):
     """RECORD without its source digests: what a change to the host is judged by (a new
     digest alone is bookkeeping, as roles/deploy_record's is, never a change)."""
@@ -192,9 +220,13 @@ def apply(
     evidence=lambda kind, ident: False,
     source="",
     record_source="",
+    managed=None,
 ):
     """The new record and the orphans (a pure function, for the tests). SOURCE and
-    RECORD_SOURCE, when given, replace the recorded digests; otherwise they are kept."""
+    RECORD_SOURCE, when given, replace the recorded digests; otherwise they are kept.
+    For action sources, SOURCE is {component: digest} and MANAGED {role: digest}."""
+    if action == "sources":
+        return _sources(data, source or {}, managed or {}, record_source), {k: [] for k in KINDS}, {}
     components = dict(data["components"])
     owners = {item: set(names) for item, names in data["items"].items()}
     before = components.get(name, {})
@@ -234,6 +266,8 @@ def apply(
     }
     if record_source or data.get("record_source"):
         record["record_source"] = record_source or data["record_source"]
+    if data.get("managed"):
+        record["managed"] = data["managed"]
     grouped = {kind: [] for kind in KINDS}
     for item in orphans:
         kind, _, ident = item.partition(":")
@@ -248,8 +282,10 @@ def main():
     module = AnsibleModule(
         argument_spec={
             "path": {"type": "path", "default": "/etc/ansible/facts.d/deepops_components.fact"},
-            "name": {"type": "str", "required": True},
-            "action": {"type": "str", "required": True, "choices": ["begin", "present", "absent"]},
+            "name": {"type": "str", "default": ""},
+            "action": {"type": "str", "required": True, "choices": ["begin", "present", "absent", "sources"]},
+            "sources": {"type": "dict", "default": {}},
+            "managed": {"type": "dict", "default": {}},
             "items": {"type": "list", "elements": "str", "default": []},
             "version": {"type": "str", "default": ""},
             "exclusive_packages": {"type": "list", "elements": "str", "default": []},
@@ -262,6 +298,8 @@ def main():
         supports_check_mode=True,
     )
     p = module.params
+    if (p["action"] == "sources") == bool(p["name"]):
+        module.fail_json(msg="name is required, except with action sources, which takes none")
     bad = [i for i in p["items"] if i.partition(":")[0] not in KINDS or not i.partition(":")[2]]
     if bad:
         module.fail_json(msg=f"items must be KIND:ID with KIND one of {', '.join(KINDS)}: {bad}")
@@ -304,8 +342,9 @@ def main():
         p["version"],
         set(p["exclusive_packages"]),
         evidence,
-        p["source"],
+        p["sources"] if p["action"] == "sources" else p["source"],
         p["record_source"],
+        p["managed"],
     )
     changed = bookkeeping(record) != bookkeeping(data)
     # Written, a source digest alone too: what exports the record runs again (its readers).

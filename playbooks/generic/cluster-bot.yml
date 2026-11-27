@@ -13,6 +13,11 @@
   tags:
     - cluster-bot
     - people  # members and admins come from the roster
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
 
 # The hosts that already offer the bot a service (roles/cluster_bot_access: fail2ban
 # runs before this play) authorize the key it may just have made.

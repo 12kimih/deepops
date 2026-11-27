@@ -10,3 +10,8 @@
     - role: container_storage_gc
       container_storage_gc_state: "{{ deepops_components.container_storage_gc | component_phase(deepops_phase) }}"
   tags: ['container-storage-gc', 'people']  # the active people keep their stores
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

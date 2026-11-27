@@ -13,3 +13,8 @@
     - role: gpu_diag_idle
       gpu_diag_idle_state: "{{ deepops_components.gpu_diag_idle | component_phase(deepops_phase) }}"
   tags: ['gpu-diag-idle']
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

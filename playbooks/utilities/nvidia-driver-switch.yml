@@ -43,6 +43,13 @@
                               else ['role', 'reboot', 'verify'] }}"
       when: ansible_facts.ansible_local['gpus']['count'] | int > 0 and not nvidia_driver_switch_dgx.stat.exists
   environment: "{{ proxy_env }}"
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
+      vars:
+        component_record_sources_also: [facts]
 
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true

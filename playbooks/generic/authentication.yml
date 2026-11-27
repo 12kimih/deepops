@@ -16,6 +16,11 @@
     - role: directory_defaults
     - role: site_secrets
       site_secrets: "{{ directory_site_secrets }}"
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
 
 - hosts: "{{ hostlist | default('all') }}"
   become: true
@@ -32,6 +37,11 @@
     - role: people
       people_local_accounts_enabled: "{{ directory_service != 'ldap' }}"
       when: people_manage_accounts | bool
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
 
 # Servers before the clients that bind to them.
 - name: Serve the LDAP directory
@@ -53,3 +63,8 @@
   roles:
     - role: autofs
       when: (autofs_mount | length > 0) and (autofs_map | length > 0)
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

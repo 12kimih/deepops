@@ -179,6 +179,22 @@ class Sources(unittest.TestCase):
         self.assertNotEqual(newer, first)
         self.assertEqual(mod.bookkeeping(newer), mod.bookkeeping(first))
 
+    def test_a_plays_end_records_present_components_and_managed_roles(self):
+        """action sources (tasks_from: sources): what a whole play deployed."""
+        base, _, _ = mod.apply(EMPTY, "c", "present", ["file:/x"], "1")
+        base, _, _ = mod.apply(base, "d", "begin", ["file:/y"], "1")
+        got, orphans, _ = mod.apply(base, "", "sources", [], "", source={"c": "aaaa", "d": "dddd", "gone": "g"},
+                                    record_source="rrrr", managed={"sshd": "ssss"})  # fmt: skip
+        self.assertEqual(got["components"]["c"]["source"], "aaaa")
+        self.assertNotIn("source", got["components"]["d"], "installing: not deployed yet")
+        self.assertNotIn("gone", got["components"], "an absent component is never brought back")
+        self.assertEqual((got["managed"], got["record_source"]), ({"sshd": "ssss"}, "rrrr"))
+        self.assertEqual(got["items"], base["items"])
+        self.assertFalse(any(orphans.values()))
+        self.assertEqual(mod.bookkeeping(got), mod.bookkeeping(base), "bookkeeping, never a change")
+        kept, _, _ = mod.apply(got, "c", "present", ["file:/x"], "1")
+        self.assertEqual((kept["managed"], kept["components"]["c"]["source"]), ({"sshd": "ssss"}, "aaaa"))
+
 
 class UnitOrder(unittest.TestCase):
     def test_what_starts_a_service_stops_before_it(self):
@@ -280,6 +296,8 @@ SOURCE_PLAY = """
 - hosts: all
   connection: local
   gather_facts: false
+  vars:
+    component_record_path: "{{ record }}-{{ inventory_hostname }}"
   tasks:
     - name: Fail a host first, when asked
       ansible.builtin.fail:
@@ -287,16 +305,32 @@ SOURCE_PLAY = """
     - ansible.builtin.include_role:
         name: component_record
       vars:
-        component_record_path: "{{ record }}-{{ inventory_hostname }}"
         component_record_name: chrony
         component_record_action: present
       tags: [always]
+    - name: Notify the restart
+      ansible.builtin.debug:
+      changed_when: true
+      notify: Restart
+  handlers:
+    - name: Restart
+      ansible.builtin.fail:
+      when: inventory_hostname in (handler_fails | default([]))
+  post_tasks:
+    # The play applies deepops_chrony (a component) and sshd (a managed role) whole, as
+    # far as the record is concerned: named, never run, so the test changes no host.
+    - ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
+      vars:
+        component_record_sources_also: [deepops_chrony, sshd]
 """
 
 
 class RunSources(unittest.TestCase):
-    """A whole run records the digest component_source.py gives for the host; --tags, a
-    failed host or --check keep the one recorded before."""
+    """A play's end (tasks_from: sources) records the digests component_source.py gives
+    for each host still in the play; --tags or --check keep the ones recorded before, and
+    a host that failed, in a task or a handler, or was left out by --limit records none."""
 
     def play(self, *extra, ok=True):
         argv = ["ansible-playbook", "-i", str(self.config / "inventory"), str(self.playbook),
@@ -307,13 +341,19 @@ class RunSources(unittest.TestCase):
             self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-2000:])
         return done
 
-    def recorded(self, host="a"):
-        return json.loads(Path(f"{self.record}-{host}").read_text())["components"]["chrony"].get("source")
+    def recorded(self, host="a", name="chrony"):
+        path = Path(f"{self.record}-{host}")
+        if not path.exists():
+            return None
+        data = json.loads(path.read_text())
+        if name in data["components"]:
+            return data["components"][name].get("source")
+        return (data.get("managed") or {}).get(name)
 
-    def expected(self, host="a"):
+    def expected(self, host="a", name="chrony"):
         import component_source
 
-        return component_source.sources(self.config)[host]["chrony"]
+        return component_source.sources(self.config)[host][name]
 
     def setUp(self):
         import local_scratch
@@ -335,17 +375,33 @@ class RunSources(unittest.TestCase):
         self.play()
         first = self.recorded()
         self.assertEqual(first, self.expected())
+        self.assertEqual(self.recorded(name="sshd"), self.expected(name="sshd"), "a managed role too")
         self.set_upstream("other.example.invalid")
         self.assertNotEqual(self.expected(), first, "the config value is part of it")
         self.play("--tags", "never-a-tag")
         self.assertEqual(self.recorded(), first, "--tags")
         self.play("--check")
         self.assertEqual(self.recorded(), first, "--check")
-        self.play("-e", json.dumps({"fail_hosts": ["b"]}), ok=False)
-        self.assertEqual(self.recorded(), first, "a host failed in the play")
+        self.play("--limit", "b")
+        self.assertEqual(self.recorded(), first, "--limit: a did not run")
+        self.assertEqual(self.recorded("b"), self.expected("b"), "--limit: b did")
         self.play()
         self.assertEqual(self.recorded(), self.expected())
+
+    def test_a_host_that_fails_a_task_or_a_handler_records_nothing(self):
+        self.set_upstream("ntp.example.invalid")
+        self.play()
+        first = {h: self.recorded(h) for h in "ab"}
+        self.set_upstream("other.example.invalid")
+        self.play("-e", json.dumps({"handler_fails": ["b"]}), ok=False)
+        self.assertEqual(self.recorded("b"), first["b"], "its restart failed: not deployed")
+        self.assertEqual(self.recorded("a"), self.expected("a"), "the other host ran it all")
+        self.play("-e", json.dumps({"fail_hosts": ["a"]}), ok=False)
+        self.assertEqual(self.recorded("a"), self.expected("a"))
         self.assertEqual(self.recorded("b"), self.expected("b"))
+        self.set_upstream("third.example.invalid")
+        self.play("-e", json.dumps({"fail_hosts": ["a"]}), ok=False)
+        self.assertNotEqual(self.recorded("a"), self.expected("a"), "a task failed: not deployed")
 
     def readers(self, *units, ok=True):
         """A run whose record is the host's own (deepops_component_record), with UNITS as

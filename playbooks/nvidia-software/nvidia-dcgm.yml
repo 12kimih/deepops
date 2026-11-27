@@ -9,3 +9,8 @@
     - role: facts
     - role: nvidia_dcgm
       dcgm_state: "{{ deepops_components.dcgm | component_phase(deepops_phase) }}"
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

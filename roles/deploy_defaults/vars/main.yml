@@ -304,6 +304,59 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_cluster_bot }}", group: slurm-master, first: true}
 
+# Every other role a play applies that changes a host, by role name, with its kind and
+# the one playbook that brings its hosts level (docs/deepops/component-state.md, Not
+# components). Never in the present/absent map above: a deploy records what each was
+# deployed from at the end of its play (component_record tasks_from: sources), so
+# ComponentNotDeployed and sync.py name a host a fix has not reached. Kinds:
+#   policy     a value the role keeps (an enum or a mode): no absent, another value instead
+#   oneshot    a migration or a setting made once (hosts, home directories, secrets)
+#   permanent  converged on every run, with no removal path yet
+#   operation  a step run on request (a drain, a window, a firmware update): registered,
+#              never recorded, since its run is no desired state
+deepops_managed_roles:
+  ai_agent_rules: {kind: policy, playbook: playbooks/slurm-cluster/ai-agent-rules.yml}
+  ara_server: {kind: permanent, playbook: playbooks/utilities/ara-server.yml}
+  autofs: {kind: permanent, playbook: playbooks/generic/authentication.yml}
+  cachefilesd: {kind: permanent, playbook: playbooks/generic/cachefilesd.yml}
+  cluster_sudoers: {kind: permanent, playbook: playbooks/generic/cluster-sudoers.yml}
+  deepops_hosts: {kind: oneshot, playbook: playbooks/generic/hosts.yml}
+  default_target: {kind: policy, playbook: playbooks/generic/default-target.yml}
+  dns-config: {kind: permanent, playbook: playbooks/generic/dns-config.yml}
+  docker-login: {kind: permanent, playbook: playbooks/container/docker-login.yml}
+  docker_socket_group: {kind: permanent, playbook: playbooks/container/docker-socket-group.yml}
+  facts: {kind: permanent, playbook: playbooks/slurm-cluster/nhc.yml}
+  host_baseline: {kind: permanent, playbook: playbooks/generic/host-baseline.yml}
+  k8s-internal-container-registry: {kind: permanent, playbook: playbooks/k8s-cluster/container-registry.yml}
+  kerberos_client: {kind: permanent, playbook: playbooks/generic/authentication.yml}
+  locale: {kind: policy, playbook: playbooks/generic/locale.yml}
+  login_shells: {kind: permanent, playbook: playbooks/generic/software.yml}
+  maas-controller: {kind: permanent, playbook: playbooks/provisioning/maas.yml}
+  maintenance: {kind: operation}
+  maintenance_window: {kind: operation}
+  mofed: {kind: permanent, playbook: playbooks/utilities/mofed.yml}
+  move-home-dirs: {kind: oneshot, playbook: playbooks/generic/authentication.yml}
+  netapp-trident: {kind: permanent, playbook: playbooks/k8s-cluster/netapp-trident.yml}
+  netplan: {kind: permanent, playbook: playbooks/generic/netplan.yml}
+  node_user_policy: {kind: policy, playbook: playbooks/generic/node-user-policy.yml}
+  nvidia-dgx: {kind: permanent, playbook: playbooks/nvidia-dgx/nvidia-dgx.yml}
+  nvidia-dgx-firmware: {kind: operation}
+  nvidia-mig-manager: {kind: permanent, playbook: playbooks/nvidia-software/nvidia-mig.yml}
+  nvidia-network-operator: {kind: permanent, playbook: playbooks/k8s-cluster/nvidia-network-operator.yaml}
+  nvidia-peer-memory: {kind: permanent, playbook: playbooks/nvidia-software/nvidia-peer-memory.yml}
+  nvidia_ecc: {kind: policy, playbook: playbooks/nvidia-software/nvidia-ecc.yml}
+  os_updates: {kind: policy, playbook: playbooks/generic/os-updates.yml}
+  people: {kind: permanent, playbook: playbooks/generic/people.yml}
+  root_access: {kind: permanent, playbook: playbooks/generic/root-access.yml}
+  runai: {kind: policy, playbook: playbooks/k8s-cluster/runai.yml}
+  serial_console: {kind: permanent, playbook: playbooks/generic/serial-console.yml}
+  site_secrets: {kind: oneshot, playbook: playbooks/slurm-cluster/site-secrets.yml}
+  # Slurm and MUNGE (one role): its absent path, which makes it a component with
+  # removal: explicit, comes with the rework of its templates.
+  slurm: {kind: permanent, playbook: playbooks/slurm-cluster/slurm.yml}
+  sshd: {kind: permanent, playbook: playbooks/generic/sshd.yml}
+  stale_files: {kind: permanent, playbook: playbooks/utilities/stale-files.yml}
+
 # This host's desired state of each component: present or absent.
 deepops_components: >-
   {{ deepops_component_registry | components_desired(groups, inventory_hostname, deepops_component_removals) }}

@@ -9,6 +9,13 @@
       run_once: true
   tags:
     - container-registry
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
+      vars:
+        component_record_sources_also: [k8s-internal-container-registry]
 
 - hosts: kube_node
   become: true

@@ -11,3 +11,8 @@
   become: true
   roles:
     - role: ara_server
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

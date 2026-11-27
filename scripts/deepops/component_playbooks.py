@@ -6,7 +6,8 @@ level. The rules file is generated from the playbooks; add or move a component's
 then run this.
 
 A component's playbook is the one play file, outside the two deploys, that applies its
-role with its state from the map (deepops_components.<name> | component_phase).
+role with its state from the map (deepops_components.<name> | component_phase); every
+other managed role's is the one its deepops_managed_roles entry names.
 
 Usage: component_playbooks.py [--check]   (--check reports a stale file and exits 1)
 """
@@ -50,7 +51,22 @@ def playbooks(root=ROOT):
             "each component needs exactly one playbook: "
             + "; ".join(f"{n}: {', '.join(p) or 'none'}" for n, p in sorted(bad.items()))
         )
-    return {n: found[n].pop() for n in sorted(names)}
+    out = {n: found[n].pop() for n in sorted(names)}
+    # every other managed role: the playbook its entry names (an operation records none)
+    for name, entry in managed(root).items():
+        if (entry or {}).get("kind") != "operation":
+            out[name] = entry["playbook"]
+    return dict(sorted(out.items()))
+
+
+def managed(root=ROOT):
+    """deepops_managed_roles: {role: {kind, playbook}} (roles/deploy_defaults/vars/main.yml)."""
+    return (
+        yaml.safe_load((root / "roles/deploy_defaults/vars/main.yml").read_text()).get(
+            "deepops_managed_roles"
+        )
+        or {}
+    )
 
 
 def render(mapping):

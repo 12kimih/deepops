@@ -12,6 +12,11 @@
   become: true
   roles:
     - role: facts
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
 
 # Every host first: a Slurm version change (or the retired source build) stops the
 # whole deploy before anything is installed. That is the upgrade playbook's job
@@ -51,6 +56,11 @@
   become: true
   roles:
     - role: slurm
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
 
 # Set up slurm-login-on-compute if enabled
 - hosts: slurm-master

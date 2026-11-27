@@ -11,3 +11,8 @@
     - role: shared_space
       shared_space_state: "{{ deepops_components.shared_space | component_phase(deepops_phase) }}"
   tags: ['shared-space', 'people']  # the project groups' members come from the roster
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

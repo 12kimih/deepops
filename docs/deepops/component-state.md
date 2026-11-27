@@ -102,16 +102,16 @@ or a run from another operator's machine.
   the reason.
 - **Fixed but never deployed.** The same version can still run older code: a role fix
   that only limited runs reached since leaves the other hosts on the old one, and their
-  deploy record looks current. Each whole deploy of a component records on the host a
-  source digest (`scripts/deepops/component_source.py`): its role's files; of the roles
-  it pulls in, what of them runs (the tasks files reached, their handlers, templates,
-  files and modules) and the defaults that code reads, of the component map only the
-  entries it names; the playbook that applies it; the in-tree plugins and repository
-  files those name; and the host's config values of the settings it reads and the config
-  files it names. Files count by git blob id, so an unrelated commit changes nothing and
-  a working tree with uncommitted changes counts as it is. A run that may have skipped
-  part of the role (`--tags`, `--skip-tags`, `--check`, a host failed in the play)
-  keeps the digest recorded before. component_record itself is left out of every
+  deploy record looks current. Each whole deploy records on the host a source digest
+  (`scripts/deepops/component_source.py`) for every managed role its plays applied, a
+  component or not (next section): its role's files; of the roles it pulls in, what of
+  them runs (the tasks files reached, their handlers, templates, files and modules) and
+  the defaults that code reads, of the component map only the entries it names; the
+  playbook that applies it; the in-tree plugins and repository files those name; and the
+  config values of the settings its code reads (another role's too, and through hostvars
+  every host's), of the settings those values name, and the config files they name.
+  Files count by git blob id, so an unrelated commit changes nothing and a working tree
+  with uncommitted changes counts as it is. component_record itself is left out of every
   closure and has its own digest (`record_source`). `ComponentNotDeployed` names each
   host, after three days, whose recorded digest is not what the checkouts give now, with
   the playbook; a host with no digest yet is not compared. A shared plugin is code of
@@ -153,6 +153,46 @@ A component the site manages itself (`managed: false` in its entry, such as Dock
 A playbook that needs a component on its own hosts whatever the map says
 (`ngc-ready-server.yml` needs Docker) imports it with `deepops_phase: require`.
 
+## What a deploy records
+
+Every role a play applies whole that changes a host has an entry: a component in
+`deepops_component_registry`, every other one in `deepops_managed_roles` beside it (same
+file), with its kind and the one playbook that brings its hosts level:
+
+| kind | what it is | examples |
+|---|---|---|
+| component | present or absent, the interface above | chrony, prometheus, cluster_tools |
+| policy | a value the role keeps (an enum, a mode); another value instead of absent | os_updates, node_user_policy, ai_agent_rules, nvidia_ecc |
+| oneshot | a migration or a setting made once | deepops_hosts, move-home-dirs, site_secrets |
+| permanent | converged on every run, no removal path yet | slurm (with MUNGE), sshd, people, host_baseline, mofed |
+| operation | a step run on request; registered, never recorded | maintenance, maintenance_window, nvidia-dgx-firmware |
+
+Only components enter the present/absent map: the other kinds are never removed by a
+switch. Whole means the play's `roles:` or an include_role/import_role in its tasks
+without `tasks_from`; a role used only in part (`tasks_from`) is a library of the role
+that uses it, and so are roles named `*_defaults` or `*_paths` and roles of only checks
+and facts.
+
+The record is one step, the last post_task of every play that applies an entry
+(`component_record` `tasks_from: sources`, with `component_record_sources_also` naming
+the roles the play's tasks include whole). It flushes the handlers first, so it runs
+after the play's roles, tasks and handlers, and records for each host still in the play
+the digest of every entry the play applied: a host that failed a task or a handler, or
+was unreachable, left the play and records nothing; `--limit` records the hosts it ran;
+`--tags`, `--skip-tags` and `--check` record nothing, keeping what was recorded before. A
+component's digest is written only while its record says present (an absent one is
+never brought back); the other kinds' go beside the components (`managed`). No role
+records its own digest. `tests/component-state/test_sources.py` fails a play that
+applies an entry without the step as its last post_task, a whole role a play applies
+that has no entry, and an entry whose playbook does not apply it.
+
+A role's coverage starts with its first whole run: until then it has no digest and
+ComponentNotDeployed does not compare it. Slurm and MUNGE are `permanent`, not yet
+components: their absent path, which makes them a component with `removal: explicit`,
+comes with the rework of the Slurm templates, and a run of slurm.yml limited by `--tags`
+(the prolog and epilog) records nothing, so a fix there stays unlisted until slurm.yml
+runs whole.
+
 ## Order
 
 Each component play passes its state through `component_phase(deepops_phase)`. Run alone
@@ -165,7 +205,8 @@ report and metrics before cluster_tools_lib; HPC SDK registration before Lmod; N
 clients before the server.
 - Reboot-class and access-class components never go implicitly: the NVIDIA driver,
   authentication (NIS, the directory, Kerberos), fail2ban (its removal lifts every
-  ban), Slurm itself and MUNGE, and the NFS server (unexporting /home hangs every
+  ban), Slurm itself and MUNGE once they are components (permanent until then: What a
+  deploy records), and the NFS server (unexporting /home hangs every
   client, as on 2026-11-18). Their registry entry
   says `removal: explicit`; where no rule holds the map gives `kept` and the role does
   nothing. The site retires one by naming it in `deepops_component_removals`: it goes
@@ -194,6 +235,9 @@ clients before the server.
 
 ## Not components
 
+Each of these that a play applies as a role has a `deepops_managed_roles` entry of its
+kind (What a deploy records), so a fix to it is tracked like a component's.
+
 - Migrations and one-shot settings have no absent state: move-home-dirs, hostname and
   /etc/hosts, swapoff, bootstrap-python, Kubespray itself.
 - **Policies** are enums, not present/absent: os_updates (security, off, unmanaged:
@@ -205,6 +249,8 @@ clients before the server.
 
 - Every role in the registry has `<role>_state` in its defaults, an `absent.yml`, a
   detect step, and calls `component_record` in both paths.
+- Every role a play applies whole that changes a host has an entry, and every play that
+  applies one ends with the record (test_sources.py).
 - Every deploy switch is in the registry; no import is skipped on `when: <switch>`,
   and the playbooks' order agrees with the `needs` graph. A switch a deploy still
   gates an import on is listed in the test's `GATES` with why: a policy, a one-shot

@@ -14,3 +14,8 @@
       job_scratch_state: "{{ deepops_components.job_scratch | component_phase(deepops_phase) }}"
   tags:
     - job-scratch
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

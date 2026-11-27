@@ -11,3 +11,8 @@
     - role: io_usage
       io_usage_state: "{{ deepops_components.io_usage | component_phase(deepops_phase) }}"
   tags: ['io-usage']
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

@@ -6,13 +6,28 @@ groups:
     rules:
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: ai_agent_rules, playbook: playbooks/slurm-cluster/ai-agent-rules.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: alertmanager, playbook: playbooks/slurm-cluster/alertmanager.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: ara_server, playbook: playbooks/utilities/ara-server.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: autofs, playbook: playbooks/generic/authentication.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: cachefilesd, playbook: playbooks/generic/cachefilesd.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: chrony, playbook: playbooks/generic/chrony-client.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: cluster_bot, playbook: playbooks/generic/cluster-bot.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: cluster_sudoers, playbook: playbooks/generic/cluster-sudoers.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: cluster_tools, playbook: playbooks/slurm-cluster/cluster-tools.yml}
@@ -36,13 +51,28 @@ groups:
         labels: {component: dcgm_exporter, playbook: playbooks/slurm-cluster/nvidia-dcgm-exporter.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: deepops_hosts, playbook: playbooks/generic/hosts.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: default_target, playbook: playbooks/generic/default-target.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: disk_quota, playbook: playbooks/generic/disk-quota.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: dns-config, playbook: playbooks/generic/dns-config.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: dns_resolver, playbook: playbooks/generic/dns-resolver.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: docker, playbook: playbooks/container/docker.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: docker-login, playbook: playbooks/container/docker-login.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: docker_socket_group, playbook: playbooks/container/docker-socket-group.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: easybuild, playbook: playbooks/slurm-cluster/easybuild-modules.yml}
@@ -52,6 +82,9 @@ groups:
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: enroot, playbook: playbooks/container/enroot.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: facts, playbook: playbooks/slurm-cluster/nhc.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: fail2ban, playbook: playbooks/generic/fail2ban.yml}
@@ -64,6 +97,9 @@ groups:
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: grafana, playbook: playbooks/slurm-cluster/grafana.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: host_baseline, playbook: playbooks/generic/host-baseline.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: hpcsdk, playbook: playbooks/nvidia-software/nvidia-hpc-sdk.yml}
@@ -87,6 +123,9 @@ groups:
         labels: {component: job_scratch, playbook: playbooks/slurm-cluster/job-scratch.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: k8s-internal-container-registry, playbook: playbooks/k8s-cluster/container-registry.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: k8s_gpu_feature_discovery, playbook: playbooks/k8s-cluster/nvidia-k8s-gpu-feature-discovery.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
@@ -96,13 +135,37 @@ groups:
         labels: {component: k8s_nfs_client, playbook: playbooks/k8s-cluster/nfs-client-provisioner.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: kerberos_client, playbook: playbooks/generic/authentication.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: ldap_server, playbook: playbooks/generic/ldap-server.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: lmod, playbook: playbooks/slurm-cluster/lmod.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: locale, playbook: playbooks/generic/locale.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: login_private_dirs, playbook: playbooks/generic/login-private-dirs.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: login_shells, playbook: playbooks/generic/software.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: maas-controller, playbook: playbooks/provisioning/maas.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: mofed, playbook: playbooks/utilities/mofed.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: move-home-dirs, playbook: playbooks/generic/authentication.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: netapp-trident, playbook: playbooks/k8s-cluster/netapp-trident.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: netplan, playbook: playbooks/generic/netplan.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: nfs, playbook: playbooks/generic/nfs-server.yml}
@@ -129,10 +192,28 @@ groups:
         labels: {component: node_exporter, playbook: playbooks/slurm-cluster/prometheus-node-exporter.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: node_user_policy, playbook: playbooks/generic/node-user-policy.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: nvidia-dgx, playbook: playbooks/nvidia-dgx/nvidia-dgx.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: nvidia-mig-manager, playbook: playbooks/nvidia-software/nvidia-mig.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: nvidia-network-operator, playbook: playbooks/k8s-cluster/nvidia-network-operator.yaml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: nvidia-peer-memory, playbook: playbooks/nvidia-software/nvidia-peer-memory.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: nvidia_container_toolkit, playbook: playbooks/container/nvidia-container-toolkit.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: nvidia_driver, playbook: playbooks/nvidia-software/nvidia-driver.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: nvidia_ecc, playbook: playbooks/nvidia-software/nvidia-ecc.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: nvidia_power_limit, playbook: playbooks/nvidia-software/nvidia-power-limit.yml}
@@ -144,7 +225,13 @@ groups:
         labels: {component: openmpi, playbook: playbooks/slurm-cluster/openmpi.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: os_updates, playbook: playbooks/generic/os-updates.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: pcie_acs, playbook: playbooks/generic/pcie-acs.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: people, playbook: playbooks/generic/people.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: podman, playbook: playbooks/container/podman.yml}
@@ -159,16 +246,31 @@ groups:
         labels: {component: pyxis, playbook: playbooks/container/pyxis.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: root_access, playbook: playbooks/generic/root-access.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: rsyslog_client, playbook: playbooks/generic/rsyslog-client.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: rsyslog_server, playbook: playbooks/generic/rsyslog-server.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: runai, playbook: playbooks/k8s-cluster/runai.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: scratch_space, playbook: playbooks/generic/scratch-space.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: serial_console, playbook: playbooks/generic/serial-console.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: shared_space, playbook: playbooks/slurm-cluster/shared-space.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: site_secrets, playbook: playbooks/slurm-cluster/site-secrets.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: slurm, playbook: playbooks/slurm-cluster/slurm.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: slurm_backup, playbook: playbooks/slurm-cluster/slurm-backup.yml}
@@ -183,7 +285,13 @@ groups:
         labels: {component: slurm_usage_report, playbook: playbooks/slurm-cluster/slurm-usage-report.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: sshd, playbook: playbooks/generic/sshd.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: sssd_client, playbook: playbooks/generic/sssd-client.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
+        labels: {component: stale_files, playbook: playbooks/utilities/stale-files.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: standalone_container_registry, playbook: playbooks/container/standalone-container-registry.yml}

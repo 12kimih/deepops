@@ -13,3 +13,10 @@
     - name: Configure nv_peer_mem (GPU nodes only; the role gates on GPU detection)
       ansible.builtin.include_role:
         name: nvidia-peer-memory
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources
+      vars:
+        component_record_sources_also: [facts, nvidia-peer-memory]

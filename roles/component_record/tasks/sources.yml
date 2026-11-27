@@ -1,0 +1,67 @@
+---
+# What each role this play applied whole was deployed from, recorded at the play's true
+# end: the last post_task of every play that applies a managed role (a component or one
+# of deepops_managed_roles; tests/component-state enforce it), after its tasks and its
+# handlers, so ComponentNotDeployed and sync.py name a host a later fix has not reached.
+#
+# Whole: the play's roles (ansible_play_role_names, not their dependencies and never a
+# part included with tasks_from), and component_record_sources_also, the roles its
+# tasks include whole (the test reads them from the tree). Only a run that ran all of it
+# records: under --tags, --skip-tags or --check the digests recorded before are kept. A
+# host that failed (a task or a handler) or went unreachable left the play and records
+# nothing; --limit records the hosts it ran. Worked out once per play for every host
+# (cached for the trees as they are); a failure there keeps the old digests too.
+- name: Run the handlers before recording what this play deployed
+  ansible.builtin.meta: flush_handlers
+
+- name: Work out what this play deployed on each host
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - "{{ role_path }}/../../scripts/deepops/component_source.py"
+      - --config
+      - "{{ inventory_dir }}"
+      - digest
+      - --hosts
+      - "{{ ansible_play_hosts_all | join(',') }}"
+      - --roles
+      - "{{ (ansible_play_role_names + component_record_sources_also) | unique | join(',') }}"
+  register: component_record_sources
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only (and a --check run records nothing: component_record_whole_run)
+  run_once: true
+  delegate_to: localhost
+  become: false
+  when:
+    - component_record_whole_run
+    - inventory_dir is string  # a run from a config directory (not -i host,)
+
+- name: Say why what this play deployed was not worked out
+  ansible.builtin.debug:
+    msg: >-
+      The source digests were not worked out ({{ component_record_sources.stderr | default('') | trim }});
+      the ones recorded before are kept.
+  run_once: true
+  when:
+    - component_record_sources is not skipped
+    - component_record_sources.rc | default(0) != 0
+
+- name: Record what this play deployed
+  vars:
+    _applied: >-
+      {{ (component_record_sources.stdout | from_json)
+         if component_record_sources is not skipped and component_record_sources.rc | default(1) == 0
+         else {'hosts': {}, 'managed': []} }}
+    _digests: "{{ _applied.hosts.get(inventory_hostname, {}) }}"
+  component_record:
+    path: "{{ component_record_path }}"
+    action: sources
+    sources: "{{ _digests | dict2items | rejectattr('key', 'in', _applied.managed + ['component_record']) | items2dict }}"
+    managed: "{{ _digests | dict2items | selectattr('key', 'in', _applied.managed) | items2dict }}"
+    record_source: "{{ _digests.get('component_record', '') }}"
+  register: component_record_recorded
+  when: _digests | length > 0
+
+- name: Export the record now
+  ansible.builtin.include_tasks: export.yml
