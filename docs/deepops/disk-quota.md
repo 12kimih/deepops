@@ -108,6 +108,12 @@ counted filesystem against the warn level and the limit, their folders worth cle
 how much their jobs and logins read and wrote over the last `--hours` (roles/io_usage).
 It reads Prometheus, as the report does. The Grafana dashboard Storage / per person
 (`storage-person`) draws the same queries over time, for the person its User variable picks.
+Until someone is limited somewhere (a `block_hard` or `inode_hard` in a host's
+`disk_quota_filesystems`, or a person's own `disk_quota` in the roster), quotas only count:
+`usage` shows the disk rule off and the docs data says it is not active. Setting or
+changing a limit changes the cluster_tools rules file too: `scripts/deepops/sync.py` lists
+cluster-tools.yml with disk-quota.yml after such a change, and ComponentNotDeployed names
+it until it runs.
 
 Look at the distribution, then choose hard limits that leave the filesystem's other
 users (the controller's database, the logs) a reserve: roughly, the space users may
