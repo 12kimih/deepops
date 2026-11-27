@@ -11,8 +11,10 @@ What decides a component, read from the tree, never listed apart:
   - the in-tree plugins those files name (filters, actions, module_utils) and the
     repository files they name by path (scripts/deepops/component_expected.py), with the
     Python modules those import beside them;
-  - per host, the config values of the settings those roles own, and the config files
-    those files name under inventory_dir.
+  - per host, the config values of the settings those roles own or their code names
+    (whichever role owns it), of the settings those values name in turn, and the config
+    files those files and values name under inventory_dir; a setting read of other
+    hosts (through hostvars) by every host's value.
 component_record is left out of every other closure and has its own digest: every
 component calls it, and a fix there would otherwise flag every component at once.
 Files are compared by git blob id, so an unrelated commit moves no digest, and a working
@@ -60,6 +62,10 @@ REPO_PATH = re.compile(r"\b((?:scripts|plugins)/[\w./-]+\.\w+)")
 CONFIG_PATH = re.compile(r"inventory_dir\s*\}\}\s*/([\w./-]+)|inventory_dir\s*~\s*['\"]/([\w./-]+)['\"]")
 DIGEST_LENGTH = 16
 IDENTIFIER = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+# A comment line (YAML, shell, Python) or a Jinja comment: names there are not read.
+COMMENT = re.compile(r"(?m)^[ \t]*#[^\n]*|\{#(?s:.*?)#\}")
+# An expression that reads other hosts' settings: the names in it count for every host.
+FLEET = re.compile(r"\{\{(?:(?!\}\}).)*\bhostvars\b(?:(?!\}\}).)*\}\}", re.S)
 REGISTRY = "deepops_component_registry"
 # Modules that change nothing on a host (a role of only these is inert).
 INERT_MODULES = {
@@ -433,6 +439,9 @@ def _value(value):
     return settings.plain(value)
 
 
+_HASHED = object()  # a setting a host leaves at a default its files already count
+
+
 class Sources:
     """Each component's digest per host, for one deepops tree and one config."""
 
@@ -443,6 +452,7 @@ class Sources:
         self.components[RECORD] = RECORD
         self._code = {}
         self._config_blobs = {}
+        self._resolved = {}
         self._owner_roles = {n: o.roles for n, o in owner_map.items()}
 
     def code(self, component):
@@ -452,28 +462,72 @@ class Sources:
             # the settings it reads: every one its own role owns, and of the roles it
             # pulls in, those its code names
             owned = {n for n, r in self._owner_roles.items() if role in r or (r & roles and n in names)}
-            self._code[component] = (lines, owned, config_files(texts))
+            # and those of roles it never runs that its code (not a comment) names: their
+            # defaults never reach it, only a config value does (the roster's people,
+            # another role's limits); component_record's are its own digest's
+            live = set(IDENTIFIER.findall(COMMENT.sub("", "\n".join(texts))))
+            outside = {
+                n for n, r in self._owner_roles.items()
+                if n in live and n not in owned and not r & (roles | set(SELF))
+            }  # fmt: skip
+            # and of those, the ones it reads of every host (hostvars): each host's value
+            fleet = {n for expr in FLEET.findall("\n".join(texts)) for n in IDENTIFIER.findall(expr)}
+            self._code[component] = (
+                lines,
+                owned | outside,
+                outside,
+                fleet & (owned | outside),
+                config_files(texts),
+            )
         return self._code[component]
+
+    def resolved(self, host):
+        if host not in self._resolved:
+            self._resolved[host] = self.config.resolve(host, self.owner_map)
+        return self._resolved[host]
 
     def config_blobs(self, rel):
         if rel not in self._config_blobs:
             self._config_blobs[rel] = sorted(self.config.tree.blob_ids(rel).items())
         return self._config_blobs[rel]
 
+    def _site_value(self, name, resolved):
+        """NAME's value as RESOLVED gives it, or _HASHED for one not here or a default already hashed."""
+        if name not in resolved:
+            return _HASHED
+        value, where = resolved[name]
+        owner = self.owner_map.get(name)
+        if owner is not None and where in owner.paths:
+            return _HASHED  # the default: in the role's own files above, or never there
+        return value
+
     def digest(self, host, component, resolved=None):
-        lines, owned, paths = self.code(component)
-        resolved = resolved if resolved is not None else self.config.resolve(host, self.owner_map)
+        lines, owned, _, fleet, paths = self.code(component)
+        resolved = resolved if resolved is not None else self.resolved(host)
         values = {}
-        for name in sorted(owned):
-            if name not in resolved:
+        # A value that is a template reads the settings it names (people, from the
+        # roster's file through people_roster): those count too, to any depth.
+        todo = sorted(owned, reverse=True)
+        while todo:
+            name = todo.pop()
+            if name in values:
                 continue
-            value, where = resolved[name]
-            owner = self.owner_map.get(name)
-            if owner is not None and where in owner.paths:
-                continue  # the default: in the role's own files above
-            values[name] = _value(value)
-            if isinstance(value, str):
-                paths = paths | config_files([value])
+            if name in fleet:
+                each = {h: self._site_value(name, self.resolved(h)) for h in sorted(self.config.hosts)}
+                found = [v for v in each.values() if v is not _HASHED]
+                if not found:
+                    continue
+                values[name] = {h: _value(v) for h, v in each.items() if v is not _HASHED}
+            else:
+                value = self._site_value(name, resolved)
+                if value is _HASHED:
+                    continue
+                values[name] = _value(value)
+                found = [value]
+            for value in found:
+                if isinstance(value, str):
+                    paths = paths | config_files([value])
+                    todo.extend(n for n in IDENTIFIER.findall(value) if n in resolved and n not in values)
         h = hashlib.sha256()
         h.update("\n".join(lines).encode())
         h.update(b"\nconfig\n")
@@ -487,8 +541,7 @@ class Sources:
         """{host: {component: digest}} for HOSTS (default: the inventory's)."""
         out = {}
         for host in sorted(hosts if hosts is not None else self.config.hosts):
-            resolved = self.config.resolve(host, self.owner_map)
-            out[host] = {c: self.digest(host, c, resolved) for c in self.components}
+            out[host] = {c: self.digest(host, c) for c in self.components}
         return out
 
 

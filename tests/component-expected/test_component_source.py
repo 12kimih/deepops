@@ -20,7 +20,11 @@ FILES = {
     "roles/app/defaults/main.yml": (
         'app_version: "1"\napp_setting: plain\napp_key_file: "{{ inventory_dir }}/files/app/key"\n'
     ),
-    "roles/app/templates/app.conf.j2": "{{ app_setting | myfilter }} {{ helper_used }}\n",
+    "roles/app/templates/app.conf.j2": (
+        "{{ app_setting | myfilter }} {{ helper_used }} {{ roster }}\n"
+        "{{ groups['all'] | map('extract', hostvars) | map(attribute='limits', default={}) | list }}\n"
+        "{# roster_unread #}\n"
+    ),
     "roles/app/tasks/main.yml": """\
 - ansible.builtin.include_role:
     name: helper
@@ -52,6 +56,8 @@ FILES = {
     component_record_action: present
 """,
     "roles/component_record/tasks/main.yml": "- ansible.builtin.debug:\n    msg: record\n",
+    # a role app never runs: its settings reach app only as config values
+    "roles/roster/defaults/main.yml": "roster: {}\nlimits: {}\nroster_unread: 1\n",
     "plugins/filter/used.py": "class FilterModule:\n    def filters(self):\n        return {'myfilter': str}\n",
     "plugins/filter/unused.py": "class FilterModule:\n    def filters(self):\n        return {'notused': str}\n",
     "playbooks/app.yml": "- hosts: all\n  roles:\n    - app\n",
@@ -61,6 +67,9 @@ CONFIG = {
     "inventory": "[g]\nn1\n[rest]\nn2\n",
     "group_vars/g.yml": "app_setting: special\n",
     "files/app/key": "k1\n",
+    "group_vars/all.yml": "roster: \"{{ roster_source.people }}\"\nroster_source: \"{{ lookup('file', inventory_dir ~ '/people.yml') | from_yaml }}\"\nroster_unread: 2\n",
+    "people.yml": "people: {kim: {}}\n",
+    "host_vars/n2": "limits: {/data: 2T}\n",
 }
 
 
@@ -161,6 +170,22 @@ class Digest(unittest.TestCase):
         before = self.digests()
         self.edit("files/app/key", "k1", "k2", root=self.config)  # named through inventory_dir
         self.assertEqual(self.moved(before, self.digests()), {("n1", "app"), ("n2", "app")})
+
+    def test_what_it_reads_of_a_role_it_never_runs_counts_by_the_config(self):
+        """2026-11-27: cluster_tools reads the roster (people, through people_roster and
+        people.yml) and every host's disk_quota_filesystems (hostvars), all owned by
+        roles it never runs: a change to either never moved its digest."""
+        cases = [
+            ("people.yml", "kim: {}", "kim: {disk_quota: {/: 1G}}", {"n1", "n2"}),  # through two values
+            ("host_vars/n2", "2T", "3T", {"n1", "n2"}),  # another host's, read through hostvars
+            ("group_vars/all.yml", "roster_unread: 2", "roster_unread: 3", set()),  # named in a comment only
+        ]
+        for rel, old, new, hosts in cases:
+            with self.subTest(rel=rel, change=new):
+                before = self.digests()
+                self.edit(rel, old, new, root=self.config)
+                self.assertEqual({h for h, c in self.moved(before, self.digests()) if c == "app"}, hosts)
+                self.edit(rel, new, old, root=self.config)
 
     def test_an_unrelated_commit_moves_nothing(self):
         before = self.digests("HEAD")
