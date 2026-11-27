@@ -39,15 +39,13 @@ def dropin():
 
 class Retention(unittest.TestCase):
     def test_the_oldest_head_entry_and_its_number(self):
-        since, seqnum = journald.oldest(HEADER)
-        self.assertEqual((int(since), seqnum), (0x6613D18C8C343 // 10**6, 0x1BDFF6B))
+        self.assertEqual(int(journald.oldest(HEADER)), 0x6613D18C8C343 // 10**6)
         self.assertIsNone(journald.oldest("No journal files were found.\n"))
 
     def test_the_textfile_names_the_target_and_this_run(self):
-        values = prom.parse(journald.textfile((1700000000.5, 7), 14, 1700100000))
+        values = prom.parse(journald.textfile(1700000000.5, 14, 1700100000))
         self.assertEqual(values, {
             prom.key("journald_entries_since_seconds"): "1700000000",
-            prom.key("journald_oldest_entry_seqnum"): "7",
             prom.key("journald_retention_target_seconds"): "1209600",
             prom.key("journald_retention_last_success_timestamp_seconds"): "1700100000",
         })  # fmt: skip
@@ -64,7 +62,7 @@ class Retention(unittest.TestCase):
                 [sys.executable, "-c", code, str(out), "14"], env=env, capture_output=True, text=True
             )
             self.assertEqual(done.returncode, 0, done.stderr)
-            self.assertIn("journald_oldest_entry_seqnum{} 29228907", out.read_text())
+            self.assertIn(f"journald_entries_since_seconds{{}} {0x6613D18C8C343 // 10**6}", out.read_text())
             bad = subprocess.run(
                 [sys.executable, "-c", code, str(out), "0"], env=env, capture_output=True, text=True
             )

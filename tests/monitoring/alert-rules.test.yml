@@ -1535,34 +1535,32 @@ tests:
               summary: "slurm-usage-report on ctl has not run for 3 hours"
               description: "Its notices go unsent. `systemctl list-timers 'slurm-usage-report*'` and `journalctl -u slurm-usage-report` on the host."
 
-  - name: a journal cut short after journald deleted entries warns, a young one does not
+  - name: a journal losing entries below its target warns; one filling or past the target does not
     interval: 1m
     input_series:
-      # Deleted entries (seqnum above 1), reaching back 11 hours of a 14-day target.
-      - series: 'journald_entries_since_seconds{host="m", instance="m:9100"}'
-        values: '-39600+60x80'
-      - series: 'journald_oldest_entry_seqnum{host="m", instance="m:9100"}'
-        values: '29228907x80'
-      - series: 'journald_retention_target_seconds{host="m", instance="m:9100"}'
-        values: '1209600x80'
-      # A new host: its first entry is 1, two hours old.
-      - series: 'journald_entries_since_seconds{host="n", instance="n:9100"}'
-        values: '-7200x80'
-      - series: 'journald_oldest_entry_seqnum{host="n", instance="n:9100"}'
-        values: '1x80'
-      - series: 'journald_retention_target_seconds{host="n", instance="n:9100"}'
-        values: '1209600x80'
+      # Filling: its oldest entry fixed, two hours old.
+      - series: 'journald_entries_since_seconds{host="f", instance="f:9100"}'
+        values: '-7200x150'
+      - series: 'journald_retention_target_seconds{host="f", instance="f:9100"}'
+        values: '1209600x150'
+      # Steady loss: the oldest entry moves forward, the journal 11 hours long.
+      - series: 'journald_entries_since_seconds{host="l", instance="l:9100"}'
+        values: '-39600+60x150'
+      - series: 'journald_retention_target_seconds{host="l", instance="l:9100"}'
+        values: '1209600x150'
+      # Loss beyond the target: 15 days kept, the oldest dropping off as meant.
+      - series: 'journald_entries_since_seconds{host="a", instance="a:9100"}'
+        values: '-1296000+60x150'
+      - series: 'journald_retention_target_seconds{host="a", instance="a:9100"}'
+        values: '1209600x150'
     alert_rule_test:
-      - eval_time: 30m
-        alertname: JournalRetentionShort
-        exp_alerts: []
-      - eval_time: 1h10m
+      - eval_time: 2h
         alertname: JournalRetentionShort
         exp_alerts:
-          - exp_labels: {severity: warning, host: m, instance: "m:9100"}
+          - exp_labels: {severity: warning, host: l, instance: "l:9100"}
             exp_annotations:
-              summary: "The system journal of m reaches back 11h 0m 0s only"
-              description: "journald deleted entries younger than the retention it is sized for (roles/journald, journald_retention_days): what happened before is gone. `journalctl --disk-usage`, `ls /var/log/journal/*/ | wc -l` and the top senders (`journalctl --since -1h -o json --output-fields=SYSLOG_IDENTIFIER`) there; raise journald_system_max_use or stop the flood."
+              summary: "The system journal of l is losing entries younger than its retention"
+              description: "journald deleted entries within the last 6 hours although the journal reaches back less than the retention it is sized for (roles/journald, journald_retention_days): what happened before is going. `journalctl --disk-usage`, `ls /var/log/journal/*/ | wc -l` and the top senders (`journalctl --since -1h -o json --output-fields=SYSLOG_IDENTIFIER`) there; raise journald_system_max_use or stop the flood."
 
   - name: a journal measure that stopped warns
     interval: 10m

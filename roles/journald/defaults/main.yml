@@ -14,5 +14,6 @@ journald_system_max_use: 32G
 # High enough that per-user files never evict system ones.
 journald_system_max_files: 10000
 # The retention the journal is sized for, in days: JournalRetentionShort fires when a
-# host's system journal reaches back less after journald deleted entries.
+# host's journal loses entries while it reaches back less (loss happening now, not a
+# journal still filling).
 journald_retention_days: 14

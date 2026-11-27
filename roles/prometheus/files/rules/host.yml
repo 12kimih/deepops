@@ -3,20 +3,22 @@ groups:
   - name: host
     rules:
       # roles/journald: the system journal sized for journald_retention_days, measured by
-      # journal-retention.timer. Short only once journald deleted entries (the oldest
-      # kept one is not the journal's first): a young host is not short, only new.
+      # journal-retention.timer. Loss happening now only: the oldest kept entry moved
+      # forward (journald deleted a file) within the last 6 hours, while the journal
+      # reaches back less than the target. A journal still filling (its oldest entry
+      # fixed) is quiet, and so is one that deletes beyond the target.
       - alert: JournalRetentionShort
         expr: >-
-          (time() - journald_entries_since_seconds) < journald_retention_target_seconds
-          and journald_oldest_entry_seqnum > 1
-        for: 1h
+          changes(journald_entries_since_seconds[6h]) > 0
+          and (time() - journald_entries_since_seconds) < journald_retention_target_seconds
         labels: {severity: warning}
         annotations:
-          summary: "The system journal of {{ $labels.host }} reaches back {{ $value | humanizeDuration }} only"
+          summary: "The system journal of {{ $labels.host }} is losing entries younger than its retention"
           description: >-
-            journald deleted entries younger than the retention it is sized for
-            (roles/journald, journald_retention_days): what happened before is gone.
-            `journalctl --disk-usage`, `ls /var/log/journal/*/ | wc -l` and the top senders
+            journald deleted entries within the last 6 hours although the journal
+            reaches back less than the retention it is sized for (roles/journald,
+            journald_retention_days): what happened before is going. `journalctl
+            --disk-usage`, `ls /var/log/journal/*/ | wc -l` and the top senders
             (`journalctl --since -1h -o json --output-fields=SYSLOG_IDENTIFIER`) there;
             raise journald_system_max_use or stop the flood.
       # A measure that stopped: the alert above is blind.

@@ -9,13 +9,12 @@ look back found nothing. This reads `journalctl --system --header` (each file's 
 entry, small, never the entries) and writes, through write_atomic:
 
     journald_entries_since_seconds       when the oldest kept system entry was written
-    journald_oldest_entry_seqnum         its sequence number: above 1 once journald
-                                         deleted entries (a new journal starts at 1)
     journald_retention_target_seconds    DAYS, the retention the role sizes the journal for
     journald_retention_last_success_timestamp_seconds   this run
 
-JournalRetentionShort fires when the journal reaches back less than the target although
-journald already deleted entries; a young host (nothing deleted yet) is not short.
+JournalRetentionShort fires on loss happening now: the oldest entry moved forward (a
+file deleted) lately while the journal reaches back less than the target. A journal
+still filling keeps its oldest entry and stays quiet.
 Python 3.9 or newer, standard library only.
 """
 
@@ -30,20 +29,19 @@ from .files import write_atomic
 from .prom import key, render
 
 TIMEOUT = 60
-# journalctl --header: each file's head entry, its number and its time in microseconds
-# (the hex in parentheses).
-_SEQNUM = re.compile(r"^Head sequential number: \d+ \(([0-9a-f]+)\)$", re.M)
+# journalctl --header: each file's head entry, its time in microseconds (the hex in
+# parentheses).
 _REALTIME = re.compile(r"^Head realtime timestamp: .*\(([0-9a-f]+)\)$", re.M)
 
 
 def oldest(header):
-    """(Unix time, sequence number) of the oldest head entry in HEADER (journalctl
-    --header), or None for a journal without entries."""
+    """The Unix time of the oldest head entry in HEADER (journalctl --header), or None
+    for a journal without entries."""
     heads = []
     for block in header.split("File path: ")[1:]:
-        seq, real = _SEQNUM.search(block), _REALTIME.search(block)
-        if seq and real and int(real.group(1), 16):
-            heads.append((int(real.group(1), 16) / 1e6, int(seq.group(1), 16)))
+        real = _REALTIME.search(block)
+        if real and int(real.group(1), 16):
+            heads.append(int(real.group(1), 16) / 1e6)
     return min(heads) if heads else None
 
 
@@ -53,8 +51,7 @@ def textfile(head, days, now):
         key("journald_retention_last_success_timestamp_seconds"): int(now),
     }
     if head is not None:
-        values[key("journald_entries_since_seconds")] = int(head[0])
-        values[key("journald_oldest_entry_seqnum")] = head[1]
+        values[key("journald_entries_since_seconds")] = int(head)
     return render(values)
 
 
