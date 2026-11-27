@@ -288,6 +288,9 @@ groups:
         labels: {component: slurm_usage_report, playbook: playbooks/slurm-cluster/slurm-usage-report.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: ssh_rate, playbook: playbooks/generic/ssh-rate.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: sshd, playbook: playbooks/generic/sshd.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)

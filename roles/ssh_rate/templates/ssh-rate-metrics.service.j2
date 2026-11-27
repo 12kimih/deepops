@@ -1,0 +1,13 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Publish each person's new SSH sessions on this login node and any refusal
+
+[Service]
+Type=oneshot
+# Every minute: only what it did is worth the journal.
+SyslogLevel=notice
+LogLevelMax=notice
+TimeoutStartSec=50s
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _ssh_rate_command }} {{ _ssh_rate_config }} metrics

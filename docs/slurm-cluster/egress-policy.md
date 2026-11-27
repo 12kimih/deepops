@@ -191,6 +191,8 @@ at the next deploy; `-e egress_policy_state=absent` does so at once on the hosts
 |---|---|---|
 | `ingress_policy_state` | `present` | present applies the filter; absent removes the table and its unit (everything is let in again; ufw stays off); kept does nothing. A deploy sets it from slurm_enable_ingress_policy (docs/deepops/component-state.md). |
 | `ingress_policy_tcp_ports` | `[]` | Ports open to everyone: a number or "A-B". The SSH port and the web portal on a login host; set them per host or group. |
+| `ingress_policy_ssh_new_per_minute` | `600` | New SSH connections from one address outside the cluster's networks, per minute, past which they are dropped (0: no limit): a ceiling against a flood only, far above what a whole lab behind one address opens. Each person's own limit is roles/ssh_rate's. |
+| `ingress_policy_ssh_new_burst` | `200` |  |
 | `ingress_policy_udp_ports` | `[]` |  |
 | `ingress_policy_trusted_interfaces` | `[]` | Interfaces whose traffic is let in like the cluster's networks (a VPN such as tailscale0). |
 | `ingress_policy_lockout_check` | `true` | Refuse to turn the filter on when the SSH session Ansible (or its operator) came in on would be cut: neither from the cluster's networks or a trusted interface nor to an open port. |

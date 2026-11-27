@@ -1,0 +1,14 @@
+#!/bin/sh
+{{ ansible_managed | comment }}
+# Run by pam_exec (roles/ssh_rate's PAM profile) for every PAM service; acts on sshd
+# alone. pam_exec makes any nonzero exit a failure, so this turns only the decision's
+# refusal (77) into one, and every other end (an error, no interpreter, a timeout, a
+# signal) into success: a fault in the limit never locks anyone out.
+[ "${PAM_SERVICE:-}" = sshd ] || exit 0
+timeout -k 1 2 {{ _ssh_rate_command }} {{ _ssh_rate_config }} "$1"
+status=$?
+if [ "$status" -eq 77 ]; then
+    logger -p authpriv.notice -t ssh-rate "refused a new login of ${PAM_USER:-?} (too many new sessions)" || true
+    exit 1
+fi
+exit 0

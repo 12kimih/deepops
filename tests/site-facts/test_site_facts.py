@@ -334,7 +334,7 @@ class RulesActive(unittest.TestCase):
     VARS = ROOT / "roles/cluster_tools/vars/main.yml"
     # The rules file's part each gated rule empties (cluster_tools.rules reads it).
     PARTS = {"gpu_idle": "gpu-idle", "disk": "disk", "scratch": "scratch-purge", "io": "io-heavy",
-             "login": "login-limits"}  # fmt: skip
+             "login": "login-limits", "ssh": "ssh-rate"}  # fmt: skip
 
     def test_one_gate_per_rule_and_each_part_goes_through_its_own(self):
         import cluster_tools.rules as registry

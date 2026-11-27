@@ -245,6 +245,7 @@ overwrite it; `roles/requirements.yml` lists only what is used unmodified.
 │   ├── slurm_usage_report
 │   ├── slurm_usage_report_defaults
 │   ├── source_build
+│   ├── ssh_rate
 │   ├── sshd
 │   ├── sssd_client
 │   ├── stale_files

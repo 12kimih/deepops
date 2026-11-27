@@ -1,0 +1,28 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): a limit on how many new SSH
+# sessions each person opens on a login node (docs/deepops/ssh-rate.md). A deploy sets it
+# from deepops_components (slurm_enable_ssh_rate, on slurm-login). One SSH connection
+# per command (a script, an agent, a file copy each over its own ssh) loads sshd, PAM,
+# logind and the directory for every person on the node; a ControlMaster connection
+# carries any number of commands and is counted once.
+ssh_rate_state: present
+
+# refuse: past ssh_rate_refuse_sessions within ssh_rate_window_minutes, a new login is
+# refused for ssh_rate_block_minutes; warn: counted, shown (usage login-node, the bot),
+# told (a DM, an alert), never refused, to measure before it acts.
+ssh_rate_mode: refuse
+
+# New SSH sessions per person within the window that refuse a new login. The warning
+# comes at cluster_user_warn_fraction of it, the level every rule warns at.
+ssh_rate_refuse_sessions: 100
+ssh_rate_window_minutes: 10
+
+# How long a refusal lasts. A client that keeps trying while refused (as many attempts
+# as ssh_rate_refuse_sessions within the window) is out for another block, up to
+# ssh_rate_block_max_minutes from its start; a person who stops is free when it ends.
+ssh_rate_block_minutes: 10
+ssh_rate_block_max_minutes: 60
+
+# Never counted: root and the system's accounts (below UID_MIN of /etc/login.defs, the
+# services), and these logins, by default the roster's administrators.
+ssh_rate_exempt_users: "{{ people | default({}) | people_with_role('admin') }}"

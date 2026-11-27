@@ -43,11 +43,22 @@ CONFIG_OPTIONAL = {
     "scratch": dict,
     "io": dict,
     "login": dict,
+    "ssh": dict,
     "ends_dir": str,
+    "warn_fraction": (int, float),
 }
 STATES = ("ok", "warn", "act", "off", "?")
 RISKY = ("warn", "act")
-NEAR = 0.9  # a count limit this full is a warning (the queue, a login's tasks and memory)
+# How full a limit is a warning (the queue, a login's tasks and memory, its new SSH
+# sessions): the rules file's warn_fraction, cluster_user_warn_fraction, the level every
+# rule warns at; this only for a file written before it carried one.
+NEAR = 0.9
+
+
+def near(cfg):
+    return float(cfg.get("warn_fraction", NEAR))
+
+
 DAY = 86400
 
 
@@ -89,6 +100,10 @@ RULES = (
          "usage io", "policy/rules/#io"),
     Rule("login-limits", "로그인 노드 한도", "limit", "user_slice",
          ("cluster_tools_user_slice_limits",), "usage login-node", "policy/rules/#login"),
+    Rule("ssh-rate", "SSH 접속 빈도", "notice, refuse", "ssh_rate",
+         ("ssh_rate_refuse_sessions", "ssh_rate_window_minutes", "ssh_rate_block_minutes",
+          "ssh_rate_block_max_minutes", "ssh_rate_mode", "cluster_user_warn_fraction"),
+         "usage login-node", "policy/rules/#ssh-rate"),
     Rule("queued-jobs", "제출 잡 한도", "refuse", "slurm",
          ("max_submit_jobs (accounting.yml)",), "usage submit", "policy/rules/#submit"),
     Rule("membership-end", "소속 기간 종료", "hold", "submit_holds",
@@ -279,13 +294,17 @@ def login(user, cfg, uid, cgroup_root="/sys/fs/cgroup", sample=1.0, sleep=time.s
     if mem and mem_max and mem_max != "max":
         parts.append(f"메모리 {size(int(mem))}/{size(int(mem_max))}")
         states.append(
-            "act" if int(mem) >= int(mem_max) else "warn" if int(mem) >= NEAR * int(mem_max) else "ok"
+            "act" if int(mem) >= int(mem_max) else "warn" if int(mem) >= near(cfg) * int(mem_max) else "ok"
         )
     pids, pids_max = _read(f"{base}/pids.current"), _read(f"{base}/pids.max")
     if pids and pids_max and pids_max != "max":
         parts.append(f"프로세스 {pids}/{pids_max}")
         states.append(
-            "act" if int(pids) >= int(pids_max) else "warn" if int(pids) >= NEAR * int(pids_max) else "ok"
+            "act"
+            if int(pids) >= int(pids_max)
+            else "warn"
+            if int(pids) >= near(cfg) * int(pids_max)
+            else "ok"
         )
     cpu_max = (_read(f"{base}/cpu.max") or "max").split()
     if cpu_max[0] != "max":
@@ -301,13 +320,44 @@ def login(user, cfg, uid, cgroup_root="/sys/fs/cgroup", sample=1.0, sleep=time.s
         sleep(sample)
         used = (usage() - before) / 1e6 / sample
         parts.append(f"CPU {used:.1f}/{quota:g}")
-        states.append("warn" if used >= NEAR * quota else "ok")
+        states.append("warn" if used >= near(cfg) * quota else "ok")
     state = "act" if "act" in states else "warn" if "warn" in states else "ok"
     when = {"act": "한도에 닿음: 느려지거나 새 프로세스가 거부됩니다", "warn": "한도 가까움"}.get(state, "")
     return row("login-limits", ", ".join(parts) or "한도 없음", "", state, when)
 
 
-def queued(user, jobs_data, assoc_data):
+def ssh(user, cfg, prom, now):
+    """The caller's new SSH sessions on each login node against its limit, and any
+    refusal now: what cluster_tools.ssh_rate publishes from the counts it decides by,
+    which every caller can read (the bot too)."""
+    from .disk_report import series
+    from .io_report import quoted
+
+    if not cfg.get("ssh"):
+        return row("ssh-rate", "", "", "off")
+    if prom is None:
+        return unknown("ssh-rate", NO_PROMETHEUS)
+    refuse = series(prom, "ssh_rate_refuse_sessions", ())
+    if not refuse:
+        return unknown("ssh-rate", "로그인 노드의 집계가 아직 없습니다")
+    window = series(prom, "ssh_rate_window_seconds", ())
+    who = "{user=" + quoted(user) + "}"
+    counts = series(prom, "ssh_rate_new_sessions" + who, ())
+    until = {h: v for h, v in series(prom, "ssh_rate_blocked_until_seconds" + who, ()).items() if v > now}
+    host = max(refuse, key=lambda h: (h in until, counts.get(h, 0) / refuse[h]))
+    n, cap = int(counts.get(host, 0)), int(refuse[host])
+    limit = f"{int(window.get(host, 600) // 60)}분에 {cap}번"
+    mine = f"{host[0]} {n}번" if len(refuse) > 1 else f"{n}번"
+    if host in until:
+        when = time.strftime("%H:%M", time.localtime(until[host])) + "까지 새 접속 거부"
+        return row("ssh-rate", mine, limit, "act", when)
+    warn = series(prom, "ssh_rate_warn_sessions", ())
+    if n >= warn.get(host, cap):
+        return row("ssh-rate", mine, limit, "warn", f"{cap}번에 이르면 새 접속 거부")
+    return row("ssh-rate", mine, limit, "ok")
+
+
+def queued(user, jobs_data, assoc_data, fraction=NEAR):
     """The caller's queued and running jobs against MaxSubmitJobs (an association's
     max.jobs.total), per account; array tasks count one each, as Slurm counts them."""
     counts = {}
@@ -330,7 +380,7 @@ def queued(user, jobs_data, assoc_data):
         return row("queued-jobs", f"{sum(counts.values())}개", "제한 없음", "ok")
     account = max(limits, key=lambda acct: counts.get(acct, 0) / limits[acct])
     n, cap = counts.get(account, 0), limits[account]
-    state = "act" if n >= cap else "warn" if n >= NEAR * cap else "ok"
+    state = "act" if n >= cap else "warn" if n >= fraction * cap else "ok"
     when = {"act": "새 잡 제출 거부", "warn": "한도 가까움"}.get(state, "")
     return row("queued-jobs", f"{n}개 ({account})", f"{cap}개", state, when)
 
@@ -387,7 +437,8 @@ def overview(user, cfg, uid=None, prom=None, load=slurm.load, now=None, here=Tru
         ("scratch-purge", lambda: scratch(user, cfg, prom, now)),
         ("io-heavy", lambda: io(user, cfg, prom)),
         ("login-limits", lambda: first),
-        ("queued-jobs", lambda: queued(user, jobs, load("associations"))),
+        ("ssh-rate", lambda: ssh(user, cfg, prom, now)),
+        ("queued-jobs", lambda: queued(user, jobs, load("associations"), near(cfg))),
         ("membership-end", lambda: membership(user, cfg, now, ends)),
     ):  # fmt: skip
         needs_slurm = rule_id in ("gpu-idle", "queued-jobs")

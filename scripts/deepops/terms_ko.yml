@@ -229,6 +229,12 @@ terms:
     not:
       - 로그인 노드 (?:제한|상한)
     why: A limit is 한도, as the disk's (상한 is the GPU power cap's word).
+  - title: SSH 접속 빈도
+    title_not:
+      - 접속 횟수 제한
+      - SSH 접속 제한
+      - 세션 제한
+    why: The rule counts how often new SSH connections are opened, not whether one may log in.
   - title: 제출 잡 한도
     title_not:
       - 낼 수 있는 잡 수

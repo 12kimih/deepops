@@ -1,0 +1,31 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: ssh_rate_state in ['present', 'absent', 'kept']
+    fail_msg: "ssh_rate_state must be present, absent or kept, not {{ ssh_rate_state }}."
+    quiet: true
+
+# pam-auth-update writes the PAM stacks on the Debian family; RHEL's authselect has no
+# profile for it.
+- name: Check the host is of the Debian family
+  ansible.builtin.assert:
+    that: ansible_facts.os_family == 'Debian' or ssh_rate_state != 'present'
+    fail_msg: ssh_rate supports the Debian family only (pam-auth-update).
+    quiet: true
+
+- name: Check the limit's settings
+  ansible.builtin.assert:
+    that:
+      - ssh_rate_mode in ['refuse', 'warn']
+      - ssh_rate_refuse_sessions | int > 0
+      - ssh_rate_window_minutes | int > 0
+      - 0 < ssh_rate_block_minutes | int <= ssh_rate_block_max_minutes | int
+    fail_msg: >-
+      ssh_rate_mode is refuse or warn; ssh_rate_refuse_sessions and ssh_rate_window_minutes
+      are above 0; ssh_rate_block_minutes is above 0 and at most ssh_rate_block_max_minutes.
+    quiet: true
+  when: ssh_rate_state == 'present'
+
+- name: "Limit the new SSH sessions per person {{ ssh_rate_state }}"
+  ansible.builtin.include_tasks: "{{ ssh_rate_state }}.yml"
+  when: ssh_rate_state != 'kept'

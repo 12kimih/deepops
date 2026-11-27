@@ -4,8 +4,8 @@
 _slurm_usage_report_name: slurm-usage-report
 _slurm_usage_report_command: "/usr/local/libexec/{{ _slurm_usage_report_name }}"
 _slurm_usage_report_config: "{{ cluster_tools_lib_config_dir }}/{{ _slurm_usage_report_name }}.json"
-# The runs: the hourly report, the weekly summary, the daily disk usage report and the
-# I/O notices, each its own service and timer (one template pair), sharing the
+# The runs: the hourly report, the weekly summary, the daily disk usage report, the
+# I/O notices and the SSH rate notices, each its own service and timer (one template pair), sharing the
 # configuration; all but the hourly keep their own state files beside its. args is a
 # list, so a run without any adds nothing to its command line. quiet: a run every few
 # minutes keeps systemd's start and finish lines out of the journal.
@@ -18,6 +18,8 @@ slurm_usage_report_runs:
      schedule: "{{ slurm_usage_report_disk_schedule }}", what: daily disk usage report}
   - {unit: "{{ _slurm_usage_report_name }}-io", args: [--io], schedule: "{{ slurm_usage_report_io_schedule }}",
      what: I/O notices, quiet: true}
+  - {unit: "{{ _slurm_usage_report_name }}-ssh", args: [--ssh], schedule: "{{ slurm_usage_report_ssh_schedule }}",
+     what: SSH rate notices, quiet: true}
 # What this component installs, for its record (roles/component_record). Its state files
 # (when each job turned idle, whom it notified, each person's weeks) are data and stay.
 _slurm_usage_report_units: "{{ slurm_usage_report_runs | map(attribute='unit') | product(['.timer', '.service']) | map('join') | list }}"

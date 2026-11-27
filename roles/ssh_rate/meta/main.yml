@@ -1,0 +1,18 @@
+---
+dependencies:
+  - role: people_defaults  # people (ssh_rate_exempt_users)
+  - role: deploy_defaults  # cluster_user_warn_fraction
+  - role: cluster_info_defaults  # cluster_info.docs_url
+  - role: cluster_tools_lib  # cluster_tools.ssh_rate
+  - role: prometheus_paths  # node_exporter_prom_dir
+
+galaxy_info:
+  namespace: deepops
+  role_name: ssh_rate
+  author: DeepOps
+  description: A limit on how many new SSH sessions each person opens on a login node
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]

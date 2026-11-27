@@ -104,7 +104,7 @@ sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "scripts/deepops"))
 import cli  # noqa: E402
 import terms  # noqa: E402
-from cluster_tools import submit_holds  # noqa: E402
+from cluster_tools import ssh_rate, submit_holds  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 
@@ -173,7 +173,7 @@ PUBLIC = {
     "bot": {"command", "subcommands"},
     "reports": {"usage", "weekly", "disk"},
     "schedules": {"scratch_purge"},
-    "messages": {"hold_ended", "hold_disk"},
+    "messages": {"hold_ended", "hold_disk", "ssh_rate"},
     "storage": None,  # each measured mount, its fields STORAGE_FIELDS
     "terms": {"use", "title", "not", "title_not", "why", "scope", "id", "code"},  # every glossary entry
     "titles": {"endings", "exempt"},  # the glossary's title rules
@@ -713,7 +713,11 @@ def facts(config):
             **submit_policy(s.get("slurm_job_submit_policy") or {}),
             "max_submit_jobs": max_submit_jobs(config),
         },
-        "messages": {"hold_ended": submit_holds.ENDED, "hold_disk": submit_holds.DISK_HELD},
+        "messages": {
+            "hold_ended": submit_holds.ENDED,
+            "hold_disk": submit_holds.DISK_HELD,
+            "ssh_rate": ssh_rate.REFUSED,
+        },
         "storage": storage(s),
         "terms": terms.public(terms.load()),
         "titles": terms.public_titles(terms.load()),

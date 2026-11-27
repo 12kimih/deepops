@@ -17,6 +17,12 @@ ingress_policy_state: present
 # Ports open to everyone: a number or "A-B". The SSH port and the web portal on a login
 # host; set them per host or group.
 ingress_policy_tcp_ports: []
+
+# New SSH connections from one address outside the cluster's networks, per minute, past
+# which they are dropped (0: no limit): a ceiling against a flood only, far above what
+# a whole lab behind one address opens. Each person's own limit is roles/ssh_rate's.
+ingress_policy_ssh_new_per_minute: 600
+ingress_policy_ssh_new_burst: 200
 ingress_policy_udp_ports: []
 
 # Interfaces whose traffic is let in like the cluster's networks (a VPN such as

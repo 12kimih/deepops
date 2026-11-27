@@ -102,6 +102,7 @@ SOURCES = {
     "egress_policy": r"egress_policy_\w+",
     "disk_quota": r"disk_quota_\w+",
     "scratch_space": r"scratch_space_\w+",  # the scratch cleanup (roles/scratch_space)
+    "ssh_rate": r"ssh_rate_\w+",  # new SSH sessions per person (roles/ssh_rate)
     # Folders worth cleaning (cluster_tools.cleanup), from disk_quota's scan and the scratch cleanup.
     "disk_cleanup": r"disk_cleanup_\w+",
     # Each host's expected component versions and sources, the textfile written at each

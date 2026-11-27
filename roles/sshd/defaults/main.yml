@@ -10,9 +10,7 @@ sshd_manage: false
 # Where drop-ins the role did not write are kept, one directory per run.
 sshd_backup_dir: /var/backups/sshd
 
-# The ports sshd listens on. Ubuntu 24.04+ starts sshd from ssh.socket, whose listening
-# ports a generator takes from these; a change restarts the socket, never a session.
-sshd_ports: [22]
+# sshd_ports: roles/network_defaults (the inbound filter meters them too).
 
 # Host-based authentication inside the cluster: a user logged in on one host of this
 # inventory group reaches the others as themselves, without a key of their own (the

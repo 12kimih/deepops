@@ -290,6 +290,11 @@ deepops_component_registry:
   login_private_dirs:
     rules:
       - {switch: "{{ slurm_enable_login_private_dirs }}", group: slurm-login}
+  # New SSH sessions per person on the login nodes (roles/ssh_rate): it only refuses,
+  # so removing it takes nothing from anyone.
+  ssh_rate:
+    rules:
+      - {switch: "{{ slurm_enable_ssh_rate }}", group: slurm-login}
   # Shared data and collaboration folders where /home is local; their data stays.
   shared_space:
     rules:

@@ -1,0 +1,32 @@
+---
+# New SSH sessions per person on the login nodes (roles/ssh_rate textfile metrics,
+# cluster_tools.ssh_rate): who is at the warning level, whose new logins are refused,
+# and whether the counts still come in. The person is told too (slurm-usage-report --ssh).
+groups:
+  - name: ssh-rate
+    rules:
+      # A refusal is never silent: sshd shows a key login only "Connection closed".
+      - alert: SshLoginRefused
+        expr: ssh_rate_blocked_until_seconds > time()
+        labels: {severity: warning}
+        annotations:
+          summary: "New SSH logins of {{ $labels.user }} on {{ $labels.host }} are refused for now"
+          description: >-
+            {{ $labels.user }} opened too many new SSH sessions within the window (roles/ssh_rate);
+            the refusal ends by itself unless the client keeps trying. Tell them to reuse one
+            connection (ControlMaster/ControlPersist): `usage login-node`, `journalctl -t ssh-rate`.
+      - alert: SshSessionRateHigh
+        expr: |
+          ssh_rate_new_sessions >= on (instance) group_left ssh_rate_warn_sessions
+          unless on (instance, user) ssh_rate_blocked_until_seconds > time()
+        for: 5m
+        labels: {severity: info}
+        annotations:
+          summary: "{{ $labels.user }} opens new SSH sessions on {{ $labels.host }} near the limit"
+          description: "{{ $value }} new sessions within the window; past ssh_rate_refuse_sessions a new login is refused (roles/ssh_rate)."
+      - alert: SshRateMetricsStale
+        expr: time() - ssh_rate_last_success_timestamp_seconds > 600
+        labels: {severity: warning}
+        annotations:
+          summary: "The SSH session counts of {{ $labels.host }} have not been published for 10 minutes"
+          description: "`systemctl status ssh-rate-metrics.timer` and `journalctl -u ssh-rate-metrics` on the host: the refusals still work, but nothing shows them."

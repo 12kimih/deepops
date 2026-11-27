@@ -33,5 +33,7 @@
   "io_top_jobs": slurm_usage_report_io_top_jobs | int,
   "io_repeat_hours": slurm_usage_report_io_repeat_hours | float,
   "io_advice": slurm_usage_report_io_advice,
+  "ssh_rate": slurm_enable_ssh_rate | bool,
+  "ssh_repeat_hours": slurm_usage_report_ssh_repeat_hours | float,
   "dm_log_channel": slack_dm_log_channel
 } | to_nice_json }}

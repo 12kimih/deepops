@@ -1,0 +1,22 @@
+---
+# A limit on how many new SSH sessions each person opens on a login node
+# (roles/ssh_rate, docs/deepops/ssh-rate.md). Every host it runs on converges to
+# deepops_components (present on slurm-login while slurm_enable_ssh_rate is on, removed
+# elsewhere). It changes the PAM account stack of sshd: keep a root session open on the
+# host while it runs, and log in again from a new connection before closing it.
+#
+#   ansible-playbook -K playbooks/generic/ssh-rate.yml [-l <hosts>]
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: ssh_rate
+      ssh_rate_state: "{{ deepops_components.ssh_rate | component_phase(deepops_phase) }}"
+  tags:
+    - ssh-rate
+    - people  # the roster's administrators are never counted
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

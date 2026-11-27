@@ -129,6 +129,30 @@ class Agreement(unittest.TestCase):
         self.assertEqual(rules.scratch("kim", cfg, FakeProm(""), NOW).state, "?", "never ran")
         self.assertEqual(rules.scratch("kim", cfg, None, NOW).state, "?")
 
+    def test_ssh_rate_is_the_login_nodes_own_counts(self):
+        """The row reads what cluster_tools.ssh_rate publishes from the counts it decides
+        by: the warning level it computed, the refusal it applies."""
+        from cluster_tools import ssh_rate
+
+        with tempfile.TemporaryDirectory() as d:
+            cfg = {"mode": "refuse", "window_minutes": 10, "warn_sessions": 90, "refuse_sessions": 100,
+                   "block_minutes": 10, "block_max_minutes": 60, "exempt_users": [], "state_dir": d,
+                   "textfile": os.path.join(d, "out.prom"), "docs_url": ""}  # fmt: skip
+            for login, n, blocked in (("kim", 95, False), ("lee", 101, True), ("park", 3, False)):
+                state = {"sessions": [NOW - 60 + i * 0.1 for i in range(n)]}
+                if blocked:
+                    allowed, state = ssh_rate.decide(state, cfg, NOW)
+                    self.assertFalse(allowed)
+                Path(d, login).write_text(__import__("json").dumps(state))
+            ssh_rate.metrics(cfg, NOW)
+            prom = FakeProm(Path(cfg["textfile"]).read_text())
+        on = {"ssh": {"on": True}}
+        states = {who: rules.ssh(who, on, prom, NOW).state for who in ("kim", "lee", "park", "nobody")}
+        self.assertEqual(states, {"kim": "warn", "lee": "act", "park": "ok", "nobody": "ok"})
+        self.assertIn("새 접속 거부", rules.ssh("lee", on, prom, NOW).when)
+        self.assertEqual(rules.ssh("kim", {}, prom, NOW).state, "off")
+        self.assertEqual(rules.ssh("kim", on, FakeProm(""), NOW).state, "?", "no login node reports yet")
+
     def test_io_is_the_hot_nodes_jobs(self):
         hot = [{"host": "gpu1", "mount": "/home", "jobs": [("12", "kim", 1.0), ("13", "lee", 2.0)]}]
         cfg = {"io": {"share": 0.4, "minutes": 15, "mounts": {"/home": {}}}}
@@ -211,7 +235,7 @@ class Overview(unittest.TestCase):
                 self.skipTest("root reads every file")
             cfg = {"gpu_idle": {"idle_hours": 2, "idle_util_threshold": 0},
                    "disk": {"holds_on": False}, "scratch": {"root": d, "stale_days": 60, "grace_days": 14},
-                   "io": {"share": 0.4, "minutes": 15, "mounts": {"/home": {}}}, "ends_dir": d}  # fmt: skip
+                   "io": {"share": 0.4, "minutes": 15, "mounts": {"/home": {}}}, "ssh": {"on": True}, "ends_dir": d}  # fmt: skip
             rows = rules.overview("kim", cfg, prom=Down(), load=load, now=NOW, here=False)
             for r in rows:
                 with self.subTest(rule=r.rule):
@@ -221,8 +245,12 @@ class Overview(unittest.TestCase):
                     self.assertRegex(r.when, "[가-힣]")
             os.chmod(Path(d, "kim"), 0o644)
             jobs = {"jobs": [], "associations": []}
+            login_node = (
+                "ssh_rate_refuse_sessions 100\nssh_rate_warn_sessions 90\nssh_rate_window_seconds 600\n"
+            )
             answers = FakeProm(
                 scratch_space.metrics({"root": d, "stale_days": 60}, {}, {}, (0, 0), 0, False, NOW, None)
+                + login_node
             )
             with mock.patch.object(io_report, "collect", return_value=[]):  # its rates: beyond FakeProm
                 rows = rules.overview("kim", cfg, prom=answers, load=lambda kind: jobs, now=NOW, here=False)

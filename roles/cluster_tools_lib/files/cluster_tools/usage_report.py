@@ -25,7 +25,12 @@ people, mentioned at most every disk_repeat_days; and the folders worth cleaning
 With --io it tells the users of the jobs doing most I/O on a node whose NFS traffic to
 an export stayed above io_share of what the disk behind it serves for io_minutes
 (cluster_tools.io_report), in a DM with io_advice, again every io_repeat_hours while it
-lasts, and the administrators in one line per node. Standard library only.
+lasts, and the administrators in one line per node.
+
+With --ssh it tells each person who opens new SSH sessions on a login node at the
+warning level (cluster_tools.ssh_rate's own counts, roles/ssh_rate) in a DM, again every
+ssh_repeat_hours while it lasts, and each whose new logins are refused in a DM once per
+refusal, with the administrators told in one line. Standard library only.
 """
 
 import argparse
@@ -478,10 +483,10 @@ CONFIG_KEYS = {
 # disk_top is retired (the disk report lists every person): accepted, read by nothing,
 # until every config is rewritten by its role.
 CONFIG_DEFAULTS = {"io_mounts": {}, "io_share": 0.4, "io_minutes": 15, "io_top_jobs": 3, "io_repeat_hours": 6,
-                   "io_advice": "", "dm_log_channel": ""}  # fmt: skip
+                   "io_advice": "", "dm_log_channel": "", "ssh_rate": False, "ssh_repeat_hours": 24}  # fmt: skip
 CONFIG_OPTIONAL = {"io_mounts": dict, "io_share": (int, float), "io_minutes": int, "io_top_jobs": int,
                    "io_repeat_hours": (int, float), "io_advice": str, "dm_log_channel": str,
-                   "disk_top": int}  # fmt: skip
+                   "disk_top": int, "ssh_rate": bool, "ssh_repeat_hours": (int, float)}  # fmt: skip
 
 
 def _positive(value):
@@ -581,6 +586,7 @@ def report_once():
     other.add_argument("--weekly", action="store_true", help="post the weekly per-person summary instead")
     other.add_argument("--disk", action="store_true", help="post the daily disk usage report instead")
     other.add_argument("--io", action="store_true", help="tell who drives an NFS export's load instead")
+    other.add_argument("--ssh", action="store_true", help="tell who opens too many new SSH sessions instead")
     args = ap.parse_args()
     cfg = load_config(args.config)
     if args.weekly:
@@ -591,6 +597,9 @@ def report_once():
         return
     if args.io:
         io(cfg, args)
+        return
+    if args.ssh:
+        ssh(cfg, args)
         return
     preview = args.dry_run or bool(args.to)
     state = load_state(cfg["state_file"])
@@ -853,6 +862,90 @@ def io(cfg, args):
             slack.post(cfg["admin_channel"], io_report.admin_text(due))
             for item in due:
                 told[io_report.admin_key(item)] = int(now)
+        except (RuntimeError, OSError) as e:
+            failures.append(f"telling the administrators: {e}")
+    if not preview:
+        write_atomic(path, json.dumps({"users": cache, "told": told}), mode=0o600)
+    if failures:
+        raise RuntimeError("; ".join(failures))
+
+
+SSH_BLOCK_REPEAT = 10 * 365 * 86400  # a block is told once: its key names its start
+
+
+def ssh_text(login, host, n, warn, refuse, window, until=None):
+    """The DM of a person at the warning level, or (UNTIL) whose new logins are refused."""
+    head = (
+        f"{until}까지 {host}에 새 SSH 접속이 막혔습니다: 최근 {window}분 동안 새 접속을 {n}번 열었습니다 (한도 {refuse}번)."
+        if until
+        else f"{host}에 새 SSH 접속을 최근 {window}분 동안 {n}번 열었습니다. {refuse}번에 이르면 새 접속이 잠시 막힙니다."
+    )
+    return (
+        f"{head} 명령마다 새로 접속하지 말고 접속 하나를 다시 쓰세요: ~/.ssh/config에서 "
+        f"ControlMaster와 ControlPersist를 켜면 접속 한 번으로 명령을 몇 개든 보냅니다. {rules.check_note('ssh-rate')}"
+    )
+
+
+def ssh(cfg, args):
+    """The SSH rate notices (cluster_tools.ssh_rate's metrics, from every login node): at
+    the warning level a DM, again every ssh_repeat_hours while it lasts; a refusal, a DM
+    and one line to the administrators, once each. A preview prints to --to and records
+    nothing; one failed DM does not stop the others, and the run fails naming them."""
+    if not cfg["ssh_rate"]:
+        return
+    from .disk_report import series
+
+    prom = Prometheus(cfg["prometheus_url"])
+    now = time.time()
+    counts = series(prom, "ssh_rate_new_sessions", ("user",))
+    warn = {k[0]: v for k, v in series(prom, "ssh_rate_warn_sessions", ()).items()}
+    refuse = {k[0]: v for k, v in series(prom, "ssh_rate_refuse_sessions", ()).items()}
+    window = {k[0]: v for k, v in series(prom, "ssh_rate_window_seconds", ()).items()}
+    starts = series(prom, "ssh_rate_block_start_seconds", ("user",))
+    untils = series(prom, "ssh_rate_blocked_until_seconds", ("user",))
+    over = [(host, user, n) for (host, user), n in sorted(counts.items())
+            if host in warn and n >= warn[host] and (host, user) not in starts]  # fmt: skip
+    blocked = [(host, user, int(start)) for (host, user), start in sorted(starts.items())]
+    slack = client(cfg, args)
+    path, state = side_state(cfg, "ssh.json")
+    cache, told = state.get("users", {}), state.get("told", {})
+    warn_keys = [f"ssh warn {h} {u}" for h, u, _ in over]
+    block_keys = [f"ssh block {h} {u} {s}" for h, u, s in blocked]
+    due = set(notices.due(warn_keys, {k: v for k, v in told.items() if k.startswith("ssh warn")}, now,
+                          cfg["ssh_repeat_hours"] * 3600, leeway=RUN_LEEWAY))  # fmt: skip
+    due |= set(notices.due(block_keys, {k: v for k, v in told.items() if k.startswith("ssh block")}, now,
+                           SSH_BLOCK_REPEAT))  # fmt: skip
+    told = {k: v for k, v in told.items() if k in set(warn_keys) | set(block_keys)}
+    texts = []
+    for (host, user, n), k in zip(over, warn_keys):
+        texts.append((k, user, ssh_text(user, host, int(n), int(warn[host]), int(refuse.get(host, 0)),
+                                        int(window.get(host, 0) // 60))))  # fmt: skip
+    for (host, user, start), k in zip(blocked, block_keys):
+        until = time.strftime("%H:%M", time.localtime(untils.get((host, user), start)))
+        n = int(counts.get((host, user), 0))
+        texts.append((k, user, ssh_text(user, host, n, int(warn.get(host, 0)), int(refuse.get(host, 0)),
+                                        int(window.get(host, 0) // 60), until=until)))  # fmt: skip
+    if args.to:
+        for _, _, text in texts:
+            to_channel(slack, args.to, "", text)
+        return
+    failures = []
+    preview = args.dry_run
+    for k, user, text in texts:
+        if k not in due or preview:
+            continue
+        try:
+            member = slack_id(user, cfg, slack, cache)
+            if member:
+                slack.dm(member, text, kind="ssh", login=user)
+            told[k] = int(now)
+        except (RuntimeError, OSError) as e:
+            failures.append(f"notifying {user}: {e}")
+    new_blocks = [(h, u) for (h, u, _), k in zip(blocked, block_keys) if k in due]
+    if new_blocks and cfg["admin_channel"] and not preview:
+        try:
+            slack.post(cfg["admin_channel"], "새 SSH 접속이 막힌 사람: "
+                       + ", ".join(f"{u} ({h})" for h, u in new_blocks))  # fmt: skip
         except (RuntimeError, OSError) as e:
             failures.append(f"telling the administrators: {e}")
     if not preview:

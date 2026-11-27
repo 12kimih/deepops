@@ -15,3 +15,7 @@ cluster_networks: []
 # none). Set it in the inventory for a host whose address the facts cannot decide; its
 # peers read it there too (plugins/filter/networks.py, cluster_addresses).
 cluster_address: "{{ (hostvars | cluster_addresses([inventory_hostname], cluster_networks))[inventory_hostname] }}"
+
+# The ports sshd listens on (roles/sshd), which roles/ingress_policy meters too. Ubuntu 24.04+ starts sshd from ssh.socket, whose listening
+# ports a generator takes from these; a change restarts the socket, never a session.
+sshd_ports: [22]

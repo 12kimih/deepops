@@ -39,6 +39,7 @@ _cluster_tools_usage_active:
   scratch-purge: "{{ slurm_enable_scratch_space | bool }}"
   io-heavy: "{{ slurm_enable_monitoring | bool and io_fairness_models | length > 0 }}"
   login-limits: "{{ cluster_tools_user_slice_limits | length > 0 }}"
+  ssh-rate: "{{ slurm_enable_ssh_rate | bool }}"
   queued-jobs: true
   membership-end: true
 # Every part always there: an empty one is a rule the cluster does not run (off).
@@ -62,3 +63,6 @@ _cluster_tools_usage_cfg:
     {{ {'root': scratch_space_root, 'stale_days': scratch_space_stale_days | int,
         'grace_days': scratch_space_grace_days | int} if _cluster_tools_usage_active['scratch-purge'] else {} }}
   login: "{{ cluster_tools_user_slice_limits if _cluster_tools_usage_active['login-limits'] else {} }}"
+  # Its thresholds come with its counts (cluster_tools.ssh_rate's metrics): on is all.
+  ssh: "{{ {'on': true} if _cluster_tools_usage_active['ssh-rate'] else {} }}"
+  warn_fraction: "{{ cluster_user_warn_fraction | float }}"

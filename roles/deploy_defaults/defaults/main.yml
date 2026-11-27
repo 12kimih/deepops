@@ -99,6 +99,10 @@ slurm_enable_disk_quota: false
 # Each person's own /tmp and /var/tmp at login on the login nodes, as each job has its
 # own (roles/login_private_dirs): sudo, cron and services keep the shared ones
 slurm_enable_login_private_dirs: false
+# A limit on how many new SSH sessions each person opens on the login nodes
+# (roles/ssh_rate, docs/deepops/ssh-rate.md): past it a new login is refused for a while;
+# the channels of a ControlMaster connection are never counted.
+slurm_enable_ssh_rate: false
 # The shared space on the home server (roles/shared_space, on the first slurm-nfs): shared
 # datasets, models and container images one account writes for everyone, and the
 # collaboration folders of shared_projects. Off by default.

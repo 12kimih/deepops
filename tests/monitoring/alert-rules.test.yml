@@ -1439,3 +1439,53 @@ tests:
         exp_samples:
           - labels: 'host_mount_operation:nfs_queue_share:ratio5m{host="n1", mountpoint="/home", operation="READ"}'
             value: 0.3333333333333333
+
+  - name: a refused SSH login alerts at once, a count near the limit after 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'ssh_rate_warn_sessions{host="m", instance="m:9100"}'
+        values: '90x10'
+      - series: 'ssh_rate_new_sessions{host="m", instance="m:9100", user="kim"}'
+        values: '95x10'
+      - series: 'ssh_rate_new_sessions{host="m", instance="m:9100", user="lee"}'
+        values: '120x10'
+      - series: 'ssh_rate_blocked_until_seconds{host="m", instance="m:9100", user="lee"}'
+        values: '1200x10'
+      - series: 'ssh_rate_new_sessions{host="m", instance="m:9100", user="park"}'
+        values: '12x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: SshLoginRefused
+        exp_alerts:
+          - exp_labels: {severity: warning, host: m, instance: "m:9100", user: lee}
+            exp_annotations:
+              summary: "New SSH logins of lee on m are refused for now"
+              description: "lee opened too many new SSH sessions within the window (roles/ssh_rate); the refusal ends by itself unless the client keeps trying. Tell them to reuse one connection (ControlMaster/ControlPersist): `usage login-node`, `journalctl -t ssh-rate`."
+      - eval_time: 3m
+        alertname: SshSessionRateHigh
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: SshSessionRateHigh
+        exp_alerts:
+          - exp_labels: {severity: info, host: m, instance: "m:9100", user: kim}
+            exp_annotations:
+              summary: "kim opens new SSH sessions on m near the limit"
+              description: "95 new sessions within the window; past ssh_rate_refuse_sessions a new login is refused (roles/ssh_rate)."
+
+
+  - name: SSH session counts that stop coming in alert after 10 minutes
+    interval: 1m
+    input_series:
+      - series: 'ssh_rate_last_success_timestamp_seconds{host="m", instance="m:9100"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: SshRateMetricsStale
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: SshRateMetricsStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: m, instance: "m:9100"}
+            exp_annotations:
+              summary: "The SSH session counts of m have not been published for 10 minutes"
+              description: "`systemctl status ssh-rate-metrics.timer` and `journalctl -u ssh-rate-metrics` on the host: the refusals still work, but nothing shows them."

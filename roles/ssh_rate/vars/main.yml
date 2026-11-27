@@ -1,0 +1,30 @@
+---
+# The decision's own entries, root's, for PAM and the metrics timer (never on PATH).
+_ssh_rate_command: /usr/local/libexec/ssh-rate
+_ssh_rate_gate: /usr/local/libexec/ssh-rate-gate
+_ssh_rate_config: "{{ cluster_tools_lib_config_dir }}/ssh-rate.json"
+_ssh_rate_textfile: "{{ node_exporter_prom_dir }}/ssh-rate.prom"
+_ssh_rate_units: [ssh-rate-metrics.service, ssh-rate-metrics.timer]
+# pam-auth-update's profile (pam-auth-update(8): local profiles go in /usr/share/pam-configs).
+_ssh_rate_profile: deepops-ssh-rate
+_ssh_rate_profile_file: /usr/share/pam-configs/{{ _ssh_rate_profile }}
+_ssh_rate_cfg:
+  mode: "{{ ssh_rate_mode }}"
+  window_minutes: "{{ ssh_rate_window_minutes | int }}"
+  warn_sessions: "{{ [1, (ssh_rate_refuse_sessions | int * cluster_user_warn_fraction | float) | round(0, 'ceil') | int] | max }}"
+  refuse_sessions: "{{ ssh_rate_refuse_sessions | int }}"
+  block_minutes: "{{ ssh_rate_block_minutes | int }}"
+  block_max_minutes: "{{ ssh_rate_block_max_minutes | int }}"
+  exempt_users: "{{ ssh_rate_exempt_users | list }}"
+  # A tmpfs: the counts go with a reboot, as the sessions do.
+  state_dir: /run/deepops/ssh-rate
+  textfile: "{{ _ssh_rate_textfile }}"
+  docs_url: "{{ (cluster_info.docs_url | default('') ~ 'start/connect/') if cluster_info.docs_url | default('') else '' }}"
+
+# What this component installs, for its record (roles/component_record).
+ssh_rate_items: >-
+  {{ ['unit:ssh-rate-metrics.timer', 'unit:ssh-rate-metrics.service']
+     + _ssh_rate_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
+     + ['file:' ~ _ssh_rate_command, 'file:' ~ _ssh_rate_gate, 'file:' ~ _ssh_rate_config,
+        'file:' ~ _ssh_rate_profile_file, 'file:' ~ _ssh_rate_textfile,
+        'file:' ~ cluster_tools_lib_config_records ~ '/ssh_rate.json'] }}

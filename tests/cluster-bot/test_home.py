@@ -64,7 +64,8 @@ class Home(unittest.TestCase):
         marks = [e["name"] for b in full()["blocks"] if b["type"] == "rich_text" for s in b["elements"]
                  for e in s.get("elements", []) if e.get("type") == "emoji"]  # fmt: skip
         self.assertEqual(
-            marks[: len(rules.RULES)], [rules.STATE_MARK[s].strip(":") for s in (rules.STATES * 2)[:7]]
+            marks[: len(rules.RULES)],
+            [rules.STATE_MARK[s].strip(":") for s in (rules.STATES * 2)[: len(rules.RULES)]],
         )
 
     def test_an_empty_figure_is_left_out(self):

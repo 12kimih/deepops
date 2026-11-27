@@ -77,6 +77,13 @@ slurm_usage_report_io_advice: >-
   잡이 많이 읽고 쓰는 데이터는 클러스터의 스크래치 공간(있다면)이나 노드의 로컬 디스크에
   두고, 결과만 마지막에 한 번 옮겨 주세요.
 
+# The SSH rate notices (systemd OnCalendar, every 5 minutes; roles/ssh_rate, while
+# slurm_enable_ssh_rate is on): a person whose new SSH sessions on a login node reach the
+# warning level is sent a DM, again every ssh_repeat_hours while it lasts; one whose new
+# logins are refused, a DM and the administrators one line, once per refusal.
+slurm_usage_report_ssh_schedule: "*:0/5"
+slurm_usage_report_ssh_repeat_hours: 24
+
 # Slurm user -> Slack member ID or email (default: the roster's, slack_members). Users
 # not listed are looked up as <user>@<email_domain> when email_domain is set; otherwise
 # shown without a mention.
