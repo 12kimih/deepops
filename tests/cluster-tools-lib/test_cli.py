@@ -90,10 +90,10 @@ class CliTests(unittest.TestCase):
             with contextlib.redirect_stderr(err):
                 return run_main("demo", body), err.getvalue().strip()
 
-        self.assertEqual(fails(slurm.Missing("scontrol not found")), (127, "demo: scontrol not found"))
-        self.assertEqual(fails(slurm.Failed("scontrol: down")), (1, "demo: scontrol: down"))
+        self.assertEqual(fails(slurm.Missing("scontrol not found")), (2, "demo: scontrol not found"))
+        self.assertEqual(fails(slurm.Failed("scontrol: down")), (3, "demo: scontrol: down"))
         self.assertEqual(fails(PermissionError(13, "Permission denied", "/etc/x.prom")),
-                         (1, "demo: /etc/x.prom: Permission denied"))  # fmt: skip
+                         (3, "demo: /etc/x.prom: Permission denied"))  # fmt: skip
         # A bug of the command's own is not dressed up as Slurm's.
         with self.assertRaises(ValueError):
             run_main("demo", lambda: int("x"))

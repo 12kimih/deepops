@@ -1,8 +1,11 @@
 """cluster_tools.bans: the jails and their bans read from fail2ban-client as it prints
 them, an unban only for a well-formed address, and the bot's key asks for nothing else."""
 
+import contextlib
+import io
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
@@ -49,6 +52,18 @@ class Bans(unittest.TestCase):
         for bad in ("", "ban 192.0.2.7", "unban", "list x", "unban a b"):
             with self.subTest(request=bad), self.assertRaises(bans.Error):
                 bans.served(bad)
+
+    def test_a_refused_request_could_not_run_and_a_silent_fail2ban_is_retry_later(self):
+        down = bans.proc.CalledProcessError(255, [bans.CLIENT], stderr="Failed to access socket path")
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            self.assertEqual(bans.main(["cluster-bans", "unban", "192.0.2"]), 2)
+            self.assertEqual(bans.main(["cluster-bans", "ban", "192.0.2.7"]), 2)
+            with mock.patch.dict(bans.os.environ, {"SSH_ORIGINAL_COMMAND": "ban 192.0.2.7"}):
+                self.assertEqual(bans.main(["cluster-bans", "serve"]), 2)
+            with mock.patch.object(bans.proc, "run", side_effect=down):
+                self.assertEqual(bans.main(["cluster-bans", "list"]), 3)
+        self.assertIn("cluster-bans: fail2ban-client status: Failed to access socket path", err.getvalue())
 
 
 if __name__ == "__main__":

@@ -14,8 +14,8 @@ code, against the thresholds the cluster_tools role renders for this node).
                            per-person limits (cluster_tools.login_usage)
 
 One dispatcher (cluster_tools.cli Group); each subcommand keeps its own domain's code,
-and every one shares --json (schema 1, rules.JSON_NOTE), -u/--user and the exit status:
-0 ok, 1 at risk, 2 could not run, 3 unknown. Python 3.9 or newer, standard library only.
+and every one shares --json (schema 1, JSON_NOTE), -u/--user and the exit status of a
+judging command (cluster_tools.exits). Python 3.9 or newer, standard library only.
 """
 
 import json
@@ -25,7 +25,7 @@ import sys
 import time
 
 from . import rules
-from .cli import UNKNOWN, Command, Group, me, opt_json, opt_user, run_main
+from .cli import Command, Group, me, opt_json, opt_user, run_main
 from .prometheus import Prometheus
 from .render import Grid
 from .site import info as site_info
@@ -35,10 +35,7 @@ JSON_NOTE = (
     "--json: one object, schema 1: schema (1), command (usage, usage disk, ...), user, at\n"
     "(Unix time), status (the exit status below), rules (one object per rule shown:\n"
     "rule, title, mine, limit, state, when, check, detail) and the subcommand's own figures\n"
-    "under its own keys. A key is only ever added within a schema.\n"
-    "Exit status: 0 ok, 1 at risk (a rule at warn or act), 2 could not run (a wrong\n"
-    "option, a broken config), 3 unknown (Slurm, Prometheus or a file did not answer):\n"
-    "retry later."
+    "under its own keys. A key is only ever added within a schema."
 )
 
 
@@ -82,6 +79,7 @@ COMMAND = Command(
     machine="--json",
     notes=NOTES,
     summary_ko="경고, 한도, 취소가 있는 규칙마다 내 현황",
+    judges=True,
 )
 
 STYLE = {"ok": "text", "warn": "warn", "act": "crit", "off": "muted", "?": "warn"}
@@ -129,7 +127,7 @@ def overview_main(argv=None):
         rows = rules.overview(user, cfg, uid=uid, prom=prom)
         return emit("usage", user, rows, args, theme, table(rows, theme, f"usage of {user}"))
 
-    return run_main("usage", body, unknown=UNKNOWN)
+    return run_main("usage", body)
 
 
 def main(argv=None):

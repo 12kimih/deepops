@@ -375,16 +375,16 @@ class OptionTests(unittest.TestCase):
 
 
 class FailureTests(unittest.TestCase):
-    def test_a_failing_controller_is_one_line_and_exit_1(self):
+    def test_a_failing_controller_is_one_line_and_exit_3(self):
         r = sq(env={"FAKE_FAIL": "slurm_load_node error: Unable to contact slurm controller"})
-        self.assertEqual(r.returncode, 1)
+        self.assertEqual(r.returncode, 3)
         self.assertEqual(
             r.stderr.strip(), "sq: scontrol: slurm_load_node error: Unable to contact slurm controller"
         )
 
     def test_a_stalled_controller_is_bounded(self):
         r = sq(env={"FAKE_SLEEP": "3", "CLUSTER_TOOLS_TIMEOUT": "1"})
-        self.assertEqual(r.returncode, 1)
+        self.assertEqual(r.returncode, 3)
         self.assertIn("no answer in 1 s (slurmctld slow, or rate limiting", r.stderr)
 
     def test_the_interval_backs_off_while_slurm_fails(self):
@@ -413,12 +413,12 @@ class FailureTests(unittest.TestCase):
             (Path(d) / "nodes.json").write_text(json.dumps({**data, "nodes": []}))
             for args in ((), ("--json",)):
                 r = sq(*args, env={"FIXTURES": d})
-                self.assertEqual(r.returncode, 1, r.stderr)
+                self.assertEqual(r.returncode, 3, r.stderr)
                 self.assertNotIn("Traceback", r.stderr)
             self.assertIn("No node data", sq(env={"FIXTURES": d}).stdout)
 
-    def test_no_scontrol_is_127(self):
-        self.assertEqual(sq(path=False).returncode, 127)
+    def test_no_scontrol_could_not_run(self):
+        self.assertEqual(sq(path=False).returncode, 2)
 
 
 if __name__ == "__main__":

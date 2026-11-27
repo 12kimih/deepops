@@ -247,16 +247,16 @@ class SchemaTests(unittest.TestCase):
 class ErrorTests(unittest.TestCase):
     """Every Slurm failure is a slurm.Error carrying its line and exit status."""
 
-    def test_missing_client_is_127(self):
+    def test_a_missing_client_could_not_run(self):
         with self.assertRaises(slurm.Missing) as ctx:
             slurm.run("no-such-slurm-client")
         self.assertEqual((ctx.exception.status, str(ctx.exception)),
-                         (127, "no-such-slurm-client not found; run this on a Slurm client."))  # fmt: skip
+                         (2, "no-such-slurm-client not found; run this on a Slurm client."))  # fmt: skip
 
     def test_failed_client_names_itself(self):
         with self.assertRaises(slurm.Failed) as ctx:
             slurm.run("false")
-        self.assertEqual((ctx.exception.status, str(ctx.exception)), (1, "false: false exited with status 1"))
+        self.assertEqual((ctx.exception.status, str(ctx.exception)), (3, "false: false exited with status 1"))
 
     def test_unreadable_reply_is_a_schema_error(self):
         saved = slurm.run

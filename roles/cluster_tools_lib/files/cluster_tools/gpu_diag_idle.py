@@ -35,6 +35,7 @@ import time
 
 from . import config, slurm, vocab
 from .cli import run_main
+from .exits import CANNOT_RUN
 from .files import write_atomic
 from .prom import series
 
@@ -331,7 +332,7 @@ def main(argv=None):
     args = [a for a in argv if a != "--dry-run"]
     if len(args) != 2 or args[0] not in ("run", "publish"):
         print("usage: gpu-diag-idle run|publish CONFIG [--dry-run]", file=sys.stderr)
-        return 2
+        return CANNOT_RUN
 
     def body():
         cfg = load_config(args[1])

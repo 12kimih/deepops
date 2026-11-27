@@ -48,6 +48,7 @@ from pathlib import Path
 
 from . import config, proc
 from .cli import run_main
+from .exits import CANNOT_RUN
 from .files import read_textfile, write_textfile
 from .prom import series
 
@@ -414,7 +415,7 @@ def main(argv=None):
     argv = sys.argv if argv is None else argv
     if len(argv) not in (2, 3) or (len(argv) == 3 and argv[2] != "--dry-run"):
         print("usage: container-storage-gc CONFIG.json [--dry-run]", file=sys.stderr)
-        return 2
+        return CANNOT_RUN
     dry_run = len(argv) == 3
 
     def body():

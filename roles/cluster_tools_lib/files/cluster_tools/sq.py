@@ -18,6 +18,7 @@ from fnmatch import fnmatchcase
 from . import qos as quota
 from . import render, slurm, vocab
 from . import cli
+from .exits import OK, UNKNOWN
 from .cli import Command, Opt, opt_all, opt_json, opt_me, opt_user, run_main
 from .render import Grid, width
 
@@ -1104,7 +1105,8 @@ def snapshot(args):
 
 def frame(theme, args):
     model = snapshot(args)
-    return show(theme, model, args), 1 if not model["nodes"] else 0
+    # No nodes: Slurm's answer held nothing to show (no scontrol access here).
+    return show(theme, model, args), UNKNOWN if not model["nodes"] else OK
 
 
 def watch(theme, args):
@@ -1132,7 +1134,7 @@ def watch(theme, args):
             time.sleep(wait)
     except KeyboardInterrupt:
         sys.stdout.write(theme.reset + "\n")
-        return 0
+        return OK
 
 
 def main(argv=None):
@@ -1146,7 +1148,7 @@ def main(argv=None):
             model = snapshot(args)
             json.dump(to_json(model, args), sys.stdout, indent=1, default=str)
             sys.stdout.write("\n")
-            return 0 if model["nodes"] else 1
+            return OK if model["nodes"] else UNKNOWN
         text, rc = frame(theme, args)
         sys.stdout.write(text)
         return rc

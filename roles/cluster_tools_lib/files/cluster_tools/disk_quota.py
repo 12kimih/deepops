@@ -59,6 +59,7 @@ from pathlib import Path
 
 from . import cleanup, config, proc
 from .cli import run_main
+from .exits import CANNOT_RUN, OK, CannotRun
 from .files import write_atomic, write_textfile
 from .prom import key, render
 
@@ -81,7 +82,7 @@ SCAN_TIMEOUT = 86400
 LOW = ["nice", "-n", "10", "ionice", "-c", "2", "-n", "7"]
 
 
-class Error(Exception):
+class Error(CannotRun):
     """A configuration or a host the tool refuses, said plainly."""
 
 
@@ -560,34 +561,30 @@ def main(argv=None):
         "scan",
     ):
         print(USAGE, file=sys.stderr)
-        return 2
+        return CANNOT_RUN
     if check and args[1] in ("metrics", "scan"):
         print(USAGE, file=sys.stderr)
-        return 2
+        return CANNOT_RUN
 
     def body():
         cfg = load_config(args[0])
         host = Host()
-        try:
-            if args[1] == "metrics":
-                if cfg.get("textfile"):
-                    write_atomic(cfg["textfile"], metrics(host, cfg, time.time()))
-                return 0
-            if args[1] == "scan":
-                if cfg.get("scan"):
-                    write_textfile(
-                        cfg["scan_textfile"],
-                        render(scan(host, cfg, time.time())),
-                        cfg.get("scan_textfile_kept", ""),
-                    )
-                return 0
-            for text, action in steps_for(host, cfg, args[1]):
-                print(text)
-                if not check:
-                    action()
-        except Error as e:
-            print(f"disk-quota: {e}", file=sys.stderr)
-            return 1
-        return 0
+        if args[1] == "metrics":
+            if cfg.get("textfile"):
+                write_atomic(cfg["textfile"], metrics(host, cfg, time.time()))
+            return OK
+        if args[1] == "scan":
+            if cfg.get("scan"):
+                write_textfile(
+                    cfg["scan_textfile"],
+                    render(scan(host, cfg, time.time())),
+                    cfg.get("scan_textfile_kept", ""),
+                )
+            return OK
+        for text, action in steps_for(host, cfg, args[1]):
+            print(text)
+            if not check:
+                action()
+        return OK
 
     return run_main("disk-quota", body)

@@ -34,6 +34,7 @@ from pathlib import Path
 
 from . import config, proc
 from .cli import run_main
+from .exits import CANNOT_RUN
 from .files import write_atomic
 from .prom import series
 
@@ -314,7 +315,7 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) != 2 or argv[0].startswith("-"):
         print("usage: egress-policy-metrics CONFIG.json PATH  (a node_exporter textfile)", file=sys.stderr)
-        return 2
+        return CANNOT_RUN
 
     def body():
         cfg = load_config(argv[0])

@@ -30,6 +30,7 @@ from datetime import date, timedelta
 
 from . import slurm
 from .config import require
+from .exits import AT_RISK, OK, UNKNOWN
 
 PATH = "/etc/cluster-tools/usage.json"
 # A job leaving its GPUs idle, the glossary's idle_job: one noun in titles and sentences
@@ -397,8 +398,6 @@ ROW_KEYS = ("rule", "title", "mine", "limit", "state", "when", "check", "detail"
 
 def exit_status(rows):
     """0 ok, 1 when a rule is at warn or act, 3 when one is unknown and none at risk."""
-    from .cli import AT_RISK, OK, UNKNOWN
-
     if any(r.state in RISKY for r in rows):
         return AT_RISK
     return UNKNOWN if any(r.state == "?" for r in rows) else OK

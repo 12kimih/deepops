@@ -15,7 +15,8 @@ import pwd
 import shlex
 import sys
 
-from . import config, render, slurm
+from . import render
+from .exits import OK, UNKNOWN, CannotRun, NoAnswer, note
 
 # Value completers: a single field per line from a standard Slurm command, so the
 # completion never parses free text and never needs this package to be importable. They
@@ -174,7 +175,8 @@ class Command:
     MACHINE is the option whose output scripts read, which ignores ENV defaults; NOTES
     are extra paragraphs for --help, as text or as a function returning text; THEME_ENV
     pins a flavour for this command only, after $CLUSTER_THEME; REFUSE maps options this
-    command deliberately does not take (another tool's) to the reason and what to use."""
+    command deliberately does not take (another tool's) to the reason and what to use;
+    JUDGES marks a command whose exit status 1 means at risk (cluster_tools.exits)."""
 
     def __init__(
         self,
@@ -188,7 +190,9 @@ class Command:
         theme_env=None,
         refuse=None,
         summary_ko="",
+        judges=False,
     ):
+        self.judges = judges
         self.name, self.summary, self.options = name, summary, list(options) + STYLE
         self.summary_ko = summary_ko
         self.env, self.machine, self.notes = env, machine, list(notes)
@@ -245,12 +249,13 @@ class Command:
                 lines += ["", f"{s}:"]
             for o in (x for x in shown if x.section == s):
                 lines.append(f"  {o.label():<{width}}{o.help}")
-        if not full:
-            lines += ["", f"More: {self.name} --help"]
-        else:
+        if full:
             for n in self.notes:
                 text = n() if callable(n) else n
                 lines += ["", text.rstrip()]
+        lines += ["", note(self.judges)]
+        if not full:
+            lines += ["", f"More: {self.name} --help"]
         return "\n".join(lines) + "\n"
 
     def completion_parts(self):
@@ -365,39 +370,25 @@ def me():
         return str(os.getuid())
 
 
-# The exit statuses of a command that judges (usage and its subcommands), as monitoring
-# tools give them: an agent tells "you called it wrong" (2) from "retry later" (3).
-OK, AT_RISK, CANNOT_RUN, UNKNOWN = 0, 1, 2, 3
-
-
-def run_main(name, body, unknown=None):
+def run_main(name, body):
     """Run BODY() -> exit status, with the failures every command shares, each as one
-    line: Slurm's (slurm.Error, with its own status: 127 for a missing client, else 1)
-    a config's (2, cluster_tools.config) and a file's (1). With UNKNOWN (a judging
-    command's: cli.UNKNOWN), a source that did not answer (Slurm, Prometheus, a file)
-    gives it instead. Ctrl-C and a closed pipe end quietly. Anything else is a bug and
-    keeps its traceback, rather than being reported as Slurm's."""
-    from .prometheus import Error as PrometheusError
-
+    line and with its status (cluster_tools.exits): CannotRun (a config's, a missing
+    Slurm client, a request refused) 2, NoAnswer (Slurm's, Prometheus's) and a file's
+    OSError 3. Ctrl-C and a closed pipe end quietly. Anything else is a bug and keeps
+    its traceback, rather than being reported as a source's."""
     try:
-        return body() or 0
-    except config.ConfigError as e:  # names the file and the key
+        return body() or OK
+    except (CannotRun, NoAnswer) as e:  # a config's names the file and the key
         print(f"{name}: {e}", file=sys.stderr)
-        return CANNOT_RUN
-    except slurm.Error as e:
-        print(f"{name}: {e}", file=sys.stderr)
-        return e.status if unknown is None else unknown
-    except PrometheusError as e:
-        print(f"{name}: {e}", file=sys.stderr)
-        return 1 if unknown is None else unknown
+        return e.status
     except KeyboardInterrupt:
         return 130
     except BrokenPipeError:
         sys.stderr.close()  # `qos | head`: nothing left to say
-        return 0
+        return OK
     except OSError as e:
         print(f"{name}: {e.filename}: {e.strerror}" if e.filename else f"{name}: {e}", file=sys.stderr)
-        return 1 if unknown is None else unknown
+        return UNKNOWN
 
 
 class Group:

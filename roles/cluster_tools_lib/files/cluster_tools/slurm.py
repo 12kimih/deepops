@@ -16,6 +16,7 @@ import re
 import sys
 
 from . import proc
+from .exits import CannotRun, NoAnswer
 
 
 # A throttled RPC does not fail: the client library sleeps and retries it for ever,
@@ -41,19 +42,14 @@ def _timeout(raw):
 TIMEOUT = _timeout(os.environ.get("CLUSTER_TOOLS_TIMEOUT"))
 
 
-class Error(Exception):
-    """A Slurm read that did not give an answer. str() is one line on why, `status` the
-    exit status a command reports it with. Everything this module raises about Slurm is
-    one of these, so a caller catches Slurm's failures and nothing else: a file error
-    or a bug of its own is never reported as Slurm's."""
-
-    status = 1
+class Error(NoAnswer):
+    """A Slurm read that did not give an answer. str() is one line on why. Everything
+    this module raises about Slurm is one of these, so a caller catches Slurm's failures
+    and nothing else: a file error or a bug of its own is never reported as Slurm's."""
 
 
-class Missing(Error):
-    """The Slurm client is not installed here."""
-
-    status = 127
+class Missing(CannotRun, Error):
+    """The Slurm client is not installed here: no answer, and none by waiting (exit 2)."""
 
 
 class Failed(Error):

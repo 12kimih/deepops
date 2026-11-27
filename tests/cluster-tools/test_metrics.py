@@ -104,7 +104,7 @@ class WriteTests(unittest.TestCase):
             self.assertIn("slurm_gpu_configured{", path.read_text())
             path.write_text("previous\n")
             r = run_tool("metrics", str(path), env={"FAKE_FAIL": "slurm_load_jobs error: down"})
-            self.assertEqual(r.returncode, 1)
+            self.assertEqual(r.returncode, 3)
             self.assertEqual(path.read_text(), "previous\n")
             self.assertEqual(run_tool("metrics").returncode, 2)
 
@@ -113,7 +113,7 @@ class WriteTests(unittest.TestCase):
             path = str(Path(d) / "no-dir" / "slurm_gpu.prom")
             r = run_tool("metrics", path)
             self.assertEqual(
-                (r.returncode, r.stderr.strip()), (1, f"metrics: {path}: No such file or directory")
+                (r.returncode, r.stderr.strip()), (3, f"metrics: {path}: No such file or directory")
             )
 
 

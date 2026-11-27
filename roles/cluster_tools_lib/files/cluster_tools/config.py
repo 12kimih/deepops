@@ -30,11 +30,13 @@ import json
 import sys
 from pathlib import Path
 
+from .exits import CannotRun
+
 RECORDS = Path("/etc/cluster-tools/configs.d")
 
 
-class ConfigError(ValueError):
-    pass
+class ConfigError(CannotRun, ValueError):
+    """A config file a tool cannot run with; str() names the file and the key."""
 
 
 def _kind_name(kind):

@@ -19,23 +19,30 @@ import sys
 
 from . import bot_serve, proc
 from .cli import run_main
+from .exits import CANNOT_RUN, OK, CannotRun, NoAnswer
 
 TIMEOUT = 30
 CLIENT = "fail2ban-client"
 
 
-class Error(Exception):
+class Error(CannotRun):
     """A request the tool refuses, said plainly."""
 
 
+class Unanswered(NoAnswer, Error):
+    """fail2ban did not answer: not running, failing, or past the timeout."""
+
+
 def client(*words):
-    """fail2ban-client's output; its refusal (fail2ban not running, say) as an Error."""
+    """fail2ban-client's output; its failure (fail2ban not running, say) as Unanswered."""
     try:
         return proc.run([CLIENT, *words], timeout=TIMEOUT, capture_output=True, text=True).stdout
     except proc.CalledProcessError as e:
-        raise Error(f"{CLIENT} {words[0]}: {(e.stderr or e.stdout or '').strip() or e.returncode}") from None
+        raise Unanswered(
+            f"{CLIENT} {words[0]}: {(e.stderr or e.stdout or '').strip() or e.returncode}"
+        ) from None
     except proc.TimeoutExpired:
-        raise Error(f"{CLIENT} {words[0]}: no answer within {TIMEOUT}s") from None
+        raise Unanswered(f"{CLIENT} {words[0]}: no answer within {TIMEOUT}s") from None
 
 
 def jails(status):
@@ -86,25 +93,15 @@ def served(original):
 
 
 def main(argv=None):
-    args = (sys.argv if argv is None else argv)[1:]
-    if args == ["serve"]:
-        try:
+    def body(args=(sys.argv if argv is None else argv)[1:]):
+        if args == ["serve"]:
             args = served(os.environ.get("SSH_ORIGINAL_COMMAND"))[1:]
-        except Error as e:
-            print(f"cluster-bans: {e}", file=sys.stderr)
-            return 2
-    if not args or len(args) - 1 not in ARITY.get(args[0], ()):
-        print(__doc__.split("\n\n")[1], file=sys.stderr)
-        return 2
-
-    def body():
-        try:
-            result = list_bans() if args[0] == "list" else unban(args[1])
-        except Error as e:
-            print(f"cluster-bans: {e}", file=sys.stderr)
-            return 1
+        if not args or len(args) - 1 not in ARITY.get(args[0], ()):
+            print(__doc__.split("\n\n")[1], file=sys.stderr)
+            return CANNOT_RUN
+        result = list_bans() if args[0] == "list" else unban(args[1])
         print(json.dumps(result, sort_keys=True))
-        return 0
+        return OK
 
     return run_main("cluster-bans", body)
 

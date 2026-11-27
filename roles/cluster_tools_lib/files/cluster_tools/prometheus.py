@@ -17,10 +17,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from .exits import NoAnswer
+
 TIMEOUT = 30
 
 
-class Error(RuntimeError):
+class Error(NoAnswer, RuntimeError):
     """Prometheus gave no usable answer; str() says why in one line."""
 
 

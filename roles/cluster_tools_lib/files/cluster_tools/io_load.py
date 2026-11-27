@@ -17,7 +17,8 @@ import sys
 
 from . import rules, slurm
 from .usage import JSON_NOTE
-from .cli import UNKNOWN, Command, Opt, opt_json, opt_user, run_main
+from .cli import Command, Opt, opt_json, opt_user, run_main
+from .exits import CANNOT_RUN, UNKNOWN
 from .disk_report import host_of
 from .io_report import DIRECTIONS, quoted
 from .render import Grid, size
@@ -58,6 +59,7 @@ COMMAND = Command(
     machine="--json",
     notes=[__doc__.split("\n\n", 1)[1].rsplit("\n", 1)[0], JSON_NOTE],
     summary_ko="내 잡과 로그인의 I/O, 내 노드가 공유 스토리지에 거는 부하, 알림 여부",
+    judges=True,
 )
 
 
@@ -132,7 +134,7 @@ def main(argv=None):
     def body():
         if args.hours < 1 or args.top < 1:
             print("usage io: --hours and --top take a whole number from 1", file=sys.stderr)
-            return 2
+            return CANNOT_RUN
         user, _, cfg, api = context(args.user)
         if api is None:
             print("usage io: no prometheus_url", file=sys.stderr)
@@ -151,7 +153,7 @@ def main(argv=None):
         )
         return emit("usage io", user, [row], args, theme, text, **data)
 
-    return run_main("usage io", body, unknown=UNKNOWN)
+    return run_main("usage io", body)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ import sys
 
 from . import rules
 from .usage import JSON_NOTE
-from .cli import UNKNOWN, Command, opt_json, opt_user, run_main
+from .cli import Command, opt_json, opt_user, run_main
 
 COMMAND = Command(
     "usage login-node",
@@ -21,6 +21,7 @@ COMMAND = Command(
     machine="--json",
     notes=[JSON_NOTE],
     summary_ko="이 로그인 노드에서 내 CPU, 메모리, 프로세스 수와 한 사람당 한도",
+    judges=True,
 )
 
 
@@ -36,7 +37,7 @@ def main(argv=None):
             "usage login-node", user, found, args, theme, table(found, theme, f"{user} on this login node")
         )
 
-    return run_main("usage login-node", body, unknown=UNKNOWN)
+    return run_main("usage login-node", body)
 
 
 if __name__ == "__main__":

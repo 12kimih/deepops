@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Fake scontrol: serves the fixture for `scontrol [-d] --json show nodes|partitions|jobs`.
-# FAKE_SLEEP=SEC stalls as a throttled RPC does; FAKE_FAIL=TEXT fails with TEXT.
+# FAKE_SLEEP=SEC stalls as a throttled RPC does; FAKE_FAIL=TEXT fails with TEXT;
+# FAKE_SLURM_SLEEP=SEC stalls every fake client, a silent Slurm.
+[[ -n "${FAKE_SLURM_SLEEP:-}" ]] && sleep "$FAKE_SLURM_SLEEP"   # a Slurm that does not answer at all
 [[ -n "${FAKE_SLEEP:-}" ]] && sleep "$FAKE_SLEEP"
 [[ -n "${FAKE_FAIL:-}" ]] && { echo "$FAKE_FAIL" >&2; exit 1; }
 for a in "$@"; do case "$a" in nodes|partitions) exec cat "$FIXTURES/$a.json" ;; job|jobs) exec cat "$FIXTURES/jobs.json" ;; esac; done

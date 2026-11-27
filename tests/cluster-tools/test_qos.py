@@ -165,7 +165,7 @@ class CommandTests(unittest.TestCase):
 
     def test_stalled_accounting_read_fails_in_one_line(self):
         r = run_tool("qos", env={"FAKE_DBD_SLEEP": "3", "CLUSTER_TOOLS_TIMEOUT": "1"})
-        self.assertEqual(r.returncode, 1)
+        self.assertEqual(r.returncode, 3)
         self.assertEqual(
             r.stderr.strip().splitlines(),
             ["qos: sacctmgr: no answer in 1 s (slurmctld slow, or rate limiting your requests)"],
@@ -174,7 +174,7 @@ class CommandTests(unittest.TestCase):
     def test_exit_codes(self):
         self.assertEqual(run_tool("qos", "--bogus").returncode, 2)
         missing = run_tool("qos", path=False)
-        self.assertEqual(missing.returncode, 127)
+        self.assertEqual(missing.returncode, 2)
         self.assertIn("sacctmgr not found", missing.stderr)
 
 

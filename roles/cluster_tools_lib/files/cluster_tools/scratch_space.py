@@ -62,6 +62,7 @@ from collections import defaultdict
 from . import cleanup, config, slurm, vocab
 from .cleanup import last_use, walk
 from .cli import run_main
+from .exits import CANNOT_RUN
 from .files import write_atomic, write_textfile
 from .prom import key, render
 from .render import size
@@ -600,7 +601,7 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if len(argv) not in (2, 3) or argv[1] != "purge" or argv[2:] not in ([], ["--check"]):
         print(f"usage: {USAGE}", file=sys.stderr)
-        return 2
+        return CANNOT_RUN
 
     def run():
         purge(Host(), load_config(argv[0]), time.time(), check=argv[2:] == ["--check"])

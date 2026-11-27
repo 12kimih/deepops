@@ -28,7 +28,8 @@ import time
 from . import slurm
 from . import rules
 from .usage import JSON_NOTE
-from .cli import UNKNOWN, Command, Opt, opt_json, opt_user, run_main
+from .cli import Command, Opt, opt_json, opt_user, run_main
+from .exits import CANNOT_RUN
 from .prometheus import Error as PrometheusError
 from .render import Grid, duration
 from .site import PATH as SITE_PATH
@@ -104,6 +105,7 @@ COMMAND = Command(
     machine="--json",
     notes=[*NOTES, JSON_NOTE],
     summary_ko="잡이 GPU를 실제로 얼마나 썼는지: 사용률, SM 활동, 메모리, 전력 (실행 중이거나 끝난 잡)",
+    judges=True,
 )
 
 
@@ -306,11 +308,11 @@ def main(argv=None):
             jobs = slurm.load("accounting", job)["jobs"]
             if not jobs:
                 print(f"usage gpu: no job {job} in Slurm's accounting", file=sys.stderr)
-                return 2
+                return CANNOT_RUN
             held += [j for j in jobs if holds_gpus(j)]
         if args.job and not held:
             print(f"usage gpu: job {args.job} holds no GPUs", file=sys.stderr)
-            return 2
+            return CANNOT_RUN
         reports = [report(j, args.source, api, now) for j in held]
         # The rule off (not run here) reads nothing more: no Slurm, no Prometheus.
         detail = slurm.load("jobs_detail") if cfg.get("gpu_idle") and api else None
@@ -318,7 +320,7 @@ def main(argv=None):
         text = table([row], theme, f"idle GPUs of {user}") + (render(reports, theme) if reports else "")
         return emit("usage gpu", user, [row], args, theme, text, jobs=reports)
 
-    return run_main("usage gpu", body, unknown=UNKNOWN)
+    return run_main("usage gpu", body)
 
 
 if __name__ == "__main__":

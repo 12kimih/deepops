@@ -67,6 +67,7 @@ from contextlib import contextmanager
 
 from . import bot_serve, config, proc
 from .cli import run_main
+from .exits import CANNOT_RUN, OK, CannotRun, NoAnswer
 from .files import write_atomic, write_textfile
 from .prom import key, render
 
@@ -98,8 +99,12 @@ CONFIG_KEYS = {
 CONFIG_OPTIONAL = {"bot_service": str}
 
 
-class Error(Exception):
+class Error(CannotRun):
     """A request refused, or a download failed, said plainly."""
+
+
+class Unanswered(NoAnswer, Error):
+    """A source host did not answer: it does not resolve, or the download broke off."""
 
 
 def load_config(path):
@@ -135,7 +140,7 @@ def checked(url, hosts=(), resolve=socket.getaddrinfo):
     try:
         found = {ai[4][0] for ai in resolve(host, parts.port or 443, proto=socket.IPPROTO_TCP)}
     except OSError as e:
-        raise Error(f"{host} does not resolve: {e}") from None
+        raise Unanswered(f"{host} does not resolve: {e}") from None
     if not found or not all(ipaddress.ip_address(a.split("%")[0]).is_global for a in found):
         raise Error(f"{host} is not a public host ({', '.join(sorted(found))})")
     return host, parts.port or 443, sorted(found)
@@ -338,7 +343,7 @@ def download(cfg, kind, name, now=time.time, opener=None, resolve=socket.getaddr
         shutil.rmtree(partial, ignore_errors=True)
         with ledger(cfg) as doc:
             doc[f"{kind}/{name}"].update(state="failed", error=str(e), ended=int(now()))
-        raise Error(f"{kind}/{name}: {e}") from None
+        raise (Unanswered if isinstance(e, (NoAnswer, OSError)) else Error)(f"{kind}/{name}: {e}") from None
     with ledger(cfg) as doc:
         doc[f"{kind}/{name}"].update(state="done", bytes=size, sha256_got=digest.hexdigest(),
                                      file=os.path.basename(target), ended=int(now()))  # fmt: skip
@@ -416,22 +421,18 @@ def main(argv=None):
     ops = {("serve", 0), ("metrics", 0), ("download", 2)}
     if len(argv) < 2 or (argv[1], len(argv) - 2) not in ops:
         print(__doc__.split("\n\n")[1], file=sys.stderr)
-        return 2
+        return CANNOT_RUN
 
     def body():
         cfg = load_config(argv[0])
-        try:
-            if argv[1] == "serve":
-                result = serve(cfg, os.environ.get("SSH_ORIGINAL_COMMAND"), time.time())
-            elif argv[1] == "download":
-                result = download(cfg, *argv[2:])
-            else:
-                return metrics(cfg, time.time()) or 0
-        except (Error, bot_serve.Error) as e:
-            print(f"cluster-shared-data: {e}", file=sys.stderr)
-            return 1
+        if argv[1] == "serve":
+            result = serve(cfg, os.environ.get("SSH_ORIGINAL_COMMAND"), time.time())
+        elif argv[1] == "download":
+            result = download(cfg, *argv[2:])
+        else:
+            return metrics(cfg, time.time()) or OK
         print(json.dumps(result, sort_keys=True))
-        return 0
+        return OK
 
     return run_main("cluster-shared-data", body)
 

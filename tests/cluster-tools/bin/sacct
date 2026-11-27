@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Fake sacct: serves $ACCOUNTING (a test writes the reply for
 # `sacct --json --clusters=all -j JOB`).
+[[ -n "${FAKE_SLURM_SLEEP:-}" ]] && sleep "$FAKE_SLURM_SLEEP"   # a Slurm that does not answer at all
 [[ "$1 $2 $3" == "--json --clusters=all -j" && -n "${ACCOUNTING:-}" ]] && exec cat "$ACCOUNTING"
 echo "sacct: unsupported fake call: $*" >&2; exit 1

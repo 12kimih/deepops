@@ -10,7 +10,7 @@ import time
 
 from . import rules, slurm
 from .usage import JSON_NOTE
-from .cli import UNKNOWN, Command, opt_json, opt_user, run_main
+from .cli import Command, opt_json, opt_user, run_main
 
 COMMAND = Command(
     "usage submit",
@@ -23,6 +23,7 @@ COMMAND = Command(
     machine="--json",
     notes=[JSON_NOTE],
     summary_ko="새 잡이 거부될지와 그 이유: 제출 잡 한도, 제출 보류",
+    judges=True,
 )
 
 
@@ -50,7 +51,7 @@ def main(argv=None):
         found = rows(user, cfg, prom, time.time())
         return emit("usage submit", user, found, args, theme, table(found, theme, f"submitting as {user}"))
 
-    return run_main("usage submit", body, unknown=UNKNOWN)
+    return run_main("usage submit", body)
 
 
 if __name__ == "__main__":

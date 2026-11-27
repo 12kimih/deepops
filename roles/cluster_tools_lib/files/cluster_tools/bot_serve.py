@@ -30,6 +30,7 @@ import stat
 import sys
 
 from . import proc
+from .exits import CannotRun
 
 NAME = re.compile(r"[a-z][a-z0-9-]{0,31}")
 # The dispatcher's own request; no service takes the name (roles/cluster_bot_access).
@@ -38,7 +39,7 @@ OFFERS = "offers"
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 
-class Error(Exception):
+class Error(CannotRun):
     """A request this host does not serve, said plainly."""
 
 

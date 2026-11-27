@@ -16,7 +16,7 @@ The file is a line "generated <unix time>", then "<uid> <reason>" per person hel
 rendered job_submit.lua reads it at most once a minute and trusts it for `max_age`
 seconds (submit_holds_max_age), so a writer that stopped holds no one once it is stale;
 the metrics carry `max_age` for the alert that says so first (SubmitHoldsStale). A run that cannot read Prometheus still writes the ends holds and
-keeps the last file's disk holds, exits 1 and leaves the metrics (so the alert fires).
+keeps the last file's disk holds, exits 3 and leaves the metrics (so the alert fires).
 A login the host cannot resolve is skipped, said on standard error.
 
 CONFIG: prometheus_url, file (the holds), disk, disk_from, ends, textfile
@@ -30,6 +30,7 @@ import time
 
 from . import config, disk_report
 from .cli import run_main
+from .exits import CANNOT_RUN, OK, UNKNOWN
 from .files import write_atomic
 from .prom import key, render
 from .prometheus import Error as PrometheusError
@@ -144,7 +145,7 @@ def main(argv=None):
     args = (sys.argv if argv is None else argv)[1:]
     if len(args) != 1:
         print("usage: submit-holds CONFIG.json", file=sys.stderr)
-        return 2
+        return CANNOT_RUN
 
     def body():
         cfg = load_config(args[0])
@@ -159,9 +160,9 @@ def main(argv=None):
         held = {**kept, **holds(data, cfg, now)}
         write_atomic(cfg["file"], text(held, now), mode=0o644)
         if failed:
-            return 1
+            return UNKNOWN
         write_atomic(cfg["textfile"], metrics(held, cfg, now), mode=0o644)
-        return 0
+        return OK
 
     return run_main("submit-holds", body)
 

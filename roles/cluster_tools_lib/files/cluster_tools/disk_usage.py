@@ -22,7 +22,8 @@ import time
 
 from . import rules
 from .usage import JSON_NOTE
-from .cli import UNKNOWN, Command, Opt, opt_json, opt_user, run_main
+from .cli import Command, Opt, opt_json, opt_user, run_main
+from .exits import CANNOT_RUN, UNKNOWN
 from .disk_report import USAGE, host_of, where
 from .io_report import quoted
 from .render import Grid, size, width
@@ -89,6 +90,7 @@ COMMAND = Command(
     machine="--json",
     notes=[*NOTES, JSON_NOTE],
     summary_ko="내 용량과 파일 수, 경고 수준과 한도, 정리하면 좋을 폴더, 정리될 스크래치 파일",
+    judges=True,
 )
 
 
@@ -212,7 +214,7 @@ def main(argv=None):
     def body():
         if args.top < 1:
             print(f"{USAGE}: --top takes a whole number from 1", file=sys.stderr)
-            return 2
+            return CANNOT_RUN
         user, _, cfg, api = context(args.user)
         if api is None:
             print(f"{USAGE}: no prometheus_url", file=sys.stderr)
@@ -226,7 +228,7 @@ def main(argv=None):
         data.pop("user", None)
         return emit(USAGE, user, rows, args, theme, text, **data)
 
-    return run_main(USAGE, body, unknown=UNKNOWN)
+    return run_main(USAGE, body)
 
 
 if __name__ == "__main__":

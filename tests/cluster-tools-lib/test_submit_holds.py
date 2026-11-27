@@ -75,7 +75,7 @@ class HoldTests(unittest.TestCase):
             holds.write_text("generated 1\n1002 at the hard limit\n")
             away = mock.patch.object(submit_holds.disk_report, "collect", side_effect=PrometheusError("away"))
             with away, mock.patch("sys.stderr"):
-                self.assertEqual(submit_holds.main(["submit-holds", str(cfg)]), 1)
+                self.assertEqual(submit_holds.main(["submit-holds", str(cfg)]), 3)
             self.assertTrue(holds.read_text().endswith("\n1002 at the hard limit\n"))
             self.assertFalse(prom.exists(), "no success is recorded: SubmitHoldsStale fires")
             with mock.patch.object(submit_holds.disk_report, "collect", return_value=None):
@@ -111,7 +111,7 @@ class EndsTests(unittest.TestCase):
             away = mock.patch.object(submit_holds.disk_report, "collect", side_effect=PrometheusError("away"))
             today = mock.patch.object(submit_holds.time, "time", return_value=self.at("2026-11-22"))
             with away, today, mock.patch("sys.stderr"), mock.patch.object(submit_holds, "uid_of", UIDS.get):
-                self.assertEqual(submit_holds.main(["submit-holds", str(cfg)]), 1)
+                self.assertEqual(submit_holds.main(["submit-holds", str(cfg)]), 3)
             lines = holds.read_text().splitlines()
             self.assertEqual(lines[1], "1002 at the hard limit")
             self.assertTrue(lines[2].startswith("1003 Your membership ended on 2026-11-21."))

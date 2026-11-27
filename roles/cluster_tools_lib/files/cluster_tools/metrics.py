@@ -17,9 +17,10 @@ of one name add up in every sum (tests/cluster-tools/test_metrics.py checks it).
 
 `metrics PATH` writes the text file atomically (a temporary file in the same directory,
 fsync, rename), which node_exporter's textfile collector needs so it never reads half a
-file. On a Slurm failure it exits 1 and leaves the previous file, whose timestamp then
-shows how stale it is. The alerts read that series, not the file's mtime, so they hold
-whatever the file is called. Python 3.9 or newer, standard library only.
+file. On a Slurm failure it exits 3 (cluster_tools.exits) and leaves the previous
+file, whose timestamp then shows how stale it is. The alerts read that series, not the
+file's mtime, so they hold whatever the file is called. Python 3.9 or newer, standard
+library only.
 """
 
 import sys
@@ -27,6 +28,7 @@ import time
 
 from . import slurm, vocab
 from .cli import run_main
+from .exits import CANNOT_RUN
 from .files import write_atomic
 from .prom import series
 
@@ -78,7 +80,7 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) != 1 or argv[0].startswith("-"):
         print("usage: metrics PATH  (a node_exporter textfile, e.g. .../slurm-gpu.prom)", file=sys.stderr)
-        return 2
+        return CANNOT_RUN
     return run_main(
         "metrics", lambda: write_atomic(argv[0], textfile(slurm.load("jobs_detail"), slurm.load("nodes")))
     )

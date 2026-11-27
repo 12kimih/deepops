@@ -67,6 +67,18 @@ class SharedData(unittest.TestCase):
         with self.assertRaises(shared_data.Error):
             shared_data.public_url("https://huggingface.co.evil.example/x", hosts, self.resolve)
 
+    def test_a_refused_url_could_not_run_and_a_silent_resolver_is_retry_later(self):
+        with self.assertRaises(shared_data.Error) as refused:
+            shared_data.public_url("http://data.example/a.tar", (), self.resolve)
+        self.assertEqual(refused.exception.status, 2)
+
+        def silent(*_a, **_k):
+            raise OSError("Temporary failure in name resolution")
+
+        with self.assertRaises(shared_data.Error) as unanswered:
+            shared_data.public_url("https://data.example/a.tar", (), silent)
+        self.assertEqual(unanswered.exception.status, 3)
+
     def test_a_fetch_is_recorded_and_runs_as_the_writer(self):
         self.assertEqual(self.fetch("imagenet")["started"], "shared-data-datasets-imagenet")
         argv = self.started[0]

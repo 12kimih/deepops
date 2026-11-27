@@ -157,7 +157,7 @@ class Agreement(unittest.TestCase):
 class Overview(unittest.TestCase):
     def test_a_source_down_is_unknown_never_ok_and_exits_3(self):
         from cluster_tools import slurm
-        from cluster_tools.cli import AT_RISK, OK, UNKNOWN
+        from cluster_tools.exits import AT_RISK, OK, UNKNOWN
 
         def load(kind):
             raise slurm.Error("slurmctld down")
