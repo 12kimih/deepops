@@ -32,7 +32,8 @@ checkout:
 
 - deepops: `tests/slack-text/test_terms.py` (every tracked file);
 - the site config: its commit hook (`scripts/deepops/config-pre-commit.sh`) runs
-  `scripts/deepops/terms.py --site` over the staged tree;
+  `scripts/deepops/terms.py --site` over the staged tree, which also refuses the name of a
+  retired command (`scripts/deepops/retired_names.py`);
 - the user docs: `scripts/docs/site_facts.py` exports the list (`terms` and `titles` in
   the public `site.json`) and their own test applies it.
 

@@ -5,7 +5,8 @@ refused.
     terms.py [PATH ...]    print each line using a refused variant: this repository's
                            tracked files, or just PATHs
     terms.py --site        the same for the site config (DEEPOPS_CONFIG_DIR) as committed
-                           at DEEPOPS_SITE_REV (its staged tree; default HEAD)
+                           at DEEPOPS_SITE_REV (its staged tree; default HEAD), and each
+                           line naming a retired command (retired_names.py)
 
 The glossary is the one list, and each repository applies it to its own files at its
 own commit, so none waits on another's checkout: tests/slack-text/test_terms.py over
@@ -36,6 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GLOSSARY = Path(__file__).with_name("terms_ko.yml")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
+import retired_names  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 # The files that must quote the variants: the glossary, its reader, its doc and its tests.
@@ -254,12 +256,15 @@ def scan():
 
 
 def scan_site():
-    """Every violation in the site config (DEEPOPS_CONFIG_DIR) at DEEPOPS_SITE_REV."""
+    """Every violation in the site config (DEEPOPS_CONFIG_DIR) at DEEPOPS_SITE_REV: the
+    glossary's, and each mention of a retired command (deepops holds its own files to
+    that in tests/cluster-tools/test_retired_names.py; the user docs from site.json)."""
     site = os.environ.get("DEEPOPS_CONFIG_DIR") or str(ROOT / "config")
-    return [
-        f"config/{v}"
-        for v in check_texts(load(), committed(site, os.environ.get("DEEPOPS_SITE_REV") or "HEAD"))
+    texts = committed(site, os.environ.get("DEEPOPS_SITE_REV") or "HEAD")
+    retired = [
+        f"{rel}:{n}: {old!r} -> {new}" for rel, text in texts for n, old, new in retired_names.mentions(text)
     ]
+    return [f"config/{v}" for v in check_texts(load(), texts) + retired]
 
 
 def main(argv=None):

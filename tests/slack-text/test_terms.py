@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
+import retired_names  # noqa: E402
 import terms  # noqa: E402
 from cluster_tools import rules, usage_report  # noqa: E402
 
@@ -47,6 +48,19 @@ class Glossary(unittest.TestCase):
                 env["DEEPOPS_SITE_REV"] = tree
                 with unittest.mock.patch.dict("os.environ", env):
                     self.assertEqual(len(terms.scan_site()), 1, "the staged tree, as the hook names it")
+
+    def test_the_site_config_names_no_retired_command(self):
+        """The site config's hook refuses a retired command's name (owner, 2026-11-27: no
+        text sends people to a command that is gone), as deepops' and the docs' own checks."""
+        old, new = next(iter(retired_names.RETIRED.items()))
+        with tempfile.TemporaryDirectory() as tmp:
+            git = ["git", "-C", tmp, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+            subprocess.run(["git", "init", "-q", tmp], check=True)
+            (Path(tmp) / "a.md").write_text(f"`{old}`로 확인합니다.\n`{old}.py`, #{old}\n")
+            subprocess.run([*git, "add", "a.md"], check=True)
+            subprocess.run([*git, "commit", "-q", "-m", "a"], check=True)
+            with unittest.mock.patch.dict("os.environ", {"DEEPOPS_CONFIG_DIR": tmp, "DEEPOPS_SITE_REV": ""}):
+                self.assertEqual(terms.scan_site(), [f"config/a.md:1: {old!r} -> {new}"])
 
     def test_each_word_passes_every_entry_that_applies_where_it_does(self):
         for e in ENTRIES:
