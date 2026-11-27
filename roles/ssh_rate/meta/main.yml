@@ -3,7 +3,7 @@ dependencies:
   - role: people_defaults  # people (ssh_rate_exempt_users)
   - role: deploy_defaults  # cluster_user_warn_fraction
   - role: cluster_info_defaults  # cluster_info.docs_url
-  - role: cluster_tools_lib  # cluster_tools.ssh_rate
+  - role: cluster_tools_lib  # cluster_tools.ssh_rate, cluster_tools_lib_dir, cluster_tools_lib_python
   - role: prometheus_paths  # node_exporter_prom_dir
 
 galaxy_info:

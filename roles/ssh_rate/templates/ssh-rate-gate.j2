@@ -3,7 +3,11 @@
 # Run by pam_exec (roles/ssh_rate's PAM profile) for every PAM service; acts on sshd
 # alone. pam_exec makes any nonzero exit a failure, so this turns only the decision's
 # refusal (77) into one, and every other end (an error, no interpreter, a timeout, a
-# signal) into success: a fault in the limit never locks anyone out.
+# signal) into success: a fault in the limit never locks anyone out. The PAM line runs
+# it through /bin/sh only when it is there and executable, so a missing gate lets every
+# login in too. pam_exec has no timeout of its own: this script, the decision and its
+# interpreter are on local disk (the role checks), where nothing can stall before the
+# timeout below starts.
 [ "${PAM_SERVICE:-}" = sshd ] || exit 0
 timeout -k 1 2 {{ _ssh_rate_command }} {{ _ssh_rate_config }} "$1"
 status=$?

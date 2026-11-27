@@ -40,7 +40,11 @@ profile (`deepops-ssh-rate`, through `roles/pam_profile`, the only writer of the
 `/run/deepops/ssh-rate` (root's, a tmpfs, locked), and at account time it decides. The
 gate (`/usr/local/libexec/ssh-rate-gate`) acts on sshd alone, runs the decision under a
 2 second timeout and makes only its refusal (exit 77) a failure: an error, a timeout or
-a missing interpreter lets the login in. A refusal is logged (`journalctl -t ssh-rate`).
+a missing interpreter lets the login in. The PAM line runs the gate through `/bin/sh`
+only when it is there and executable, so a missing gate lets every login in too.
+pam_exec has no timeout of its own: the gate, the decision and its interpreter must be
+on local disk, and the role refuses to deploy when one is on NFS or another network
+filesystem. A refusal is logged (`journalctl -t ssh-rate`).
 
 What a refused person sees: sshd shows the message (`새 SSH 접속이 잠시 막혔습니다: ...`,
 with the count, when it opens again and how to turn on ControlMaster) to a password

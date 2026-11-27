@@ -16,6 +16,28 @@
     update_cache: true
     cache_valid_time: 3600
 
+# pam_exec waits as long as its command does: what runs before the gate's timeout must
+# never sit on a filesystem that can stall (NFS), or one stall hangs every new login.
+- name: Find the filesystems the gate, the decision and its interpreter are on
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, FSTYPE, --target, "{{ item }}"]
+  loop:
+    - "{{ _ssh_rate_gate | dirname }}"
+    - "{{ cluster_tools_lib_dir }}"
+    - "{{ cluster_tools_lib_python }}"
+  register: ssh_rate_fstypes
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Check they are all on local disk
+  ansible.builtin.assert:
+    that: item.stdout | trim is not match('^(nfs|nfs4|cifs|smb3|fuse\\.|9p|lustre|gpfs|ceph)')
+    fail_msg: "{{ item.item }} is on {{ item.stdout | trim }}: a stall there would hang every new SSH login (pam_exec has no timeout)."
+    quiet: true
+  loop: "{{ ssh_rate_fstypes.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
 - name: Install the decision
   ansible.builtin.include_role:
     name: cluster_tools_lib

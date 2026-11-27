@@ -8,7 +8,7 @@ Proven here, as before the first deploy (2026-11-28): below the level a login go
 past it one is refused; a key login sees "Connection closed", a password login the
 message; an exempt account and another PAM service (su) are never refused; the channels
 of a ControlMaster connection count once; a broken config, a hung decision and a
-missing interpreter let the login in; a retrying client's block grows to its cap; warn
+missing interpreter or a missing gate let the login in; a retrying client's block grows to its cap; warn
 mode refuses no one."""
 
 import json
@@ -157,6 +157,23 @@ class Pam(unittest.TestCase):
                 finally:
                     self.inside(restore)
         self.assertEqual(self.ssh("kim").returncode, 255, "restored: blocked again")
+
+    def test_4b_a_missing_gate_lets_the_login_in(self):
+        """The PAM line runs the gate only when it is there: a gate removed by hand, a half
+        run or a rename never refuses anyone (2026-11-20's lockout class)."""
+        self.reset("kim", block=True)
+        self.inside("mv /usr/local/libexec/ssh-rate-gate /tmp/gate")
+        try:
+            self.assertEqual(self.ssh("kim").returncode, 0)
+            self.inside(
+                "cp /tmp/gate /usr/local/libexec/ssh-rate-gate && chmod 0644 /usr/local/libexec/ssh-rate-gate"
+            )
+            self.assertEqual(self.ssh("kim").returncode, 0, "there but not executable")
+        finally:
+            self.inside(
+                "mv /tmp/gate /usr/local/libexec/ssh-rate-gate && chmod 0755 /usr/local/libexec/ssh-rate-gate"
+            )
+        self.assertEqual(self.ssh("kim").returncode, 255, "back: blocked again")
 
     def test_5_a_retrying_client_is_kept_out_up_to_the_cap(self):
         self.reset("kim")
