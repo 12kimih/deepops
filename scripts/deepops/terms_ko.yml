@@ -19,7 +19,7 @@ terms:
       - 할당받은 GPU를 쓰지 않는 잡
       - GPU를 할당받아 두고
       - 유휴 GPU
-      - 쉬(?:는|던) 잡
+      - 쉬(?:는|던) (?:잡|GPU)
       - 잡아 둔
     why: 'A noun in titles and sentences alike (owner, 2026-11-27); "GPU를 쓰지 않는 잡"
       alone read as a CPU-only job. Its definition is kept once, in the user docs'' GPU
@@ -200,6 +200,28 @@ terms:
     not:
       - 불이익은 도(?:움받기|와드리기)
     why: A penalty is not "helped"; it is remedied.
+  # The rules that act on a person (usage, the bot, the docs): each title is the
+  # glossary's word (owner, 2026-11-27); GPU 유휴 잡 and 디스크 한도 are above.
+  - title: /scratch 정리
+    title_not:
+      - 스크래치 정리
+    why: The scratch purge, named by the path people type.
+  - title: 공유 스토리지 부하
+    title_not:
+      - ^공유 스토리지 I/O$
+    why: The rule is about the load one person's I/O puts on everyone's storage.
+  - title: 로그인 노드 한도
+    not:
+      - 로그인 노드 (?:제한|상한)
+    why: A limit is 한도, as the disk's (상한 is the GPU power cap's word).
+  - title: 제출 잡 한도
+    title_not:
+      - 낼 수 있는 잡 수
+    why: The cap counts queued and running jobs together, as a 한도.
+  - title: 소속 기간 종료
+    title_not:
+      - 구성원 기간
+    why: What acts on a person is the end of their membership, not the period itself.
   # Title idioms (owner, 2026-11-27): a verb phrase that names a thing has a noun for
   # it in a title; refused in titles only, sentences keep them.
   - title: 역할

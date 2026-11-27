@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 import terms  # noqa: E402
-from cluster_tools import usage_report  # noqa: E402
+from cluster_tools import rules, usage_report  # noqa: E402
 
 ENTRIES = terms.load()
 
@@ -77,6 +77,8 @@ class Glossary(unittest.TestCase):
             "idle GPU jobs": "jobs leaving their GPUs idle",
             "SSH 공개 키": "SSH 공개키",
             "새 Slurm 잡은 제출되지 않습니다": "새 Slurm 잡을 제출할 수 없습니다",
+            "오래 쉬는 GPU": "GPU 유휴 잡",
+            "로그인 노드 제한": "로그인 노드 한도",
         }
         for old, new in caught.items():
             self.assertTrue(any(p.search(old) for e in ENTRIES if not e["scope"] for p in e["patterns"]), old)
@@ -132,6 +134,21 @@ class Glossary(unittest.TestCase):
         self.assertFalse(
             self.titled("a.md", "| 명령 | 역할 |\n|---|---|\n| a | 잡이 하는 일을 보여 줍니다 |\n")
         )
+
+    def test_the_rules_that_act_on_a_person_have_the_glossarys_titles(self):
+        """Owner, 2026-11-27: usage, the bot and the docs title each rule alike."""
+
+        def found(title):
+            return terms.check_texts(ENTRIES, [("a.md", f"## {title}\n")])
+
+        old = ("쉬는 GPU", "스크래치 정리", "공유 스토리지 I/O", "낼 수 있는 잡 수", "구성원 기간")
+        for title in old:
+            self.assertTrue(found(title), title)
+        words = {w for e in ENTRIES for w in (e.get("use"), e.get("title"))}
+        for title in (r.title for r in rules.RULES):
+            self.assertIn(title, words)
+            self.assertFalse(found(title), title)
+        self.assertFalse(found("공유 스토리지 I/O 줄이기"), "the old title alone")
 
     def test_an_entry_needs_a_word_variants_and_a_reason(self):
         with tempfile.TemporaryDirectory() as tmp:
