@@ -10,4 +10,5 @@ galaxy_info:
     - name: Ubuntu
       versions: [jammy, noble]
 dependencies:
+  - role: os_updates_defaults  # deepops_component_record_readers
   - role: deepops_paths  # maintenance_reboot_requests_dir

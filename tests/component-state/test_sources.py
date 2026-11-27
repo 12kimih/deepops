@@ -68,7 +68,7 @@ class Sources(unittest.TestCase):
         self.assertEqual(sorted(missing), [], "add each to deepops_managed_roles with its kind")
 
     def test_each_managed_entry_names_a_kind_and_its_playbook(self):
-        components = set(cs.component_roles(self.tree).values())
+        components = set(cs._load(self.tree.text(cs.MANAGED_FILE))[cs.REGISTRY])
         applied = {}
         for rel, play in self.plays:
             roles, tasks = whole(play)
@@ -77,7 +77,7 @@ class Sources(unittest.TestCase):
         for name, entry in self.managed.items():
             with self.subTest(role=name):
                 self.assertTrue(self.closure.role_files(name), "no such role")
-                self.assertNotIn(name, components, "a component is in the registry above")
+                self.assertNotIn(name, components, "a component of the registry is not managed too")
                 self.assertIn(entry.get("kind"), KINDS)
                 if entry["kind"] == "operation":
                     self.assertNotIn("playbook", entry, "an operation records nothing")
@@ -85,6 +85,14 @@ class Sources(unittest.TestCase):
                     self.assertIn(
                         entry.get("playbook"), applied.get(name, ()), "a playbook applying it whole"
                     )
+
+    def test_everything_recorded_has_its_playbook(self):
+        """A digest the alert and sync.py compare names the playbook that brings its hosts
+        level: a role that records present (bmc did) with no entry had none."""
+        import component_playbooks
+
+        playbooks = component_playbooks.playbooks(ROOT)
+        self.assertEqual(sorted(n for n in cs.recorded(self.tree) if n not in playbooks), [])
 
     def test_every_play_that_applies_one_records_at_its_end(self):
         """The record is the play's last post_task, so it runs after its roles, tasks and

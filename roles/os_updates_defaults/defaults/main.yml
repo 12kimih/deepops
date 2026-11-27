@@ -1,0 +1,30 @@
+---
+# How hosts update packages on their own: `security` (security fixes only, never
+# os_updates_held_back, never a reboot), `off` (no unattended upgrades) or `unmanaged`
+# (leave the distribution's settings as they are).
+os_updates_policy: security
+
+# Pending updates and whether a reboot is needed, as node_exporter textfile metrics
+# (os_updates_pending_packages{kind="security"|"all"}, os_updates_security_pending_since_seconds,
+# os_updates_reboot_required and _since_seconds, os_updates_dpkg_problems for an
+# interrupted dpkg, os_updates_apt_ok when apt cannot simulate, os_updates_package_info
+# per installed package for the fleet drift alert, and from the host's component record
+# os_updates_component_info (each component's version) and os_updates_package_component_info
+# (each package's component), so the drift alerts name the playbook that levels it),
+# measured daily, after every dpkg run, at every boot (the kept state from
+# /var/lib/os-updates first) and at the end of each deploy of the role; the component
+# series (a file of their own) also each time a deploy writes the record. So updates
+# that wait for a maintenance window cannot pile up unseen. Debian family. false removes the timer.
+os_updates_metrics: true
+
+# The textfile producers that export the host's component record (oneshot services),
+# run as soon as a deploy writes it (roles/component_record, tasks_from: export), so it
+# shows in Prometheus at once, not at the producer's next timer run. Each with the
+# playbook that installs it and whether that role runs it on this host: off, it is left;
+# on but not installed yet (a deploy that runs before os-updates.yml, or one whose
+# reader is newer than the host's last os-updates.yml), the run warns and names the
+# playbook, since what it recorded stays unseen until the producer's next run.
+deepops_component_record_readers:
+  - name: os-updates-metrics.components.service
+    playbook: playbooks/generic/os-updates.yml
+    "on": "{{ os_updates_policy != 'unmanaged' and os_updates_metrics | bool }}"

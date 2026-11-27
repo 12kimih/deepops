@@ -65,3 +65,9 @@
 
 - name: Export the record now
   ansible.builtin.include_tasks: export.yml
+  when: >-
+    (component_record_recorded.written | default(false)) or (component_record_play_wrote | default(false))
+
+- name: Start the next play's note afresh
+  ansible.builtin.set_fact:
+    component_record_play_wrote: false

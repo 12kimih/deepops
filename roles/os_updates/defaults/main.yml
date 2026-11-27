@@ -1,8 +1,6 @@
 ---
-# How hosts update packages on their own: `security` (security fixes only, never the
-# held-back packages below, never a reboot), `off` (no unattended upgrades) or
-# `unmanaged` (leave the distribution's settings as they are).
-os_updates_policy: security
+# os_updates_policy and os_updates_metrics: roles/os_updates_defaults (the record's
+# readers depend on them too).
 
 # Packages unattended upgrades never touch (shell-style globs on the package name).
 # They change the kernel, GPU, scheduler, container or storage stack, or (systemd,
@@ -43,16 +41,3 @@ os_updates_restart_services: false
 # (Docker was held on some nodes only, so their versions drifted). Pin a version
 # through the owning role instead. Debian family.
 os_updates_allowed_holds: []
-
-# Pending updates and whether a reboot is needed, as node_exporter textfile metrics
-# (os_updates_pending_packages{kind="security"|"all"}, os_updates_security_pending_since_seconds,
-# os_updates_reboot_required and _since_seconds, os_updates_dpkg_problems for an
-# interrupted dpkg, os_updates_apt_ok when apt cannot simulate, os_updates_package_info
-# per installed package for the fleet drift alert, and from the host's component record
-# os_updates_component_info (each component's version) and os_updates_package_component_info
-# (each package's component), so the drift alerts name the playbook that levels it),
-# measured daily, after every dpkg run, at every boot (the kept state from
-# /var/lib/os-updates first) and at the end of each deploy of the role; the component
-# series (a file of their own) also each time a deploy writes the record. So updates
-# that wait for a maintenance window cannot pile up unseen. Debian family. false removes the timer.
-os_updates_metrics: true

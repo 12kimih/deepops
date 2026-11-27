@@ -10,11 +10,6 @@ deepops_cache_dir: /var/cache/deepops
 # The record of every component a deploy installed and what it installed (a local fact,
 # roles/component_record), read by roles that must leave another component's files be.
 deepops_component_record: /etc/ansible/facts.d/deepops_components.fact
-# The textfile producers that export the record (oneshot services): component_record
-# runs each one installed on the host as soon as it writes the record, so a deploy shows
-# in Prometheus at once, not at the producer's next timer run (roles/textfile_keep,
-# tasks_from: refresh).
-deepops_component_record_readers: [os-updates-metrics.components.service]
 # The command search path of a script a daemon runs with little or no environment
 # (slurmd's prolog and epilog, systemd-shutdown's hooks): set and exported by the script,
 # so a program it runs through timeout, xargs or env is found in sbin too (glibc's own

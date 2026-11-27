@@ -175,6 +175,10 @@
     role: "{{ component_record_role }}"
   register: component_record_recorded
 
-- name: Export the record now
-  ansible.builtin.include_tasks: export.yml
-  when: component_record_action != 'begin'  # what is there until the deploy ends stays shown
+# Exported once, at the play's end (tasks_from: sources), with everything the play wrote.
+- name: Note that this play wrote the record
+  ansible.builtin.set_fact:
+    component_record_play_wrote: true
+  when:
+    - component_record_action != 'begin'  # what is there until the deploy ends stays shown
+    - component_record_recorded.written | default(false)

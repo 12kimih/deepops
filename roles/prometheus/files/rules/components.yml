@@ -18,6 +18,9 @@ groups:
         labels: {component: autofs, playbook: playbooks/generic/authentication.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: bmc, playbook: playbooks/utilities/bmc.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: cachefilesd, playbook: playbooks/generic/cachefilesd.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)

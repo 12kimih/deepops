@@ -126,7 +126,12 @@ def mismatches(ansible, role, tasks_from, public, counter):
                 pending.append((task, depth + 1))
             if not task.vars:
                 continue
-            inside = next(iter(ansible.children(play, task)), None)
+            # The included role's own first task: a dependency comes first, and one of only
+            # defaults holds just Ansible's implicit end-of-role task, where nothing of the
+            # include's is used (component_record's os_updates_defaults, 2026-11-27).
+            children = ansible.children(play, task)
+            own = [c for c in children if c._role is not None and c._role.get_name() == task._role_name]
+            inside = next(iter(own or children), None)
             if inside is None:
                 continue
             for name, raw in task.vars.items():

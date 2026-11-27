@@ -4,19 +4,54 @@
 # producer's next timer run: os-updates-metrics runs daily, and the source digests a
 # deploy recorded showed a day late (2026-11-26). Each one waits for the run and fails
 # the deploy when the run fails, with its journal (plugins/action/systemd_unit). A
-# producer not installed on the host (its role is off there) is left; a measurement is
-# not a change to the host, so it is never reported as one.
+# measurement is not a change to the host, so it is never reported as one.
+#
+# A producer is a unit name, which the calling role has just installed: not on the host,
+# the run fails. Or it is {name, playbook, on}, one another role installs: off (its
+# role does not run it here), it is left; on but not installed yet, the run warns and
+# names the playbook, since what this deploy changed stays unseen until it runs (the
+# component record's reader was missing on every host for a day, unseen, 2026-11-27).
 #   - ansible.builtin.include_role:
 #       name: textfile_keep
 #       tasks_from: refresh
 #     vars:
 #       textfile_keep_producers: [os-updates-metrics.service]
+- name: Name the textfile producers
+  ansible.builtin.set_fact:
+    _textfile_keep_wanted: >-
+      {{ textfile_keep_producers | map('textfile_keep_producer') | list }}
+
 - name: Look up the textfile producers
   systemd_unit:
-    name: "{{ item }}"
-  loop: "{{ textfile_keep_producers }}"
+    name: "{{ item.name }}"
+  loop: "{{ _textfile_keep_wanted | selectattr('on') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
   register: _textfile_keep_producers
   check_mode: true  # read-only; a unit not installed is LoadState not-found, no failure
+
+- name: Stop when a producer this role installs is missing
+  ansible.builtin.fail:
+    msg: "{{ item.item.name }} is not on this host, though the role that runs this installs it."
+  loop: "{{ _textfile_keep_producers.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - item.status.LoadState | default('not-found') != 'loaded'
+    - item.item.playbook | length == 0
+    - not ansible_check_mode  # --check only previewed installing it
+
+- name: Say which playbook installs a producer not here yet
+  warn:
+    msg: >-
+      {{ item.item.name }} is not on {{ inventory_hostname }} yet: what this deploy changed
+      shows in Prometheus only once it runs; run {{ item.item.playbook }}.
+  loop: "{{ _textfile_keep_producers.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - item.status.LoadState | default('not-found') != 'loaded'
+    - item.item.playbook | length > 0
 
 # A producer that keeps running (or stays active after its run) would not run again on a
 # start: a timer's service is a oneshot that ends.
@@ -25,19 +60,19 @@
     that:
       - item.status.Type | default('') == 'oneshot'
       - item.status.RemainAfterExit | default('no') == 'no'
-    fail_msg: "{{ item.item }} is not a oneshot that ends (Type={{ item.status.Type | default('') }}); a start would not run it again."
+    fail_msg: "{{ item.item.name }} is not a oneshot that ends (Type={{ item.status.Type | default('') }}); a start would not run it again."
     quiet: true
   loop: "{{ _textfile_keep_producers.results }}"
   loop_control:
-    label: "{{ item.item }}"
+    label: "{{ item.item.name }}"
   when: item.status.LoadState | default('not-found') == 'loaded'
 
 - name: Run the textfile producers now
   systemd_unit:
-    name: "{{ item.item }}"
+    name: "{{ item.item.name }}"
     state: started
   loop: "{{ _textfile_keep_producers.results }}"
   loop_control:
-    label: "{{ item.item }}"
+    label: "{{ item.item.name }}"
   changed_when: false
   when: item.status.LoadState | default('not-found') == 'loaded'

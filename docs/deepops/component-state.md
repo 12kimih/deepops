@@ -77,9 +77,13 @@ or a run from another operator's machine.
   and nothing writes the record under `--check`.
 - **Seen by Prometheus.** roles/os_updates publishes each record
   (`os_updates_component_info`, `os_updates_package_component_info`,
-  `os_updates_component_source_info`) as soon as a deploy writes it: component_record
-  then runs what exports the record (`deepops_component_record_readers`, through
-  roles/textfile_keep `tasks_from: refresh`), and the daily measurement does too. And
+  `os_updates_component_source_info`) as soon as a deploy writes it: the play's end runs
+  what exports the record (`deepops_component_record_readers`, roles/os_updates_defaults,
+  through roles/textfile_keep `tasks_from: refresh`), and the daily measurement does too.
+  A reader its role runs on the host but that is not installed yet (a deploy before
+  os-updates.yml, or a reader newer than the host's last os-updates.yml) makes the run
+  warn with the playbook to run: until then what was recorded stays unseen, and
+  ComponentNotDeployed would name hosts that are deployed. And
   `scripts/deepops/component_playbooks.py` generates each component's playbook as a
   series (`roles/prometheus/files/rules/components.yml`): a component at two versions
   across its hosts (a run limited to some of them) or a local package at two versions

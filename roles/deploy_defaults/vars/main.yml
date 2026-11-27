@@ -318,6 +318,8 @@ deepops_managed_roles:
   ai_agent_rules: {kind: policy, playbook: playbooks/slurm-cluster/ai-agent-rules.yml}
   ara_server: {kind: permanent, playbook: playbooks/utilities/ara-server.yml}
   autofs: {kind: permanent, playbook: playbooks/generic/authentication.yml}
+  # Records its boot files through component_record (owner sets), with no absent path.
+  bmc: {kind: permanent, playbook: playbooks/utilities/bmc.yml}
   cachefilesd: {kind: permanent, playbook: playbooks/generic/cachefilesd.yml}
   cluster_sudoers: {kind: permanent, playbook: playbooks/generic/cluster-sudoers.yml}
   deepops_hosts: {kind: oneshot, playbook: playbooks/generic/hosts.yml}

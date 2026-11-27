@@ -414,11 +414,29 @@ class RunSources(unittest.TestCase):
         # 2026-11-26: the new digests showed a day late, at the daily measurement
         self.set_upstream("ntp.example.invalid")
         lookup = "textfile_keep : Look up the textfile producers"
-        absent = "deepops-test-not-installed.service"
+        absent = {"name": "deepops-test-not-installed.service", "playbook": "playbooks/x.yml", "on": True}
         self.assertIn(lookup, self.readers(absent).stdout, "written: run")
         self.assertNotIn(lookup, self.readers(absent).stdout, "unchanged: left")
         self.set_upstream("other.example.invalid")  # a new digest alone: written, no change
         self.assertIn(lookup, self.readers(absent).stdout)
+
+    def test_a_reader_on_but_not_installed_warns_with_its_playbook_and_off_is_left(self):
+        # 2026-11-27: the record's new reader was on no host yet, and the refresh said nothing
+        self.set_upstream("ntp.example.invalid")
+        reader = {"name": "deepops-test-not-installed.service", "playbook": "playbooks/x.yml", "on": True}
+        done = self.readers(reader)
+        out = done.stdout + done.stderr  # a warning goes to stderr
+        self.assertIn("deepops-test-not-installed.service is not on a yet", out)
+        self.assertIn("run playbooks/x.yml", out)
+        self.set_upstream("other.example.invalid")
+        done = self.readers({**reader, "on": False})
+        self.assertNotIn("is not on a yet", done.stdout + done.stderr, "its role is off here: left")
+
+    def test_a_producer_its_own_role_installs_must_be_there(self):
+        self.set_upstream("ntp.example.invalid")
+        done = self.readers("deepops-test-not-installed.service", ok=False)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("though the role that runs this installs it", done.stdout)
 
     def test_a_reader_that_is_not_a_oneshot_fails_the_run(self):
         self.set_upstream("ntp.example.invalid")

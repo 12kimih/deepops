@@ -1,13 +1,12 @@
 ---
 # What exports the record runs now (deepops_component_record_readers), so a deploy shows
 # in Prometheus at once, not at the next daily measurement. Only for the record this
-# role keeps (one at another path, a test's, has no readers) and only when written.
+# role keeps (one at another path, a test's, has no readers); the play's end runs it when
+# the play wrote the record. A reader off on this host is left, one not here yet warns.
 - name: Export the record now
-  when:
-    - component_record_recorded.written | default(false)
-    - component_record_path == deepops_component_record
+  when: component_record_path == deepops_component_record
   block:
-    # Resolved here: deepops_paths is this role's dependency, not textfile_keep's.
+    # Resolved here: os_updates_defaults is this role's dependency, not textfile_keep's.
     - name: Name what exports the record
       ansible.builtin.set_fact:
         _component_record_readers: "{{ deepops_component_record_readers }}"

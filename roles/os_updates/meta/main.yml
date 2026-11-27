@@ -14,5 +14,6 @@ galaxy_info:
     - name: EL
       versions: ["8", "9"]
 dependencies:
+  - role: os_updates_defaults  # os_updates_policy, os_updates_metrics
   - role: prometheus_paths  # node_exporter_prom_dir
   - role: deepops_paths  # deepops_component_record
