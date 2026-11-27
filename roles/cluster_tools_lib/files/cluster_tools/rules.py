@@ -116,6 +116,25 @@ def unknown(rule_id, why):
     return row(rule_id, "?", "", "?", why)
 
 
+NO_PROMETHEUS = "Prometheus 주소가 없습니다"
+
+
+def reason(error):
+    """A short Korean reason for a source that failed, for the person reading it: never
+    the exception itself (an errno, a path, a URL)."""
+    if isinstance(error, slurm.Error):
+        return "Slurm이 답하지 않습니다"
+    if isinstance(error, PermissionError):
+        return "이 계정으로는 읽을 수 없습니다"
+    if isinstance(error, FileNotFoundError):
+        return "읽을 파일이 이 노드에 없습니다"
+    from .prometheus import Error as PrometheusError
+
+    if isinstance(error, PrometheusError):
+        return "Prometheus가 답하지 않습니다"
+    return "확인하지 못했습니다"
+
+
 # --- each rule, by its enforcer's own decision ------------------------------------
 
 
@@ -128,7 +147,7 @@ def gpu_idle(user, cfg, jobs_data, prom, now):
     if not rule:
         return row("gpu-idle", "", "", "off")
     if prom is None:
-        return unknown("gpu-idle", "no prometheus_url")
+        return unknown("gpu-idle", NO_PROMETHEUS)
     window = float(rule["idle_hours"]) * 3600
     threshold = float(rule["idle_util_threshold"])
     cancel = float(rule.get("cancel_after_hours") or 0)
@@ -156,6 +175,8 @@ def disk(user, cfg, prom, now):
     rule = cfg.get("disk")
     if not rule:
         return row("disk", "", "", "off")
+    if prom is None:
+        return unknown("disk", NO_PROMETHEUS)
     data = disk_report.collect(prom, now)
     rows = [r for r in disk_report.over_warn(data) if r[2] == user] if data else []
     mine = {k: e for k, e in (data or {}).get("users", {}).items() if k[2] == user}
@@ -178,29 +199,37 @@ def disk(user, cfg, prom, now):
     return row("disk", f"{place} {used}", limit, "warn", state)
 
 
-def scratch(user, cfg, now):
-    """What of the caller's scratch_space listed to go (its list file), and when first."""
-    from . import scratch_space
+def scratch(user, cfg, prom, now):
+    """What of the caller's scratch_space's last purge run listed to go, and when first:
+    the run's own figures per person (scratch_space.metrics, from the plan it writes each
+    list from), which every caller can read; the list itself is in the person's own
+    directory, which the bot cannot open."""
+    from .disk_report import series
+    from .io_report import quoted
 
     rule = cfg.get("scratch")
     if not rule:
         return row("scratch-purge", "", "", "off")
-    path = os.path.join(rule["root"], user, rule.get("list_name") or scratch_space.LIST_NAME)
+    if prom is None:
+        return unknown("scratch-purge", NO_PROMETHEUS)
     limit = f"{rule['stale_days']}일 안 씀 + {rule['grace_days']}일"
-    try:
-        with open(path, encoding="utf-8", errors="surrogateescape") as f:
-            n, total, first = scratch_space.summarize_list(f)
-    except FileNotFoundError:
-        if not os.path.isdir(rule["root"]):
-            return unknown("scratch-purge", f"{rule['root']}이(가) 이 노드에 없습니다")
-        return row("scratch-purge", "지울 파일 없음", limit, "ok")
-    except OSError as e:
-        return unknown("scratch-purge", str(e))
-    if not n:
+    runs = series(prom, "scratch_space_last_success_timestamp_seconds", ())
+    if not runs:
+        return unknown("scratch-purge", "정리가 아직 한 번도 돌지 않았습니다")
+    if now - max(runs.values()) > 2 * DAY:
+        return unknown("scratch-purge", "정리가 이틀 넘게 돌지 않았습니다")
+    who = "{user=" + quoted(user) + "}"
+    files = sum(series(prom, "scratch_space_purge_due_files" + who, ()).values())
+    if not files:
         return row("scratch-purge", "지울 파일 없음", limit, "ok")
     from .render import size
 
-    return row("scratch-purge", f"파일 {n:,}개 {size(total)}", limit, "act", f"{first}부터 삭제", first=first)
+    total = sum(series(prom, "scratch_space_purge_due_bytes" + who, ()).values())
+    first = min(series(prom, "scratch_space_purge_next_timestamp_seconds" + who, ()).values(), default=now)
+    day = time.strftime("%Y-%m-%d", time.localtime(first))
+    return row(
+        "scratch-purge", f"파일 {int(files):,}개 {size(total)}", limit, "act", f"{day}부터 삭제", first=day
+    )
 
 
 def io(user, cfg, prom):
@@ -210,6 +239,8 @@ def io(user, cfg, prom):
     rule = cfg.get("io")
     if not rule or not rule.get("mounts"):
         return row("io-heavy", "", "", "off")
+    if prom is None:
+        return unknown("io-heavy", NO_PROMETHEUS)
     share, minutes = float(rule["share"]), int(rule["minutes"])
     hot = io_report.collect(prom, rule["mounts"], share, minutes, int(rule.get("top") or 3))
     limit = f"노드 NFS가 디스크의 {share:.0%} 넘게 {minutes}분"
@@ -223,10 +254,12 @@ def io(user, cfg, prom):
 
 
 def _read(path):
+    """PATH's text, or None when there is no such file. Any other failure (a file the
+    caller may not read) raises: unread is unknown, never "none"."""
     try:
         with open(path) as f:
             return f.read().strip()
-    except OSError:
+    except FileNotFoundError:
         return None
 
 
@@ -343,13 +376,15 @@ def overview(user, cfg, uid=None, prom=None, load=slurm.load, now=None, here=Tru
         jobs = load("jobs_detail")
     except Exception as e:  # noqa: BLE001 - Slurm down: its rules unknown, the others go on
         jobs = None
-        slurm_error = str(e)
+        slurm_error = reason(e)
     # The login limits first: their CPU sample must not count this run's own work.
-    first = login(user, cfg, uid) if here else row("login-limits", "", "", "off", "로그인 노드에서 usage")
+    # Measured on the login node itself (its user slice): elsewhere unknown, never off,
+    # and the row's check (usage login-node) says where to look.
+    first = login(user, cfg, uid) if here else unknown("login-limits", "로그인 노드에서만 잴 수 있습니다")
     for rule_id, fn in (
         ("gpu-idle", lambda: gpu_idle(user, cfg, jobs, prom, now)),
         ("disk", lambda: disk(user, cfg, prom, now)),
-        ("scratch-purge", lambda: scratch(user, cfg, now)),
+        ("scratch-purge", lambda: scratch(user, cfg, prom, now)),
         ("io-heavy", lambda: io(user, cfg, prom)),
         ("login-limits", lambda: first),
         ("queued-jobs", lambda: queued(user, jobs, load("associations"))),
@@ -357,12 +392,12 @@ def overview(user, cfg, uid=None, prom=None, load=slurm.load, now=None, here=Tru
     ):  # fmt: skip
         needs_slurm = rule_id in ("gpu-idle", "queued-jobs")
         if needs_slurm and jobs is None:
-            out.append(unknown(rule_id, f"Slurm: {slurm_error}"))
+            out.append(unknown(rule_id, slurm_error))
             continue
         try:
             out.append(fn())
         except Exception as e:  # noqa: BLE001 - one source down never hides the other rules
-            out.append(unknown(rule_id, str(e)))
+            out.append(unknown(rule_id, reason(e)))
     return out
 
 

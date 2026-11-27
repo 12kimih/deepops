@@ -202,7 +202,11 @@ def scratch(user, cfg, top, now):
     part = cfg.get("scratch")
     if not part or not os.path.isdir(part["root"]):
         return ""
-    text, _ = scratch_space.show(scratch_space.Host(), part["root"], user, now, top=top)
+    try:
+        text, _ = scratch_space.show(scratch_space.Host(), part["root"], user, now, top=top)
+    except PermissionError:
+        # The list is in the person's own directory: the counts above are for everyone.
+        return f"\nThe file by file list is in {user}'s own directory: only they can read it.\n"
     return "\n" + text
 
 
@@ -221,7 +225,7 @@ def main(argv=None):
             return UNKNOWN
         now = time.time()
         data = collect(api, user, args.top)
-        rows = [rules.disk(user, cfg, api, now), rules.scratch(user, cfg, now)]
+        rows = [rules.disk(user, cfg, api, now), rules.scratch(user, cfg, api, now)]
         text = (
             table(rows, theme, f"space of {user}") + render(data, theme) + scratch(user, cfg, args.top, now)
         )

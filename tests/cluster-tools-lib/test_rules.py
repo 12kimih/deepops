@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -23,6 +24,21 @@ NOT_A_RULE = {
     "job_notice": "tells a job's owner the job ended (--mail-type): no limit",
 }
 NOW = 1_800_000_000
+
+
+class FakeProm:
+    """Instant queries over a node_exporter textfile: NAME or NAME{label="value"}."""
+
+    def __init__(self, text):
+        from cluster_tools import prom
+
+        self.values = prom.parse(text)
+
+    def query(self, expr, at=None):
+        name, _, want = expr.partition("{")
+        wanted = dict(re.findall(r'(\w+)="([^"]*)"', want))
+        return [{"metric": dict(labels), "value": [0, value]} for (n, labels), value in self.values.items()
+                if n == name and wanted.items() <= dict(labels).items()]  # fmt: skip
 
 
 class Registry(unittest.TestCase):
@@ -94,20 +110,24 @@ class Agreement(unittest.TestCase):
             self.assertEqual(disk_report.past(entry), [])
             self.assertEqual(rules.disk("kim", {"disk": {"holds_on": True}}, object(), NOW).state, "ok")
 
-    def test_scratch_is_the_cleanups_list(self):
-        with tempfile.TemporaryDirectory() as root:
-            os.mkdir(os.path.join(root, "kim"))
-            cfg = {"scratch": {"root": root, "stale_days": 60, "grace_days": 14}}
-            self.assertEqual(rules.scratch("kim", cfg, NOW).state, "ok", "no list: nothing due")
-            listed = "# header\n2026-12-10\t100\t/s/kim/a\n2026-12-01\t50\t/s/kim/b\n"
-            Path(root, "kim", scratch_space.LIST_NAME).write_text(listed)
-            _, entries = scratch_space.read_list(listed)
-            row = rules.scratch("kim", cfg, NOW)
-            self.assertEqual((row.state, row.detail["first"]), ("act", min(d for d, _, _ in entries)))
-            self.assertIn(f"{len(entries)}개", row.mine)
-            self.assertEqual(
-                rules.scratch("kim", {"scratch": {**cfg["scratch"], "root": root + "/x"}}, NOW).state, "?"
-            )
+    def test_scratch_is_the_purge_runs_own_figures(self):
+        """What the purge run published for each person (scratch_space.metrics, from the
+        plan it writes their list from): every caller reads it, the bot too (the list
+        is in the person's own directory: Permission denied, 2026-11-27)."""
+        cfg = {"scratch": {"root": "/s", "stale_days": 60, "grace_days": 14}}
+        due = {"/s/kim/a": {"user": "kim", "due": NOW + 9 * 86400, "bytes": 100},
+               "/s/kim/b": {"user": "kim", "due": NOW + 2 * 86400, "bytes": 50},
+               "/s/lee/c": {"user": "lee", "due": NOW + 86400, "bytes": 7}}  # fmt: skip
+        text = scratch_space.metrics({"root": "/s", "stale_days": 60}, due, {}, (0, 0), 3, False, NOW, None)
+        prom = FakeProm(text)
+        row = rules.scratch("kim", cfg, prom, NOW)
+        first = time.strftime("%Y-%m-%d", time.localtime(NOW + 2 * 86400))
+        self.assertEqual((row.state, row.detail["first"]), ("act", first))
+        self.assertIn("2개", row.mine)
+        self.assertEqual(rules.scratch("park", cfg, prom, NOW).state, "ok", "nothing of theirs due")
+        self.assertEqual(rules.scratch("kim", cfg, prom, NOW + 3 * 86400).state, "?", "the run stopped")
+        self.assertEqual(rules.scratch("kim", cfg, FakeProm(""), NOW).state, "?", "never ran")
+        self.assertEqual(rules.scratch("kim", cfg, None, NOW).state, "?")
 
     def test_io_is_the_hot_nodes_jobs(self):
         hot = [{"host": "gpu1", "mount": "/home", "jobs": [("12", "kim", 1.0), ("13", "lee", 2.0)]}]
@@ -170,6 +190,46 @@ class Overview(unittest.TestCase):
         self.assertEqual(rules.exit_status([rules.row("disk", "", "", "warn"), *rows]), AT_RISK)
         self.assertEqual(rules.exit_status([rules.row("disk", "", "", "ok")]), OK)
         self.assertEqual([r.rule for r in rows], [r.id for r in rules.RULES], "every rule, in order")
+
+    def test_a_reader_who_is_not_the_person_gets_reasons_never_errors(self):
+        """rules.overview as the bot reads it (another account, not on the login node):
+        each source that fails is "?" with a short Korean reason, never an errno, a path
+        or a URL; each that answers is measured."""
+        from cluster_tools import prometheus, slurm
+
+        class Down:
+            def query(self, expr, at=None):
+                raise prometheus.Error("http://prom.example.invalid:9090: connection refused")
+
+        def load(kind):
+            raise slurm.Error("slurm.example.invalid:6820: [Errno 111] Connection refused")
+
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "kim").write_text('{"ends": "2020-01-01", "login_expires": "2020-02-01"}')
+            os.chmod(Path(d, "kim"), 0)
+            if os.access(Path(d, "kim"), os.R_OK):
+                self.skipTest("root reads every file")
+            cfg = {"gpu_idle": {"idle_hours": 2, "idle_util_threshold": 0},
+                   "disk": {"holds_on": False}, "scratch": {"root": d, "stale_days": 60, "grace_days": 14},
+                   "io": {"share": 0.4, "minutes": 15, "mounts": {"/home": {}}}, "ends_dir": d}  # fmt: skip
+            rows = rules.overview("kim", cfg, prom=Down(), load=load, now=NOW, here=False)
+            for r in rows:
+                with self.subTest(rule=r.rule):
+                    self.assertEqual(r.state, "?")
+                    said = f"{r.mine} {r.limit} {r.when}"
+                    self.assertNotRegex(said, r"Errno|/|https?:|\.invalid", "a reason, not the error")
+                    self.assertRegex(r.when, "[가-힣]")
+            os.chmod(Path(d, "kim"), 0o644)
+            jobs = {"jobs": [], "associations": []}
+            answers = FakeProm(
+                scratch_space.metrics({"root": d, "stale_days": 60}, {}, {}, (0, 0), 0, False, NOW, None)
+            )
+            with mock.patch.object(io_report, "collect", return_value=[]):  # its rates: beyond FakeProm
+                rows = rules.overview("kim", cfg, prom=answers, load=lambda kind: jobs, now=NOW, here=False)
+            states = {r.rule: r.state for r in rows}
+            self.assertEqual(states.pop("login-limits"), "?", "measured on the login node only")
+            self.assertNotIn("?", states.values(), states)
+            self.assertEqual(states["membership-end"], "act", "readable: read")
 
 
 if __name__ == "__main__":

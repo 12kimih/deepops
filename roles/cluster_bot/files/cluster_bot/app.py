@@ -469,7 +469,7 @@ def usage_lines(login, cfg, path=None):
     try:
         rcfg = rules.load_config(path or rules.PATH)
     except Exception as e:  # noqa: BLE001 - no rules file on this host: say so, never fail the bot
-        return [f"규칙의 기준을 읽지 못했습니다: {e}"]
+        return [f"규칙의 기준을 읽지 못했습니다: {rules.reason(e)}"]
     url = rcfg.get("prometheus_url")
     rows = rules.overview(login, rcfg, prom=prometheus.Prometheus(url) if url else None, here=False,
                           ends=(cfg.get("leave") or {}).get("leaving") or {})  # fmt: skip
