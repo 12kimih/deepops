@@ -22,7 +22,7 @@ endings) unless its file is exempt (titles: exempt, each with why). The title po
 (titles()): Markdown headings, bold-only lines and a list item's bold lead, table header
 rows, a Slack guide's title, table and bookmark (slack/*.md front matter); in Python a
 Slack header block, a modal title, a **bold** lead in a string, a form field's label, a
-button and a table() header; a Grafana dashboard's or panel's title; an alert's summary.
+button, a table() header and cluster_tools.cards' header, part label and fact label; a Grafana dashboard's or panel's title; an alert's summary.
 """
 
 import os
@@ -100,6 +100,8 @@ _PY = (
     re.compile(r'\*\*([^*"\n]+)\*\*(?=\\n|"|  |$)'),
     re.compile(r'\bfield\(\s*"[^"]+",\s*f?"([^"]+)"'),
     re.compile(r'\bbutton\(\s*f?"([^"]+)"'),
+    re.compile(r'\bcards\.(?:title|part)\(\s*f?"([^"]+)"'),  # cluster_tools.cards: a header, a part's label
+    re.compile(r'^\s*\(f?"([^"]+)",\s*f?"[^"]*",\s*"(?:ok|warn|act|off|\?)?"'),  # a cards.facts label
 )
 
 
@@ -135,6 +137,10 @@ def titles(rel, lines):
         for i, line in enumerate(lines):
             for p in _PY:
                 out += [(i + 1, m.group(1)) for m in p.finditer(line)]
+            if re.search(r"\bcards\.(?:title|part)\(\s*$", line) and i + 1 < len(lines):
+                m = re.match(r'\s*f?"([^"]+)"', lines[i + 1])  # the label on the next line
+                if m:
+                    out.append((i + 2, m.group(1)))
             for m in re.finditer(r"\btable\(\(([^)]*)\)", line):
                 out += [(i + 1, a or b) for a, b in re.findall(r"'([^']*)'|\"([^\"]*)\"", m.group(1))]
     elif rel.endswith(".json"):

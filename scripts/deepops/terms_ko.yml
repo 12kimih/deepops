@@ -24,6 +24,16 @@ terms:
     why: 'A noun in titles and sentences alike (owner, 2026-11-27); "GPU를 쓰지 않는 잡"
       alone read as a CPU-only job. Its definition is kept once, in the user docs'' GPU
       session rules (every GPU the job was allocated sat idle the whole time).'
+  - use: GPU 유휴 시간
+    not:
+      - 쉰 (?:GPU|상태)
+      - GPU ?시간 (?:쉼|쉬었)
+      - 쉬는 중
+      - (?<![가-힣])쉼(?=[:)]|$)
+    why: The minutes a job's GPUs sat at or under the idle threshold (the weekly summary),
+      in the noun the owner named for idle (GPU 유휴, 2026-11-27); the verb forms (쉰,
+      쉼, 쉬는 중) read as rest. A GPU 유휴 잡 is the other measure, a job whose GPUs all
+      sat idle for the rule's hours.
   - use: a job leaving its GPUs idle
     not:
       - (?i:\bidle[- ](?:GPU )?(?:jobs?|rule)\b)

@@ -37,7 +37,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from . import config, disk_report, io_report, notices, rich, rules
+from . import cards, config, disk_report, io_report, notices, rich, rules
 from .config import ConfigError
 from .files import write_atomic
 from .prometheus import Prometheus
@@ -174,6 +174,12 @@ def collect_gpus(prom, window):
     }
 
 
+def util_at_most(threshold):
+    """The idle threshold (idle_util_threshold, percent) as a phrase: "0%" (nothing is
+    below it), else "5% 이하". The hourly rule, the weekly hours and usage say it alike."""
+    return "0%" if threshold == 0 else f"{threshold:g}% 이하"
+
+
 def collect_week(prom, threshold, days=WEEK_DAYS):
     """[{user, held, idle}] in GPU-hours over the last DAYS: each minute a job held a GPU,
     and each such minute its utilisation was at or under THRESHOLD percent."""
@@ -188,25 +194,32 @@ def collect_week(prom, threshold, days=WEEK_DAYS):
     )
 
 
-def render_week(rows, who, threshold, days=WEEK_DAYS, top=WEEK_TOP):
+def render_week(rows, who, threshold, days=WEEK_DAYS, top=WEEK_TOP, now=None):
     """(text, blocks): totals, then everyone who held GPUs, idlest first; the TOP idlest
-    with idle hours are mentioned. THRESHOLD is collect_week's, in percent."""
+    with idle hours are mentioned. THRESHOLD is collect_week's, in percent; NOW dates the
+    header (default: now)."""
     held = sum(r["held"] for r in rows)
     idle = sum(r["idle"] for r in rows)
     share = idle / held if held else 0
-    head = f"지난 {days}일 GPU 사용: {held:,.0f} GPU시간 중 {idle:,.0f} GPU시간 쉬었습니다 ({share:.0%})"
+    head = f"지난 {days}일 GPU 사용: {held:,.0f} GPU시간 중 GPU 유휴 시간 {idle:,.0f} ({share:.0%})"
     lines = []
     for n, r in enumerate(rows):
         name = who(r["user"], n < top and r["idle"] >= 1)
         part = r["idle"] / r["held"] if r["held"] else 0
-        lines.append(f"{name}: {r['held']:,.0f} GPU시간 중 {r['idle']:,.0f} GPU시간 쉼 ({part:.0%})")
-    body = "\n".join(lines) or "GPU 잡이 없었습니다."
+        lines.append(f"- {name}: {r['held']:,.0f} GPU시간 중 유휴 {r['idle']:,.0f} ({part:.0%})")
+    stamp = datetime.fromtimestamp(time.time() if now is None else now).strftime("%Y-%m-%d")
     note = (
-        f"쉼: 잡이 할당받은 GPU의 사용률이 {threshold:g}% 이하였던 시간입니다 (1분 단위로 셉니다). "
-        "쓰지 않는 GPU는 `scancel <JOBID>`로 반납해 주세요."
+        f"GPU 유휴 시간: 잡이 할당받은 GPU의 사용률이 {util_at_most(threshold)}였던 시간입니다 (1분 단위로 셉니다). "
+        f"GPU 유휴 시간이 가장 긴 {top}명(1시간 이상)을 멘션합니다."
     )
-    return head, [{"type": "header", "text": {"type": "plain_text", "text": head[:150]}}] + sections(body) + [
-        rich.context(note)
+    return head, [
+        cards.title(f"지난 {days}일 GPU 사용", stamp),
+        cards.facts(
+            [("할당된 GPU시간", f"{held:,.0f}", ""), ("GPU 유휴 시간", f"{idle:,.0f} ({share:.0%})", "")]
+        ),
+        *cards.part("사람별", "\n".join(lines) or "GPU 잡이 없었습니다."),
+        cards.note(note),
+        *cards.step(f"쓰지 않는 GPU는 `scancel <JOBID>`로 반납해 주세요. {rules.check_note('gpu-idle')}"),
     ]
 
 
@@ -313,22 +326,21 @@ def summary_card(report):
         f"GPU 사용 현황 {stamp}: GPU {alloc}/{total}장 할당 ({100 * alloc / total:.0f}%), "
         f"평균 사용률 {avg}, {IDLE_JOB} {len(idle)}개"
     )
-    status = ":large_green_circle:" if not idle and not report["reasons"] else ":large_yellow_circle:"
-    fields = [
-        f"**할당된 GPU**\n{alloc} / {total}장 ({100 * alloc / total:.0f}%)",
-        f"**평균 사용률**\n{avg}",
-        f"**{IDLE_JOB}**\n{len(idle)}개" + (" :zzz:" if idle else ""),
-        f"**대기 중인 잡**\n{pend_jobs}개, GPU {pend_gpus}장",
-        f"**{DOWN_TITLE} (drain, down)**\n{len(report['reasons'])}대"
-        + (" :warning:" if report["reasons"] else ""),
+    facts = [
+        ("할당된 GPU", f"{alloc} / {total}장 ({100 * alloc / total:.0f}%)", ""),
+        ("평균 사용률", avg, ""),
+        (IDLE_JOB, f"{len(idle)}개", "warn" if idle else "ok"),
+        ("대기 중인 잡", f"{pend_jobs}개, GPU {pend_gpus}장", ""),
+        (f"{DOWN_TITLE} (drain, down)", f"{len(report['reasons'])}대", "warn" if report["reasons"] else "ok"),
     ]
-    footer = "자세한 내용은 스레드에 있습니다"
+    more = "자세한 내용은 이 메시지의 스레드에 있습니다."
     if report.get("dashboard_url"):
-        footer += f"  |  <{report['dashboard_url']}|Grafana>"
+        more += f" <{report['dashboard_url']}|Grafana>"
     return text, [
-        {"type": "header", "text": {"type": "plain_text", "text": f"\U0001f4ca GPU 사용 현황  {stamp}"}},
-        rich.fields(*fields),
-        rich.context(f"{status}  {footer}"),
+        cards.title("GPU 사용 현황", stamp),
+        cards.facts(facts),
+        cards.note(more),
+        *cards.step(f"내 잡의 GPU 사용은 `{rules.BY_ID['gpu-idle'].check}`로 봅니다."),
     ]
 
 
@@ -336,22 +348,21 @@ def idle_section(idle, cfg, due, who):
     """The jobs leaving their GPUs idle, per owner, each owner mentioned when told this run (DUE)."""
     if not idle:
         return []
-    rule = (
-        f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게 이어진 잡"
-    )
-    lines = [f":zzz: **{IDLE_JOB}**  _{rule}_"]
+    rule = f"모든 GPU의 사용률이 {util_at_most(cfg['idle_util_threshold'])}로 {cfg['idle_hours']:g}시간 넘게 이어진 잡"
+    lines = [f"_{rule}_"]
     owners = by_owner(idle)
     for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
         told = "mention" in cfg["notify"] and user in due
-        lines.append(f"• {who(user, told)}  잡 {len(owners[user])}개")
+        lines.append(f"- {who(user, told)}  잡 {len(owners[user])}개")
         for j in owners[user]:
             hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
             lines.append(
-                f"    `{j['label']}`  {j['gpu_type'] or 'GPU'} {len(j['gpus'])}장, {hosts}  "
+                f"  - `{j['label']}`  {j['gpu_type'] or 'GPU'} {len(j['gpus'])}장, {hosts}  "
                 f"{duration(j['runtime'])} 실행 중"
             )
-    lines.append("_더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요._")
-    return sections("\n".join(lines))
+    return cards.part(IDLE_JOB, "\n".join(lines), "warn") + cards.step(
+        "더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요."
+    )
 
 
 def nodes_section(reasons):
@@ -359,10 +370,8 @@ def nodes_section(reasons):
     if not reasons:
         return []
     rows = [(n, st, since.replace("T", " ")[:16], u, why) for n, st, since, u, why in reasons]
-    return sections(
-        f":warning: **{DOWN_TITLE} (drain, down)**\n"
-        + table(("노드", "상태", "언제부터", "누가", "사유"), rows)
-    )
+    down = table(("노드", "상태", "언제부터", "누가", "사유"), rows)
+    return cards.part(f"{DOWN_TITLE} (drain, down)", down, "warn")
 
 
 def pending_section(pending):
@@ -379,10 +388,7 @@ def pending_section(pending):
         )
         for u, p in sorted(pending.items(), key=lambda kv: -kv[1]["gpus"])
     ]
-    return sections(
-        ":hourglass_flowing_sand: **대기 중인 잡**\n"
-        + table(("사용자", "잡", "GPU", "최장 대기", "사유"), rows)
-    )
+    return cards.part("대기 중인 잡", table(("사용자", "잡", "GPU", "최장 대기", "사유"), rows))
 
 
 def people_section(jobs, total):
@@ -393,16 +399,14 @@ def people_section(jobs, total):
             by_user[j["user"]].append(j)
     if not by_user:
         return []
-    blocks = [{"type": "divider"}, *sections(":busts_in_silhouette: **사람별 실행 중인 GPU 잡**")]
+    blocks = [{"type": "divider"}, *cards.part("사람별 실행 중인 GPU 잡")]
     for user, ujobs in sorted(by_user.items(), key=lambda kv: -sum(len(j["gpus"]) for j in kv[1])):
         n = sum(len(j["gpus"]) for j in ujobs)
         rows = []
         for j in sorted(ujobs, key=lambda j: -j["runtime"]):
             hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
             note = (
-                "쉬는 중"
-                if j["idle"]
-                else (f"{j['idle_gpus']}/{len(j['gpus'])} 쉬는 중" if j["idle_gpus"] else "")
+                "유휴" if j["idle"] else (f"{j['idle_gpus']}/{len(j['gpus'])} 유휴" if j["idle_gpus"] else "")
             )
             rows.append(
                 (
@@ -416,9 +420,9 @@ def people_section(jobs, total):
                     note,
                 )
             )
-        head = f"**{user}**  GPU {n}장 ({100 * n / total:.1f}%)  |  잡 {len(ujobs)}개"
-        blocks.extend(
-            sections(f"{head}\n{table(('잡', 'GPU', '노드', '시간', 'QoS', '사용률', '메모리', ''), rows)}")
+        blocks += cards.part(
+            f"{user}  GPU {n}장 ({100 * n / total:.1f}%), 잡 {len(ujobs)}개",
+            table(("잡", "GPU", "노드", "시간", "QoS", "사용률", "메모리", ""), rows),
         )
     return blocks
 
@@ -787,12 +791,8 @@ def disk(cfg, args):
             try:
                 member = slack_id(row[2], cfg, slack, cache)
                 if member:
-                    slack.dm(
-                        member,
-                        disk_report.dm_text(row, disk_report.hold_note(hold, now)),
-                        kind="disk",
-                        login=row[2],
-                    )
+                    text = disk_report.dm_text(row, disk_report.hold_note(hold, now))
+                    slack.dm(member, *cards.notice("disk", text), kind="disk", login=row[2])
                     delivered = True
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {row[2]}: {e}")
@@ -842,7 +842,8 @@ def io(cfg, args):
         try:
             member = slack_id(user, cfg, slack, cache)
             if member:
-                slack.dm(member, io_report.dm_text(item, rank, cfg["io_advice"]), kind="io", login=user)
+                text = io_report.dm_text(item, rank, cfg["io_advice"])
+                slack.dm(member, *cards.notice("io-heavy", text), kind="io", login=user)
                 told[key] = int(now)
         except (RuntimeError, OSError) as e:
             failures.append(f"notifying {user}: {e}")
@@ -880,7 +881,8 @@ def purge_notices(cfg, slack, cache, state, now, preview):
                 k, entry = entries[key]
                 member = slack_id(k[1], cfg, slack, cache)
                 if member:
-                    slack.dm(member, disk_report.purge_dm_text(k, entry), kind="scratch-purge", login=k[1])
+                    text = disk_report.purge_dm_text(k, entry)
+                    slack.dm(member, *cards.notice("scratch-purge", text), kind="scratch-purge", login=k[1])
                     told[key] = int(now)
             elif key in bursts and cfg["admin_channel"]:
                 k, n = bursts[key]
@@ -896,12 +898,12 @@ def purge_notices(cfg, slack, cache, state, now, preview):
 def cancelled_note(cancelled, cfg, who):
     """The report thread's (text, blocks) on the jobs CANCELLED for leaving their GPUs idle."""
     lines = [
-        f":no_entry: {who(user, bool(cfg['notify']))}  "
+        f"{cards.mark('act')}{who(user, bool(cfg['notify']))}  "
         + ", ".join(f"`{j['label']}`" for j in jobs)
         + f": 할당받은 GPU를 {cfg['cancel_after_hours']:g}시간 동안 쓰지 않아 취소했습니다"
         for user, jobs in by_owner(cancelled).items()
     ]
-    return f"{IDLE_JOB}을 취소했습니다", sections("\n".join(lines))
+    return f"{IDLE_JOB}을 취소했습니다", cards.part(f"{IDLE_JOB} 취소", "\n".join(lines), "act")
 
 
 def post_report(report, cfg, who, slack, to):
@@ -939,7 +941,8 @@ def act(report, cfg, who, slack, cache, now):
         if "dm" in cfg["notify"]:
             try:
                 text = cfg["dm_text"].format(jobs=job_lines(jobs), count=len(jobs), hours=hours)
-                slack.dm(member, f"{text}\n{rules.check_note('gpu-idle')}", kind="idle", login=user)
+                text = f"{text}\n{rules.check_note('gpu-idle')}"
+                slack.dm(member, *cards.notice("gpu-idle", text), kind="idle", login=user)
                 delivered = True
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {user}: {e}")
@@ -966,12 +969,8 @@ def act(report, cfg, who, slack, cache, now):
                     text = cfg["cancel_warn_text"].format(
                         jobs=job_lines(ahead), count=len(ahead), hours=f"{cfg['cancel_warn_hours']:g}"
                     )
-                    slack.dm(
-                        member,
-                        f"{text}\n{rules.check_note('gpu-idle')}",
-                        kind="idle-cancel-warning",
-                        login=user,
-                    )
+                    text = f"{text}\n{rules.check_note('gpu-idle')}"
+                    slack.dm(member, *cards.notice("gpu-idle", text), kind="idle-cancel-warning", login=user)
                     for j in ahead:
                         j["state"]["warned"] = now
             except (RuntimeError, OSError) as e:

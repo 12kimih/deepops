@@ -93,6 +93,10 @@ class Glossary(unittest.TestCase):
             "새 Slurm 잡은 제출되지 않습니다": "새 Slurm 잡을 제출할 수 없습니다",
             "오래 쉬는 GPU": "GPU 유휴 잡",
             "로그인 노드 제한": "로그인 노드 한도",
+            "쉰 GPU시간": "GPU 유휴 시간",
+            "90 GPU시간 쉼 (75%)": "유휴 90 (75%)",
+            "2/4 쉬는 중": "2/4 유휴",
+            "쉼: 사용률이 0%였던 시간": "GPU 유휴 시간: 사용률이 0%였던 시간",
             "확인 없이 진행하는 모드에서도": "자동 승인 모드에서도",
         }
         for old, new in caught.items():
@@ -126,6 +130,19 @@ class Glossary(unittest.TestCase):
         )
         self.assertTrue(
             self.titled("a.py", 'x = f"평균 {DOWN_TITLE} {n}대"\n'), "the title constant in a sentence"
+        )
+
+    def test_the_cards_labels_are_titles(self):
+        """cluster_tools.cards builds every report (2026-11-27): its header, part label and
+        fact label are titles, also when the label sits on the call's next line."""
+        self.assertTrue(self.titled("a.py", 'b = cards.part("쓸 수 없는 노드", x)\n'))
+        self.assertTrue(self.titled("a.py", 'b = cards.part(\n    "쓸 수 없는 노드",\n    x,\n)\n'))
+        self.assertTrue(self.titled("a.py", '        ("쓸 수 없는 노드", "3대", "warn"),\n'))
+        self.assertTrue(self.titled("a.py", 'b = cards.title("규정이 바뀝니다")\n'))
+        self.assertFalse(
+            self.titled(
+                "a.py", 'b = cards.part(f"{DOWN_TITLE} (drain)", x, "warn")\nDOWN_TITLE = "중단 노드"\n'
+            )
         )
 
     def test_a_title_ends_no_sentence_unless_its_file_is_exempt(self):

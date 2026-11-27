@@ -153,16 +153,16 @@ def gpu_idle(user, cfg, jobs_data, prom, now):
     cancel = float(rule.get("cancel_after_hours") or 0)
     running, _ = usage_report.parse_jobs(jobs_data, now)
     mine = [j for j in running if j["user"] == user and j["gpus"]]
-    limit = f"{rule['idle_hours']:g}시간 사용률 {threshold:g}% 이하"
+    limit = f"{rule['idle_hours']:g}시간 사용률 {usage_report.util_at_most(threshold)}"
     if not mine:
         return row("gpu-idle", "GPU 잡 없음", limit, "ok")
     idle = usage_report.analyze(mine, usage_report.collect_gpus(prom, int(window)), int(window), threshold)
-    text = f"GPU 잡 {len(mine)}개 중 {len(idle)}개 쉼"
+    text = f"GPU 잡 {len(mine)}개 중 {IDLE_JOB} {len(idle)}개"
     if not idle:
         return row("gpu-idle", text, limit, "ok")
     ids = ", ".join(j["label"] for j in idle)
     if cancel:
-        when = f"쉰 상태로 {cancel:g}시간 더 지나면 취소 ({ids})"
+        when = f"유휴 상태로 {cancel:g}시간 더 지나면 취소 ({ids})"
         return row("gpu-idle", text, limit, "act", when, jobs=[j["id"] for j in idle])
     return row("gpu-idle", text, limit, "warn", f"알림 ({ids})", jobs=[j["id"] for j in idle])
 
