@@ -64,6 +64,7 @@ class FakeChannel:
     def __init__(self, no_history=False):
         self.messages, self.pins, self.log, self.no_history, self.n = [], set(), [], no_history, 0
         self.refuse = set()
+        self.usergroups = {}  # usergroup ID -> its members, as usergroups.users.list answers
 
     @staticmethod
     def cid(channel):
@@ -108,6 +109,10 @@ class FakeChannel:
                 "ok": True,
                 "permalink": f"https://slack.example/archives/{p['channel']}/p{p['message_ts']}",
             }
+        if method == "usergroups.users.list":
+            if p["usergroup"] not in self.usergroups:
+                raise Error("Slack usergroups.users.list failed: no_such_subteam")
+            return {"ok": True, "users": list(self.usergroups[p["usergroup"]])}
         if method == "auth.test":
             return {"ok": True, "bot_id": self.BOT[0], "user_id": self.USER}
         if method == "bots.info":

@@ -42,6 +42,9 @@ class FakeApp:
     def event(self, name):
         return self._register("event", name)
 
+    def shortcut(self, name):
+        return self._register("shortcut", name)
+
 
 sys.modules["slack_bolt"] = types.SimpleNamespace(App=FakeApp)
 sys.modules.setdefault("slack_sdk", types.ModuleType("slack_sdk"))
@@ -255,6 +258,16 @@ class Handlers(unittest.TestCase):
         self.call("view", "leave.submit", body=body, view=view)
         req = self.engine.submit.call_args.args[0]
         self.assertEqual((req["user"], req["ends"]), ("boss", "2027-02-28"))
+
+    def test_the_delete_shortcut_answers_only_whoever_used_it(self):
+        payload = {"user": {"id": "UALICE"}, "channel": {"id": "CNEWS"}, "message": {"ts": "5.0"}}
+        with mock.patch.object(app.remove, "run", return_value="no") as run:
+            self.call("shortcut", app.remove.SHORTCUT, shortcut=payload)
+        self.assertEqual(run.call_args.kwargs["user"], "UALICE")
+        self.assertEqual(run.call_args.kwargs["log_channel"], "#admin")
+        self.client.chat_postEphemeral.assert_called_once()
+        self.assertEqual(self.client.chat_postEphemeral.call_args.kwargs["user"], "UALICE")
+        self.client.chat_postMessage.assert_not_called()
 
     def test_only_an_admin_decides_a_held_request(self):
         body = {"user": {"id": "UALICE"}, "channel": {"id": "C"}, "message": {"ts": "1"}}

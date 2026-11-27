@@ -61,6 +61,8 @@ _cluster_bot_cfg:
   # summary (cluster_bot.commands.cluster_lines): what the bot host publishes.
   cluster_commands: "{{ cluster_tools_commands }}"
   admin_group: "{{ slack_admin_group }}"
+  # Whose members may delete the bot's messages (cluster_bot.remove), read live from Slack.
+  admin_group_id: "{{ slack_admin_group_id }}"
   admin_mention: "{{ slack_admin_mention }}"
   members: "{{ dict(cluster_bot_members.values() | zip(cluster_bot_members.keys())) }}"
   # The administrators the bot can reach: one without a Slack member (a shared admin

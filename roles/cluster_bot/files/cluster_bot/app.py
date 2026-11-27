@@ -67,6 +67,7 @@ from .data import watch as data_watch
 from .prefs import Prefs
 from .projects import ProjectFeature, notify_deployed
 from .remote import Remote
+from . import remove
 from .requests import Engine, Failed
 
 REMIND_EVERY = 3600
@@ -441,6 +442,17 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         req = project_req(slack_id, "purpose", view["private_metadata"], purpose=purpose)
         if req:
             submit(client, slack_id, req)
+
+    # One of the bot's messages deleted by an administrator (cluster_bot.remove): only they
+    # see the answer.
+    @app.shortcut(remove.SHORTCUT)
+    def delete_message(ack, shortcut, client):
+        ack()
+        user, channel, message = shortcut["user"]["id"], shortcut["channel"]["id"], shortcut["message"]
+        text = remove.run(dms, user=user, channel=channel, ts=message["ts"], thread_ts=message.get("thread_ts"),
+                          group_id=cfg.get("admin_group_id", ""), known=(cfg.get("tidy") or {}).get("known") or {},
+                          log_channel=channels.get("admin", ""))  # fmt: skip
+        client.chat_postEphemeral(channel=channel, user=user, **rich.message(text))
 
     @app.action("request.approve")
     @app.action("request.deny")

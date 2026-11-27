@@ -164,6 +164,17 @@ message is left. A notice an integration posted is recorded as announced in the 
 round's record (the real run only), so the round never posts or pins it again once it is
 deleted by hand.
 
+Slack lets a member delete only their own messages, and an app's only a workspace owner
+or admin. So the bot has a message shortcut, "클러스터 봇 글 지우기" (a message's "..." menu,
+`cluster_bot.remove`): a member of the administrators' user group (`slack_admin_group_id`,
+read from Slack each time) deletes one of the bot's own messages with it, with the bot's
+replies under it, and the delete is logged in `slack_channels.admin`. It refuses what
+Slack would not let the bot delete (an integration's or a person's message, naming who
+posted it) and what a feature keeps up to date (the ban list, the DM log's day message),
+which would come back. A notice post may go: the notices round keeps it as announced.
+The shortcut is in the app manifest the deploy writes; import it once (and reinstall the
+app) for the shortcut and its `usergroups:read` scope.
+
 The channels' guides: each channel `slack_channels` names gets its purpose, topic, a
 canvas (the channel's README tab) and bookmarks from `<docs_url>/channels.json` (the docs
 site's build writes it, keyed by the channel's purpose, the keys of `slack_channels`),

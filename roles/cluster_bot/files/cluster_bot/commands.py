@@ -91,6 +91,7 @@ API_SCOPES = {
     "bookmarks.remove": "bookmarks:write",
     "users.lookupByEmail": "users:read.email",
     "usergroups.list": "usergroups:read",
+    "usergroups.users.list": "usergroups:read",  # who may use the delete shortcut (.remove)
     "views.open": None,  # forms: the interactivity of a slash command, no scope
     "views.publish": None,  # the Home tab: no scope
 }
@@ -111,7 +112,8 @@ SCOPES = {
     "bookmarks:write": "keep each guided channel's bookmarks, the bot's own only",
     "users:read": "users.lookupByEmail needs it beside users:read.email; the bot's own app (bots.info)",
     "users:read.email": "find a person's Slack member by <login>@<domain> when the roster has no ID",
-    "usergroups:read": "find the administrators' user group's ID by its handle (roles/slack_defaults)",
+    "usergroups:read": "find the administrators' user group's ID by its handle (roles/slack_defaults), "
+    "and its members: who may use the delete shortcut",
 }
 
 
@@ -178,9 +180,17 @@ def help_lines(command, features, footer="", cluster=()):
     return "\n\n".join(parts + ([footer] if footer else []))
 
 
+# The message shortcut that deletes one of the bot's messages (cluster_bot.remove): its
+# callback_id, the name in a message's menu and the description under it.
+SHORTCUT = "message.delete"
+SHORTCUT_NAME = "클러스터 봇 글 지우기"
+SHORTCUT_DESCRIPTION = "봇이 올린 글을 지웁니다 (관리자만)"
+
+
 def manifest(command, name="cluster-bot", extra_scopes=()):
     """The Slack app manifest: NAME (the existing app's, so an import renames nothing),
-    one slash command whose usage hint lists the subcommands, every scope a feature
+    one slash command whose usage hint lists the subcommands, the message shortcut that
+    deletes one of the bot's messages (SHORTCUT), every scope a feature
     needs (SCOPES) and EXTRA_SCOPES the app keeps for what is not this code's (an
     incoming webhook another tool posts through), the events and Socket Mode; every
     other setting as Slack creates an app, stated, so an import changes none."""
@@ -195,6 +205,14 @@ def manifest(command, name="cluster-bot", extra_scopes=()):
                     "description": "Cluster requests; help lists them",  # Slack keeps it short
                     "usage_hint": "|".join(NAMES),
                     "should_escape": False,
+                }
+            ],
+            "shortcuts": [
+                {
+                    "name": SHORTCUT_NAME,
+                    "type": "message",
+                    "callback_id": SHORTCUT,
+                    "description": SHORTCUT_DESCRIPTION,
                 }
             ],
         },
