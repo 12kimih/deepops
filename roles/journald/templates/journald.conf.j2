@@ -1,0 +1,7 @@
+{{ ansible_managed | comment }}
+# roles/journald: the system journal sized to reach back journald_retention_days
+# ({{ journald_retention_days }}) on this host; journal-retention.timer checks it.
+[Journal]
+Storage=persistent
+SystemMaxUse={{ journald_system_max_use }}
+SystemMaxFiles={{ journald_system_max_files }}

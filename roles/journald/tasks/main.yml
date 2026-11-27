@@ -1,0 +1,43 @@
+---
+- name: Create journald's drop-in directory
+  ansible.builtin.file:
+    path: "{{ _journald_dropin | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Size the system journal
+  ansible.builtin.template:
+    src: journald.conf.j2
+    dest: "{{ _journald_dropin }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+
+- name: Install the journal retention command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ _journald_command }}"
+      module: cluster_tools.journald
+
+- name: Install the journal retention units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _journald_units }}"
+  register: journald_units
+
+- name: Measure the journal's reach every 15 minutes
+  systemd_unit:
+    name: journal-retention.timer
+    enabled: true
+    state: "{{ 'restarted' if journald_units is changed else 'started' }}"
+    daemon_reload: true

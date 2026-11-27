@@ -121,6 +121,13 @@
 #locale_lang: "en_US.UTF-8"
 #locale_timezone: "Etc/UTC"
 
+# How much of the system journal every host keeps (roles/journald, playbooks/generic/
+# journald.yml): sized so the size decides, for at least journald_retention_days on the
+# smallest host's filesystem (journald's SystemKeepFree still guards a small disk).
+#journald_system_max_use: 32G
+#journald_system_max_files: 10000
+#journald_retention_days: 14
+
 # The systemd target each host boots into (roles/default_target); a host that needs a
 # desktop sets graphical.target in its host_vars.
 #default_target: multi-user.target

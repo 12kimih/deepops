@@ -79,6 +79,9 @@
 - name: Set the system locale and time zone
   import_playbook: generic/locale.yml
 
+- name: Size the system journal
+  import_playbook: generic/journald.yml
+
 - name: Set the target each host boots into
   import_playbook: generic/default-target.yml
 

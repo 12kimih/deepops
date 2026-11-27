@@ -2,6 +2,32 @@
 groups:
   - name: host
     rules:
+      # roles/journald: the system journal sized for journald_retention_days, measured by
+      # journal-retention.timer. Short only once journald deleted entries (the oldest
+      # kept one is not the journal's first): a young host is not short, only new.
+      - alert: JournalRetentionShort
+        expr: >-
+          (time() - journald_entries_since_seconds) < journald_retention_target_seconds
+          and journald_oldest_entry_seqnum > 1
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "The system journal of {{ $labels.host }} reaches back {{ $value | humanizeDuration }} only"
+          description: >-
+            journald deleted entries younger than the retention it is sized for
+            (roles/journald, journald_retention_days): what happened before is gone.
+            `journalctl --disk-usage`, `ls /var/log/journal/*/ | wc -l` and the top senders
+            (`journalctl --since -1h -o json --output-fields=SYSLOG_IDENTIFIER`) there;
+            raise journald_system_max_use or stop the flood.
+      # A measure that stopped: the alert above is blind.
+      - alert: JournalRetentionUnmeasured
+        expr: time() - journald_retention_last_success_timestamp_seconds > 3600
+        labels: {severity: warning}
+        annotations:
+          summary: "How far back the journal of {{ $labels.host }} reaches has not been measured for an hour"
+          description: >-
+            `systemctl list-timers journal-retention.timer` and `journalctl -u
+            journal-retention` on the host.
       - alert: HostDiskAlmostFull
         expr: |
           node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nfs.*|fuse.*"}

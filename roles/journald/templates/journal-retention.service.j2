@@ -1,0 +1,13 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Measure how far back the system journal reaches
+
+[Service]
+Type=oneshot
+TimeoutStartSec=2min
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _journald_command }} {{ _journald_textfile }} {{ journald_retention_days }}
+Nice=10
+SyslogLevel=notice
+LogLevelMax=notice

@@ -1,0 +1,16 @@
+---
+# How much of the system journal every host keeps (roles/journald): a journald.conf
+# drop-in sized for journald_retention_days, and a timer that measures how far back
+# the journal reaches (JournalRetentionShort).
+- name: Size the system journal
+  hosts: "{{ hostlist | default('all') }}"
+  become: true
+  roles:
+    - journald
+  tags:
+    - journald
+  post_tasks:
+    - name: Record what this play deployed
+      ansible.builtin.include_role:
+        name: component_record
+        tasks_from: sources

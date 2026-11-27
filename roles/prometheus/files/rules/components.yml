@@ -126,6 +126,9 @@ groups:
         labels: {component: job_scratch, playbook: playbooks/slurm-cluster/job-scratch.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
+        labels: {component: journald, playbook: playbooks/generic/journald.yml}
+      - record: deepops:component_playbook:info
+        expr: vector(1)
         labels: {component: k8s-internal-container-registry, playbook: playbooks/k8s-cluster/container-registry.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)

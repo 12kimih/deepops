@@ -1,0 +1,17 @@
+---
+dependencies:
+  - role: cluster_tools_lib  # cluster_tools.journald
+  - role: prometheus_paths  # node_exporter_prom_dir
+
+galaxy_info:
+  namespace: deepops
+  role_name: journald
+  author: DeepOps
+  description: How much of the system journal every host keeps, and a check that it does
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]

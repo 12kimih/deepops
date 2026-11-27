@@ -334,6 +334,7 @@ deepops_managed_roles:
   docker_socket_group: {kind: permanent, playbook: playbooks/container/docker-socket-group.yml}
   facts: {kind: permanent, playbook: playbooks/slurm-cluster/nhc.yml}
   host_baseline: {kind: permanent, playbook: playbooks/generic/host-baseline.yml}
+  journald: {kind: permanent, playbook: playbooks/generic/journald.yml}
   k8s-internal-container-registry: {kind: permanent, playbook: playbooks/k8s-cluster/container-registry.yml}
   kerberos_client: {kind: permanent, playbook: playbooks/generic/authentication.yml}
   locale: {kind: policy, playbook: playbooks/generic/locale.yml}

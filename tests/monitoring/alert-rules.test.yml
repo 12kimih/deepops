@@ -1534,3 +1534,49 @@ tests:
             exp_annotations:
               summary: "slurm-usage-report on ctl has not run for 3 hours"
               description: "Its notices go unsent. `systemctl list-timers 'slurm-usage-report*'` and `journalctl -u slurm-usage-report` on the host."
+
+  - name: a journal cut short after journald deleted entries warns, a young one does not
+    interval: 1m
+    input_series:
+      # Deleted entries (seqnum above 1), reaching back 11 hours of a 14-day target.
+      - series: 'journald_entries_since_seconds{host="m", instance="m:9100"}'
+        values: '-39600+60x80'
+      - series: 'journald_oldest_entry_seqnum{host="m", instance="m:9100"}'
+        values: '29228907x80'
+      - series: 'journald_retention_target_seconds{host="m", instance="m:9100"}'
+        values: '1209600x80'
+      # A new host: its first entry is 1, two hours old.
+      - series: 'journald_entries_since_seconds{host="n", instance="n:9100"}'
+        values: '-7200x80'
+      - series: 'journald_oldest_entry_seqnum{host="n", instance="n:9100"}'
+        values: '1x80'
+      - series: 'journald_retention_target_seconds{host="n", instance="n:9100"}'
+        values: '1209600x80'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: JournalRetentionShort
+        exp_alerts: []
+      - eval_time: 1h10m
+        alertname: JournalRetentionShort
+        exp_alerts:
+          - exp_labels: {severity: warning, host: m, instance: "m:9100"}
+            exp_annotations:
+              summary: "The system journal of m reaches back 11h 0m 0s only"
+              description: "journald deleted entries younger than the retention it is sized for (roles/journald, journald_retention_days): what happened before is gone. `journalctl --disk-usage`, `ls /var/log/journal/*/ | wc -l` and the top senders (`journalctl --since -1h -o json --output-fields=SYSLOG_IDENTIFIER`) there; raise journald_system_max_use or stop the flood."
+
+  - name: a journal measure that stopped warns
+    interval: 10m
+    input_series:
+      - series: 'journald_retention_last_success_timestamp_seconds{host="m", instance="m:9100"}'
+        values: '0x12'
+    alert_rule_test:
+      - eval_time: 50m
+        alertname: JournalRetentionUnmeasured
+        exp_alerts: []
+      - eval_time: 1h10m
+        alertname: JournalRetentionUnmeasured
+        exp_alerts:
+          - exp_labels: {severity: warning, host: m, instance: "m:9100"}
+            exp_annotations:
+              summary: "How far back the journal of m reaches has not been measured for an hour"
+              description: "`systemctl list-timers journal-retention.timer` and `journalctl -u journal-retention` on the host."

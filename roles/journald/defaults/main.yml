@@ -1,0 +1,18 @@
+---
+# roles/journald: how much of the system journal every host keeps, as a journald.conf
+# drop-in (journald.conf(5)), and a check that it reaches back as far as meant.
+#
+# journald's defaults keep at most 100 journal files (SystemMaxFiles) and 10% of the
+# filesystem up to 4G (SystemMaxUse). With a file per user (SplitMode=uid, so people
+# read their own logs) a login host with forty users hit the 100 files long before the
+# size, and journald deleted system files after 11 hours (2026-11-27). The limits
+# below are sized so the size decides, for at least journald_retention_days on the
+# smallest host's filesystem; journald's own SystemKeepFree (15% of the filesystem by
+# default) still stops it before a small disk fills. No MaxRetentionSec: the size
+# decides how far back it goes, never an age.
+journald_system_max_use: 32G
+# High enough that per-user files never evict system ones.
+journald_system_max_files: 10000
+# The retention the journal is sized for, in days: JournalRetentionShort fires when a
+# host's system journal reaches back less after journald deleted entries.
+journald_retention_days: 14

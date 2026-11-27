@@ -115,6 +115,7 @@ SOURCES = {
     # Each sender's DMs and its last run (cluster_tools.slack.DmCounts), in
     # node_exporter_unprivileged_dir.
     "slack_dm": r"slack_dm_\w+",
+    "journald": r"journald_\w+",  # how far back the system journal reaches (roles/journald)
     "shared_data": r"shared_data_\w+",  # the shared data's export, the bot's rounds (roles/shared_space)
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)
     "gpu_diag_idle": r"gpu_diag_idle_\w+",  # the weekly GPU diagnostics (roles/gpu_diag_idle)

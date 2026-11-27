@@ -1,0 +1,7 @@
+---
+# journald reads its configuration only when it starts; services keep logging across
+# the restart (their streams are held for it in its file descriptor store).
+- name: Restart journald
+  systemd_unit:
+    name: systemd-journald
+    state: restarted

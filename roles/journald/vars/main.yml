@@ -1,0 +1,7 @@
+---
+# A drop-in named to sort after any a package ships, so its values win (the zz-deepops-
+# prefix, as the sysctl files have it).
+_journald_dropin: /etc/systemd/journald.conf.d/zz-deepops-journald.conf
+_journald_command: /usr/local/libexec/journal-retention
+_journald_textfile: "{{ node_exporter_prom_dir }}/journal-retention.prom"
+_journald_units: [journal-retention.service, journal-retention.timer]
