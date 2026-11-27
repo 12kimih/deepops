@@ -101,10 +101,31 @@ def expected(config, owner_map, exprs, hosts=None):
 
 
 class State:
-    """Each host's expected versions and sources, for one deepops tree and config."""
+    """Each host's expected versions and sources, for one deepops tree and config, the
+    playbook of each component on each host (an expression resolved there) and the
+    components the site holds back (deepops_deploy_holds, {name: reason})."""
 
-    def __init__(self, versions, sources):
+    def __init__(self, versions, sources, playbooks=None, holds=None):
         self.versions, self.sources = versions, sources
+        self.playbooks, self.holds = playbooks or {}, holds or {}
+
+
+def host_playbooks(config, owner_map, playbooks, hosts=None):
+    """({host: {component: playbook}}, holds): each playbook expression resolved for each
+    host as its settings give it (left out where it cannot be), and the site's holds."""
+    out, holds = {}, {}
+    for host in sorted(hosts if hosts is not None else config.hosts):
+        values = {name: value for name, (value, _) in config.resolve(host, owner_map).items()}
+        row = {}
+        for component, playbook in playbooks.items():
+            got = render(playbook, values) if "{{" in str(playbook) else playbook
+            if not isinstance(got, Unchecked):
+                row[component] = str(got)
+        out[host] = row
+        held = values.get("deepops_deploy_holds")
+        if isinstance(held, dict):
+            holds.update({str(k): str(v) for k, v in held.items()})
+    return out, holds
 
 
 def state(config_dir, rev=None, config_rev=None):
@@ -113,9 +134,14 @@ def state(config_dir, rev=None, config_rev=None):
     tree = settings.Tree(ROOT, rev=rev)
     config = settings.Config(settings.site_tree(config_dir, config_rev))
     owner_map = settings.owners(tree, private=True)
+    import component_playbooks
+
+    playbooks, holds = host_playbooks(config, owner_map, component_playbooks.playbooks(tree.root))
     return State(
         expected(config, owner_map, expressions(tree)),
         component_source.Sources(tree, config, owner_map).all(),
+        playbooks,
+        holds,
     )
 
 
@@ -156,8 +182,9 @@ def textfile(current, playbooks):
     for host, row in sorted(current.sources.items()):
         for component, source in sorted(row.items()):
             labels = {"for_host": host, "component": component, "source": source}
-            if component in playbooks:
-                labels["playbook"] = playbooks[component]
+            playbook = current.playbooks.get(host, {}).get(component) or playbooks.get(component)
+            if playbook and "{{" not in playbook:
+                labels["playbook"] = playbook
             lines.append(f"deepops_component_expected_source_info{{{_labels(**labels)}}} 1")
     return "\n".join(lines) + "\n"
 
@@ -222,10 +249,13 @@ def moved(before, after):
     return out
 
 
-def describe(found, sources, playbooks):
+def describe(found, sources, playbooks, per_host=None, holds=None):
     """Lines saying which hosts' expected versions and sources moved, and which
-    playbooks bring them level. FOUND: changes(); SOURCES: moved()."""
-    lines, needed = [], set()
+    playbooks bring them level. FOUND: changes(); SOURCES: moved(); PER_HOST: each
+    host's own playbook of a component ({host: {component: playbook}}); HOLDS: the
+    components the site holds back ({name: reason}), named apart and never to run."""
+    lines, needed, wanted = [], set(), set()
+    per_host, holds = per_host or {}, holds or {}
     if found:
         lines.append("component versions the checkouts now expect:")
         groups = {}
@@ -236,6 +266,7 @@ def describe(found, sources, playbooks):
             for component, b, a in rows:
                 lines.append(f"    {component}: {b or '-'} -> {a or '-'}")
                 needed.add(component)
+                wanted |= {(h, component) for h in hosts}
     if sources:
         lines.append("components whose code or config changed (ComponentNotDeployed until deployed):")
         groups = {}
@@ -244,13 +275,25 @@ def describe(found, sources, playbooks):
         for names, hosts in groups.items():
             lines.append(f"  {', '.join(hosts)}: {', '.join(names)}")
             needed.update(names)
+            wanted |= {(h, c) for h in hosts for c in names}
     if not lines:
         return ["components: no host's expected version or source changed"]
-    runs = sorted({playbooks[c] for c in needed if c in playbooks})
+
+    def playbook(host, component):
+        found = per_host.get(host, {}).get(component) or playbooks.get(component)
+        return found if found and "{{" not in found else None
+
+    runs = sorted({playbook(h, c) for h, c in wanted if c not in holds and playbook(h, c)})
     if runs:
         lines.append("  run, to deploy them:")
         lines += [f"    uv run ansible-playbook -K {p}" for p in runs]
-    rest = sorted(c for c in needed if c not in playbooks)
+    held = sorted(c for c in needed if c in holds)
+    if held:
+        lines.append("  held back by the site (deepops_deploy_holds), not to run now:")
+        lines += [f"    {c}: {holds[c]}" for c in held]
+    rest = sorted(
+        c for c in needed if c not in holds and not any(playbook(h, x) for h, x in wanted if x == c)
+    )
     if rest:
         lines.append(f"  and the playbooks that apply: {', '.join(rest)}")
     return lines
@@ -283,7 +326,8 @@ def main(argv):
 
 def report(before, after, playbooks):
     """describe() of what moved from BEFORE to AFTER (two State)."""
-    return describe(changes(before.versions, after.versions), moved(before.sources, after.sources), playbooks)
+    return describe(changes(before.versions, after.versions), moved(before.sources, after.sources), playbooks,
+                    after.playbooks, after.holds)  # fmt: skip
 
 
 if __name__ == "__main__":

@@ -82,9 +82,12 @@ class Sources(unittest.TestCase):
                 if entry["kind"] == "operation":
                     self.assertNotIn("playbook", entry, "an operation records nothing")
                 else:
-                    self.assertIn(
-                        entry.get("playbook"), applied.get(name, ()), "a playbook applying it whole"
-                    )
+                    import component_playbooks
+
+                    for playbook in component_playbooks.candidates(entry.get("playbook") or ""):
+                        self.assertIn(
+                            playbook, applied.get(name, ()), "every playbook it names applies it whole"
+                        )
 
     def test_everything_recorded_has_its_playbook(self):
         """A digest the alert and sync.py compare names the playbook that brings its hosts

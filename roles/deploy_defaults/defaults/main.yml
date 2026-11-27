@@ -226,3 +226,8 @@ software_extra_packages: []
 # refuses one whose checksum differs, copies it to the host and installs it with apt,
 # and no repository can move it. Per host, where the hardware is.
 software_vendor_debs: []
+
+# Components and managed roles the site holds back from a deploy for now, with why:
+# {name: "reason"}. sync.py and component_expected.py name them apart from the playbooks
+# to run (a role whose next whole run waits for a maintenance window, say).
+deepops_deploy_holds: {}

@@ -190,6 +190,13 @@ records its own digest. `tests/component-state/test_sources.py` fails a play tha
 applies an entry without the step as its last post_task, a whole role a play applies
 that has no entry, and an entry whose playbook does not apply it.
 
+An entry's playbook is an expression over the settings where the site decides it, as
+the playbooks' own gates do: people is applied by `people.yml` without a directory and by
+`authentication.yml` with one (`people.yml` refuses there), so sync.py and the expected
+state name, for each host, the playbook that runs on it. A site holds a component or a
+role back from a deploy with `deepops_deploy_holds` ({name: reason}): sync.py names it
+apart, with the reason, and never among the playbooks to run.
+
 A role's coverage starts with its first whole run: until then it has no digest and
 ComponentNotDeployed does not compare it. Slurm and MUNGE are `permanent`, not yet
 components: their absent path, which makes them a component with `removal: explicit`,

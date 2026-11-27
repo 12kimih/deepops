@@ -50,6 +50,8 @@ def settings():
 
 
 def reads(text, names):
+    # A name in a string literal is no read ('playbooks/generic/people.yml', a path).
+    text = re.sub(r"'[^']*'|\"[^\"]*\"", "''", text)
     return any(re.search(rf"\{{\{{[^}}]*\b{re.escape(n)}\b", text) for n in names)
 
 

@@ -69,6 +69,15 @@ def managed(root=ROOT):
     )
 
 
+PLAYBOOK_PATH = re.compile(r"playbooks/[\w./-]+\.ya?ml")
+
+
+def candidates(playbook):
+    """Every playbook PLAYBOOK can name: itself, or each path its expression gives (one
+    per site setting), for what cannot know the site (the rules file)."""
+    return sorted(set(PLAYBOOK_PATH.findall(playbook))) if "{{" in playbook else [playbook]
+
+
 def render(mapping):
     """The rules file's text, in the style of the hand-written ones beside it."""
     lines = [
@@ -80,6 +89,7 @@ def render(mapping):
         "    rules:",
     ]
     for name, playbook in sorted(mapping.items()):
+        playbook = " or ".join(candidates(playbook))
         lines += [
             "      - record: deepops:component_playbook:info",
             "        expr: vector(1)",

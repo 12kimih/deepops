@@ -180,6 +180,32 @@ class Changes(unittest.TestCase):
         self.assertIn("    uv run ansible-playbook -K playbooks/e.yml", lines)
         self.assertIn("    uv run ansible-playbook -K playbooks/l.yml", lines)
 
+    def test_each_host_runs_its_own_playbook_and_a_held_one_is_named_apart(self):
+        """people is applied by people.yml without a directory and by authentication.yml
+        with one (people.yml refuses there): each site gets the one that runs
+        (2026-11-28). A component the site holds back is never listed to run."""
+        moved = {"n1": ["people", "slurm"]}
+        lines = component_expected.describe(
+            {}, moved, {"people": "{{ x }}", "slurm": "playbooks/s.yml"},
+            per_host={"n1": {"people": "playbooks/a.yml"}}, holds={"slurm": "the template window"},
+        )  # fmt: skip
+        self.assertIn("    uv run ansible-playbook -K playbooks/a.yml", lines)
+        self.assertNotIn("    uv run ansible-playbook -K playbooks/s.yml", lines)
+        self.assertIn("    slurm: the template window", lines)
+
+    def test_the_peoples_playbook_follows_the_directory(self):
+        for service, want in (
+            ("none", "playbooks/generic/people.yml"),
+            ("ldap", "playbooks/generic/authentication.yml"),
+        ):
+            with self.subTest(directory_service=service):
+                state = component_expected.state(config_dir(self, all={"directory_service": service}))
+                self.assertEqual({row.get("people") for row in state.playbooks.values()}, {want})
+        holds = component_expected.state(
+            config_dir(self, all={"deepops_deploy_holds": {"slurm": "window"}})
+        ).holds
+        self.assertEqual(holds, {"slurm": "window"})
+
     def test_nothing_moved_says_so(self):
         same = {"n1": {"a": "1"}}
         self.assertEqual(

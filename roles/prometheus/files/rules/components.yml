@@ -237,7 +237,7 @@ groups:
         labels: {component: pcie_acs, playbook: playbooks/generic/pcie-acs.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
-        labels: {component: people, playbook: playbooks/generic/people.yml}
+        labels: {component: people, playbook: playbooks/generic/authentication.yml or playbooks/generic/people.yml}
       - record: deepops:component_playbook:info
         expr: vector(1)
         labels: {component: podman, playbook: playbooks/container/podman.yml}

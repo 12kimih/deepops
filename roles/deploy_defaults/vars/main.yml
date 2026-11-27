@@ -310,8 +310,9 @@ deepops_component_registry:
       - {switch: "{{ slurm_enable_cluster_bot }}", group: slurm-master, first: true}
 
 # Every other role a play applies that changes a host, by role name, with its kind and
-# the one playbook that brings its hosts level (docs/deepops/component-state.md, Not
-# components). Never in the present/absent map above: a deploy records what each was
+# the one playbook that brings its hosts level, an expression over the settings where it
+# depends on the site, as the playbooks' own gates do (docs/deepops/component-state.md,
+# Not components). Never in the present/absent map above: a deploy records what each was
 # deployed from at the end of its play (component_record tasks_from: sources), so
 # ComponentNotDeployed and sync.py name a host a fix has not reached. Kinds:
 #   policy     a value the role keeps (an enum or a mode): no absent, another value instead
@@ -354,7 +355,10 @@ deepops_managed_roles:
   nvidia-peer-memory: {kind: permanent, playbook: playbooks/nvidia-software/nvidia-peer-memory.yml}
   nvidia_ecc: {kind: policy, playbook: playbooks/nvidia-software/nvidia-ecc.yml}
   os_updates: {kind: policy, playbook: playbooks/generic/os-updates.yml}
-  people: {kind: permanent, playbook: playbooks/generic/people.yml}
+  # Local accounts where there is no directory; with one, the directory's own play.
+  people:
+    kind: permanent
+    playbook: "{{ 'playbooks/generic/people.yml' if directory_service == 'none' else 'playbooks/generic/authentication.yml' }}"
   root_access: {kind: permanent, playbook: playbooks/generic/root-access.yml}
   runai: {kind: policy, playbook: playbooks/k8s-cluster/runai.yml}
   serial_console: {kind: permanent, playbook: playbooks/generic/serial-console.yml}
