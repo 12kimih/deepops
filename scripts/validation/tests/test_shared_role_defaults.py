@@ -22,7 +22,7 @@ import re
 import subprocess
 import sys
 import unittest
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import yaml
@@ -70,6 +70,8 @@ UNOWNED = {
     # Play parameters given with -e: read in `serial:` or a play's vars, before any role.
     "maintenance_serial",
 }  # fmt: skip
+# A whole word: a name made only of word characters is used where it is one.
+WORD = re.compile(r"\w+")
 DEFINED_TEST = re.compile(r"\b([a-z_][a-z0-9_]*)\s+is\s+(?:not\s+)?(?:defined|undefined)\b")
 # Roles that read another role's default without loading it, and why.
 ROLE_READS_OK = {
@@ -178,9 +180,12 @@ class SharedRoleDefaultTests(unittest.TestCase):
     def test_a_value_passed_is_read(self):
         """A `vars:` entry of a play, an import, a task or a role that nothing reads is a
         switch that does nothing (nvidia_docker_skip_docker_reload outlived its reader)."""
+        # Every whole word of every source, counted once: a name's uses are its count (a
+        # regex per name over every file took 90 s).
         sources = [
             p.read_text(errors="ignore") for p in tracked("roles", "playbooks", "plugins") if p.is_file()
         ]
+        words = Counter(w for text in sources for w in WORD.findall(text))
         scan, unread = Scan(minimum=150), []
         for path in map(scan.seen, [p for p in ansible_sources() if p.suffix in (".yml", ".yaml")]):
             if (
@@ -190,11 +195,10 @@ class SharedRoleDefaultTests(unittest.TestCase):
             ):
                 continue
             for name in sorted(passed_vars(load(path))):
-                use = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
                 # Its own `name:` key in the vars block is one occurrence; a reader adds more.
                 if name.startswith("ansible_") or name in KUBESPRAY_READS:
                     continue  # Ansible's own connection settings, or Kubespray's
-                if sum(len(use.findall(text)) for text in sources) <= 1:
+                if (words[name] if WORD.fullmatch(name) else uses(name, sources)) <= 1:
                     unread.append(f"{path.relative_to(ROOT)}: {name}")
         self.assertEqual(unread, [], "nothing reads it: drop it, or restore its reader")
         scan.check(self)
@@ -319,6 +323,12 @@ def named_roles(node, keys):
         for item in node:
             found += named_roles(item, keys)
     return found
+
+
+def uses(name, sources):
+    """How often NAME stands alone in SOURCES (for a name that is not one word)."""
+    use = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
+    return sum(len(use.findall(text)) for text in sources)
 
 
 def passed_vars(node):

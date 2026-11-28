@@ -114,12 +114,18 @@ class Ansible:
 def mismatches(ansible, role, tasks_from, public, counter):
     """(include name, argument, value where written, value in the included role) for every
     role include reached from ROLE's TASKS_FROM, two levels deep."""
-    found = []
+    found, expanded = [], {}
+
+    def children(include):  # each include expanded once (Ansible deep-copies every file it reads)
+        if id(include) not in expanded:
+            expanded[id(include)] = (include, ansible.children(play, include))
+        return expanded[id(include)][1]
+
     play, top = ansible.entry(role, tasks_from, public)
     pending = [(top, 0)]
     while pending:
         include, depth = pending.pop()
-        for task in ansible.children(play, include):
+        for task in children(include):
             if not isinstance(task, IncludeRole) or "{{" in str(task._role_name):
                 continue
             if depth < 2:
@@ -129,9 +135,9 @@ def mismatches(ansible, role, tasks_from, public, counter):
             # The included role's own first task: a dependency comes first, and one of only
             # defaults holds just Ansible's implicit end-of-role task, where nothing of the
             # include's is used (component_record's os_updates_defaults, 2026-11-27).
-            children = ansible.children(play, task)
-            own = [c for c in children if c._role is not None and c._role.get_name() == task._role_name]
-            inside = next(iter(own or children), None)
+            below = children(task)
+            own = [c for c in below if c._role is not None and c._role.get_name() == task._role_name]
+            inside = next(iter(own or below), None)
             if inside is None:
                 continue
             for name, raw in task.vars.items():

@@ -59,9 +59,18 @@ render() {
     # $1 = template path relative to $templates, $2 = output path
     # Per-job private directories are off unless a case names them (RENDER_PRIVATE_DIRS,
     # comma-separated): with them on, the job-scope file cleanup never runs at all.
-    python3 "$here/render.py" "$templates/$1" "$2" "${RENDER_SCOPE:-job}" "${RENDER_PRIVATE_DIRS-}" || return 1
-    # Every part logs through shared/lib/log.sh: point it at the harness's copy.
-    sed -i "s#/etc/slurm/shared/lib/log.sh#$work/shared-lib/log.sh#" "$2"
+    # The cases render a dozen distinct forms some 170 times: each is rendered once and
+    # copied after (a render is a Python start that reads every role's defaults).
+    local cached
+    cached="$work/rendered/$(printf '%s\n' "$1" "${RENDER_SCOPE:-job}" "${RENDER_PRIVATE_DIRS-}" | sha256sum | cut -c1-16)"
+    if [ ! -e "$cached" ]; then
+        mkdir -p "$work/rendered"
+        python3 "$here/render.py" "$templates/$1" "$cached.new" "${RENDER_SCOPE:-job}" "${RENDER_PRIVATE_DIRS-}" || return 1
+        # Every part logs through shared/lib/log.sh: point it at the harness's copy.
+        sed -i "s#/etc/slurm/shared/lib/log.sh#$work/shared-lib/log.sh#" "$cached.new"
+        mv "$cached.new" "$cached"
+    fi
+    cp "$cached" "$2"
     chmod +x "$2"
     # A rendered script that does not parse would fail every behavioural case
     # below with the same opaque message; check the syntax separately so the
