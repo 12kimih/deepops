@@ -132,8 +132,8 @@ _cluster_bot_cfg:
     host: "{{ _cluster_bot_addresses[_cluster_bot_data_hosts[0]] if _cluster_bot_data_hosts else '' }}"
     kinds: "{{ shared_space_data }}"
     root: "{{ shared_space_root }}"
-    unused_days: "{{ shared_space_data_unused_days | int }}"
-    grace_days: "{{ cluster_user_grace_days | int }}"
+    stale_days: "{{ shared_space_data_stale_days | int }}"
+    grace_days: "{{ shared_space_data_grace_days | int }}"
     seen: "{{ _cluster_bot_home }}/data-seen.json"
 
 # What this component installs, for its record (roles/component_record). The bot's state

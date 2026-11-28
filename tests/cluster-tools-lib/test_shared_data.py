@@ -139,21 +139,30 @@ class SharedData(unittest.TestCase):
         # A failed entry may be asked for again.
         self.fetch("bad")
 
-    def test_uses_are_recorded_and_a_removal_takes_the_directory(self):
+    def test_the_listing_reads_each_entrys_last_use_from_its_files_and_a_removal_takes_them(self):
         self.fetch("ok")
-        with self.assertRaises(shared_data.Error):  # not there yet
-            shared_data.use(self.cfg, "datasets", "ok", "bob", 1500)
         page = lambda req, timeout: Page(b"y", "https://data.example/set.tar")  # noqa: E731
         shared_data.download(self.cfg, "datasets", "ok", now=lambda: 2000, opener=page, resolve=self.resolve)
-        shared_data.use(self.cfg, "datasets", "ok", "bob", 3000)
-        self.assertEqual(shared_data.read_ledger(self.cfg)["datasets/ok"]["uses"], {"bob": 3000})
+        target = os.path.join(self.root, "datasets/ok/set.tar")
+        os.utime(target, (1000, 1000))  # older than its arrival: the arrival counts
+        self.assertEqual(shared_data.listing(self.cfg)["entries"]["datasets/ok"]["used"], 2000)
+        os.utime(target, (9000, 1000))  # someone read it
+        entries = shared_data.listing(self.cfg)["entries"]
+        self.assertEqual(entries["datasets/ok"]["used"], 9000)
+        with shared_data.ledger(self.cfg) as doc:  # a button's record from before
+            doc["datasets/ok"]["uses"] = {"bob": 3000}
+        self.assertNotIn("uses", shared_data.listing(self.cfg)["entries"]["datasets/ok"])
         self.assertEqual(
             shared_data.remove(self.cfg, "datasets", "ok"), {"removed": "datasets/ok", "recorded": True}
         )
         self.assertFalse(os.path.lexists(os.path.join(self.root, "datasets/ok")))
         self.assertEqual(shared_data.read_ledger(self.cfg), {})
 
-    def test_the_bot_may_ask_for_these_four_only(self):
+    def test_the_bot_may_no_longer_record_a_use(self):
+        with self.assertRaises(bot_serve.Error):
+            shared_data.serve(self.cfg, "use datasets ok bob", 0)
+
+    def test_the_bot_may_ask_for_these_three_only(self):
         self.assertIn("entries", shared_data.serve(self.cfg, "list", 0))
         for request in ("download datasets x", "remove datasets", "metrics", "list extra", ""):
             with self.subTest(request), self.assertRaises(bot_serve.Error):

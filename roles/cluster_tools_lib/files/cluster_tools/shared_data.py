@@ -6,7 +6,6 @@
         list                                     the ledger and the usage, as JSON
         fetch KIND NAME URL SHA256|- MAX_BYTES REQUESTER
                                                  record the entry, start its download
-        use KIND NAME LOGIN                      someone uses it (its requester: keeps it)
         remove KIND NAME                         its directory and its entry go
     cluster-shared-data CONFIG.json download KIND NAME
                                                (the writer; fetch starts it as a unit)
@@ -29,9 +28,13 @@ published (an archive stays packed: many small files on the shared filesystem sl
 everyone), its sha256 checked when one was given, and it may not grow past MAX_BYTES
 (what was asked, within the budget).
 
-The ledger records each entry: who asked, from where, its size and checksum, when it
-came, and the uses people recorded (cluster_bot.data's cleanup reads them: access
-times over NFS say nothing). Every change of it is one locked step.
+The ledger records each entry: who asked, from where, its size and checksum, and when it
+came. Every change of it is one locked step. The listing adds when each entry was last
+used, read from its files the way every cleanup on the cluster reads it
+(cluster_tools.cleanup last_use: the later of access and modification time), which
+cluster_bot.data's cleanup goes by. Reads count only where the filesystem records them
+(relatime, never noatime: roles/host_baseline's mount options); an NFS client's read
+reaches the server's access time the same way.
 
 Until the filesystem has project quotas, the usage is exported as the budget's project
 (the disk quota metrics' project series, so the daily disk report and its alert show it
@@ -65,7 +68,7 @@ import urllib.parse
 import urllib.request
 from contextlib import contextmanager
 
-from . import bot_serve, config, proc
+from . import bot_serve, cleanup, config, proc
 from .cli import run_main
 from .exits import CANNOT_RUN, OK, CannotRun, NoAnswer
 from .files import write_atomic, write_textfile
@@ -74,11 +77,14 @@ from .prom import key, render
 NAME = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
 LOGIN = re.compile(r"[a-z_][a-z0-9_-]{0,31}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
-ARITY = {"list": (0,), "fetch": (6,), "use": (3,), "remove": (2,)}
+ARITY = {"list": (0,), "fetch": (6,), "remove": (2,)}
 CHUNK = 1 << 20
 # A read that stalls this long fails the download; the unit's RuntimeMaxSec bounds it all.
 READ_TIMEOUT = 120
 START_TIMEOUT = 60
+# The files looked at per entry when reading its last use: an entry is a download kept as
+# published (an archive stays packed), so a few files; the bound keeps an odd one cheap.
+WALK_BUDGET = 100000
 
 CONFIG_KEYS = {
     "root": str,
@@ -205,9 +211,31 @@ def usage(cfg):
     return out
 
 
+def last_used(cfg, entry):
+    """When ENTRY (a ledger entry, its download done) was last used: the newest last use
+    of its files (cluster_tools.cleanup), nothing followed through a link nor another
+    filesystem entered; its arrival when none is later or its files are gone."""
+    newest = entry.get("ended") or entry.get("asked") or 0
+    where = path_of(cfg, entry["kind"], entry["name"])
+    try:
+        dev = os.lstat(where).st_dev
+    except OSError:
+        return int(newest)
+    for _, st in cleanup.walk(os, where, dev, set(), [WALK_BUDGET]):
+        newest = max(newest, cleanup.last_use(st))
+    return int(newest)
+
+
 def listing(cfg):
+    """The ledger, each finished entry with when it was last used ("used"), and the
+    usage against the budget."""
+    entries = read_ledger(cfg)
+    for entry in entries.values():
+        entry.pop("uses", None)  # recorded by a button before the access times counted
+        if entry.get("state") == "done":
+            entry["used"] = last_used(cfg, entry)
     kinds = usage(cfg)
-    return {"entries": read_ledger(cfg), "kinds": kinds, "used": sum(kinds.values()), "budget": cfg["budget"]}
+    return {"entries": entries, "kinds": kinds, "used": sum(kinds.values()), "budget": cfg["budget"]}
 
 
 def unit_name(kind, name):
@@ -241,7 +269,7 @@ def fetch(cfg, kind, name, url, sha256, max_bytes, requester, now, start=None, r
             raise Error(f"{kind}/{name} exists already")
         doc[f"{kind}/{name}"] = {"kind": kind, "name": name, "url": url, "sha256": sha256,
                                  "max_bytes": limit, "requester": requester, "asked": int(now),
-                                 "state": "fetching", "uses": {}}  # fmt: skip
+                                 "state": "fetching"}  # fmt: skip
     argv = ["systemd-run", "--quiet", "--collect", f"--unit={unit_name(kind, name)}",
             f"--uid={cfg['writer']}", f"--gid={cfg['writer']}",
             "--property=Nice=10", "--property=IOSchedulingClass=best-effort",
@@ -350,18 +378,6 @@ def download(cfg, kind, name, now=time.time, opener=None, resolve=socket.getaddr
     return {"done": f"{kind}/{name}", "bytes": size}
 
 
-def use(cfg, kind, name, login, now):
-    path_of(cfg, kind, name)
-    if not LOGIN.fullmatch(login):
-        raise Error(f"not a login: {login!r}")
-    with ledger(cfg) as doc:
-        entry = doc.get(f"{kind}/{name}")
-        if not entry or entry.get("state") != "done":
-            raise Error(f"no shared data {kind}/{name}")
-        entry.setdefault("uses", {})[login] = int(now)
-    return {"used": f"{kind}/{name}", "by": login}
-
-
 def remove(cfg, kind, name):
     where = path_of(cfg, kind, name)
     with ledger(cfg) as doc:
@@ -411,8 +427,6 @@ def serve(cfg, original, now):
         return listing(cfg)
     if op == "fetch":
         return fetch(cfg, *args, now)
-    if op == "use":
-        return use(cfg, *args, now)
     return remove(cfg, *args)
 
 

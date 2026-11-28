@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: system_accounts  # the writer's account, whose home the shared space is
+  - role: deploy_defaults  # cluster_user_stale_days, cluster_user_grace_days
 
 galaxy_info:
   namespace: deepops

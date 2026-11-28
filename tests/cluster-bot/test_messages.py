@@ -66,14 +66,13 @@ def messages():
     yield "projects, none", {"type": "home", "blocks": projects_blocks.home("carol", {}, "/home/shared")}
     yield "new project", projects_blocks.new_form({"home": "/home/shared", "scratch": "/scratch",
                                                    "scratch_stale_days": 60})  # fmt: skip
-    yield "data notice", data_blocks.notice_dm("k", "/home/shared/data/x", 90, 0)
-    yield "data channel", data_blocks.notice_channel("k", "/home/shared/data/x", "<@U1>", 0)
+    yield "data notice", data_blocks.notice_dm("/home/shared/data/x", 60, 0)
     texts = {
         "welcome": onboarding.welcome(CONNECT, "/cluster", "alice"),
         "join": onboarding.join_text(CONNECT, "/cluster"),
         "project notice": projects_blocks.notice("vision", "members", "owners", "/home/shared"),
         "data ended": data_blocks.ended("failed", "/home/shared/data/x", {"error": "**없음**"}),
-        "data removed": data_blocks.removed("/home/shared/data/x", 90, 7),
+        "data removed": data_blocks.removed("/home/shared/data/x", 60, 14),
         "help": home_blocks.help_text("<#C1>", "<!subteam^S1>"),
     }
     for name, text in texts.items():

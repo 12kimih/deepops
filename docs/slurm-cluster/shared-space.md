@@ -57,12 +57,20 @@ their project with `block_hard: "{{ shared_space_data_budget }}"` in
 `disk_quota_projects` and set `shared_space_data_quota: true`: the kernel then enforces
 the same figure and disk_quota exports it instead.
 
-**Cleanup.** Access times over NFS do not show reads (a client reads its cached copy),
-so use is what people record. An entry no one but its requester recorded a use of for
-`shared_space_data_unused_days` (28) since it came gets a notice: the requester a DM
-with a "계속 씁니다" button, the help channel a "저도 씁니다" button for anyone who uses
-it. A press records a use and ends the notice; with none in `cluster_user_grace_days`
-(14), the bot removes the entry and tells the requester and the administrators.
+**Cleanup.** The cluster's one rule for unused files, as on `/scratch`: an entry nobody
+used for `shared_space_data_stale_days` (`cluster_user_stale_days`, 60) gets a notice,
+a DM to its requester; used again within `shared_space_data_grace_days`
+(`cluster_user_grace_days`, 14) the notice is over, otherwise the bot removes the entry
+and tells the requester and the administrators. Use is read from the entry's files, the
+later of their access and modification time (`cluster_tools.cleanup`), so nobody records
+anything. That needs the filesystem to record reads: `/home` mounted `relatime` (with
+`lazytime`, so the access times cost the disks next to nothing), never `noatime`
+(`host_baseline_mount_options`). A node's read over NFS reaches the server's access time;
+one served from that node's cache does not, which over 60 days leaves at most an entry
+read only from one node's memory looking unused. The notice and the grace period cover
+it, and nothing is lost for good: the ledger keeps the source and the checksum, so a new
+request brings the same file back. A removal that fails is told to the administrators
+once per reason; the rounds keep retrying.
 
 **Alerts** (`roles/prometheus` rules `shared-space.yml`): `SharedDataUsageStale` and
 `SharedDataUsageNeverReported` when the hourly export stops (the report's figures go

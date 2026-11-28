@@ -19,9 +19,11 @@ shared_space_data_quota: false
 # The hosts the cluster bot's downloads may come from, each and any host below it; []
 # takes any public https host (cluster_tools.shared_data).
 shared_space_data_sources: []
-# An entry no one but its requester said they use for this many days gets a notice, and
-# goes cluster_user_grace_days after it unless someone does (cluster_bot.data).
-shared_space_data_unused_days: 28
+# An entry nobody used for this long (its files' access or modification time) gets a
+# notice to its requester, and goes this many days after it unless used meanwhile
+# (cluster_bot.data): the cluster's one rule for unused files, as on /scratch.
+shared_space_data_stale_days: "{{ cluster_user_stale_days }}"
+shared_space_data_grace_days: "{{ cluster_user_grace_days }}"
 
 # Collaboration folders (<shared_space_root>/projects/<name>): the people roster's
 # `projects` (checked with the roster, edited by the cluster bot's project requests), each

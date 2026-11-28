@@ -2,7 +2,7 @@
 the shared data's round: whose download ended, and the cleanup.
 
     feature = DataFeature(Remote(home server, ..., SERVICE), kinds, root)
-    watch(feature, seen, now, unused_days, grace_days, say)   one round
+    watch(feature, seen, now, stale_days, grace_days, say)   one round
 
 Someone asks (/cluster data: what, its public https URL, its size, why); an administrator
 approves (the space is one budget for everyone); the home server's service
@@ -10,12 +10,13 @@ approves (the space is one budget for everyone); the home server's service
 shared account into <root>/<kind>/<name>. req: user, category (datasets, models,
 containers), name, url, size (bytes), sha256 ("" none), purpose.
 
-Cleanup: access times over NFS say nothing of reads, so use is what people record. An
-entry nobody but its requester recorded a use of for unused_days (from when it came)
-gets a notice: the requester a DM with a button to keep it, the help channel a button
-for anyone who uses it. A press records a use (the service's ledger) and ends the
-notice; with none in grace_days, the entry is removed and the requester and the
-administrators are told.
+Cleanup, the cluster's one rule for unused files (cluster_user_stale_days and
+cluster_user_grace_days, as on /scratch): an entry nobody used for stale_days (its
+files' access or modification time, the service's listing "used") gets a notice, a DM
+to its requester; used again before grace_days pass, the notice is over, else it is
+removed and the requester and the administrators are told. Nothing is lost for good:
+its source and checksum are known, so asking for it again brings the same file back. A
+removal that fails is told to the administrators once per reason, never every round.
 """
 
 import re
@@ -99,20 +100,22 @@ class DataFeature(Feature):
 
 
 def last_use(entry):
-    """When the entry was last used, as far as anyone knows: its arrival or the latest
-    recorded use."""
-    return max([entry.get("ended") or entry.get("asked") or 0, *(entry.get("uses") or {}).values()])
+    """When the entry was last used: the service's reading of its files ("used"), else
+    its arrival."""
+    return entry.get("used") or entry.get("ended") or entry.get("asked") or 0
 
 
-def watch(feature, seen, now, unused_days, grace_days, say):
+def watch(feature, seen, now, stale_days, grace_days, say):
     """One round: SAY(event, key, entry, **more) for each download that ended since the
     last round ("done", "failed"), each entry newly due for a notice ("notice", with
-    removal: when it goes), and each removed after its notice ("removed"). SEEN ({told,
-    notices}, the caller keeps it) is updated; the first round only learns what ended
-    already. Failed when the service cannot be read: nothing changes."""
+    removal: when it goes), each removed after its notice ("removed") and each removal
+    that failed for a reason not told yet ("failed_removal", with error). SEEN ({told,
+    notices, failed}, the caller keeps it) is updated; the first round only learns what
+    ended already. Failed when the service cannot be read: nothing changes."""
     entries = feature.run("list")["entries"]
     first = "told" not in seen
     told, notices = seen.setdefault("told", {}), seen.setdefault("notices", {})
+    failed = seen.setdefault("failed", {})
     for key, entry in sorted(entries.items()):
         state = entry.get("state")
         if state in ("done", "failed") and told.get(key) != entry.get("ended"):
@@ -121,8 +124,9 @@ def watch(feature, seen, now, unused_days, grace_days, say):
                 say(state, key, entry)
         if state != "done":
             continue
-        if now - last_use(entry) < unused_days * DAY:
+        if now - last_use(entry) < stale_days * DAY:
             notices.pop(key, None)  # used again: the notice is over
+            failed.pop(key, None)
         elif key not in notices:
             notices[key] = now
             say("notice", key, entry, removal=now + grace_days * DAY)
@@ -130,11 +134,13 @@ def watch(feature, seen, now, unused_days, grace_days, say):
             try:
                 feature.run("remove", entry["kind"], entry["name"])
             except Failed as e:
-                say("failed_removal", key, entry, error=str(e))
+                if failed.get(key) != str(e):  # told once per reason, the next rounds retry
+                    failed[key] = str(e)
+                    say("failed_removal", key, entry, error=str(e))
                 continue
             notices.pop(key)
+            failed.pop(key, None)
             say("removed", key, entry)
-    for gone in set(told) - set(entries):
-        told.pop(gone)
-    for gone in set(notices) - set(entries):
-        notices.pop(gone)
+    for kept in (told, notices, failed):
+        for gone in set(kept) - set(entries):
+            kept.pop(gone)

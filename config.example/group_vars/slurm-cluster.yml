@@ -265,8 +265,10 @@ slurm_ha_state_save_location: "/sw/slurm"
 #shared_space_data_quota: false
 # The hosts the bot's downloads may come from (each and below it); [] any public https host.
 #shared_space_data_sources: []
-# An entry only its requester said they use for this many days gets a cleanup notice.
-#shared_space_data_unused_days: 28
+# An entry nobody used for this long gets a cleanup notice, and goes the grace days after
+# it unless used meanwhile: the cluster's one rule for unused files, as on /scratch.
+#shared_space_data_stale_days: "{{ cluster_user_stale_days }}"
+#shared_space_data_grace_days: "{{ cluster_user_grace_days }}"
 #submit_holds_from: ""
 
 ################################################################################

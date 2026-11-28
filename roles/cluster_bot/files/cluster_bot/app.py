@@ -12,7 +12,7 @@ cluster_bot.reminders), ssh {key, user, known_hosts} (cluster_bot.remote, to the
 it acts on), bans
 {hosts {name: address}, seen} (no hosts leaves unban requests and the ban watch off),
 leave {remind_days, leaving (people_leaving)}, command (the one slash command, its
-subcommands cluster_bot.commands'), data {host, kinds, root, unused_days, grace_days,
+subcommands cluster_bot.commands'), data {host, kinds, root, stale_days, grace_days,
 seen} (shared data requests, cluster_bot.data; no host leaves them off), connect
 {login_host, ssh_port, portal_url, dashboard_url, docs_url} and welcomed (cluster_bot.onboarding: how to
 log in, the account notice), dm_log {channel, metrics} (where the notices the bot sends a
@@ -68,7 +68,7 @@ from .prefs import Prefs
 from .projects import ProjectFeature, notify_deployed
 from .remote import Remote
 from . import remove
-from .requests import Engine, Failed
+from .requests import Engine
 
 REMIND_EVERY = 3600
 BAN_WATCH_EVERY = 300
@@ -274,7 +274,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             trigger_id=body["trigger_id"], view=projects_blocks.new_form(cfg["projects"]["places"])
         )
 
-    # Shared data (cluster_bot.data): the request form, and the button of its notices.
+    # Shared data (cluster_bot.data): the request form.
     def data_command(body, client):
         if data is None or not user_of(body["user_id"]):
             text = ("명부에 이 Slack 계정이 없습니다." if data
@@ -302,21 +302,6 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         ack()
         if req["user"]:
             submit(client, slack_id, req)
-
-    @app.action("data.use")
-    def data_use(ack, body, client, action):
-        ack()
-        slack_id, login = body["user"]["id"], user_of(body["user"]["id"])
-        if data is None or not login:
-            dm(slack_id, "명부에 이 Slack 계정이 없습니다.", kind="data", log=False)
-            return
-        kind, name = action["value"].split("/", 1)
-        try:
-            data.run("use", kind, name, login)
-            text = f"{data.root}/{action['value']}을(를) 쓴다고 기록했습니다. 고맙습니다."
-        except Failed as e:
-            text = f"기록하지 못했습니다: {e}"
-        dm(slack_id, text, kind="data", log=False)
 
     def help_command(body, client):
         client.chat_postEphemeral(
@@ -524,7 +509,7 @@ def data_rounds(client, dms, data, cfg, slack_of):
     """The shared data's round (cluster_bot.data.watch), its channel messages sent through
     CLIENT and its DMs, logged, through DMS (cluster_tools.slack.Slack)."""
     settings, channels = cfg["data"], cfg["channels"]
-    unused, grace = settings["unused_days"], settings["grace_days"]
+    stale, grace = settings["stale_days"], settings["grace_days"]
 
     def say(event, key, entry, removal=0, error=""):
         login = entry.get("requester")
@@ -533,12 +518,10 @@ def data_rounds(client, dms, data, cfg, slack_of):
             dms.dm(who, data_blocks.ended(event, path, entry), kind=f"data-{event}", login=login)
         elif event == "notice":
             if who:
-                text, blocks = data_blocks.notice_dm(key, path, unused, removal)
+                text, blocks = data_blocks.notice_dm(path, stale, removal)
                 dms.dm(who, text, blocks, kind="data-unused", login=login)
-            text, blocks = data_blocks.notice_channel(key, path, entry.get("requester"), removal)
-            client.chat_postMessage(channel=channels["help"], **rich.message(text, blocks))
         elif event == "removed":
-            text = data_blocks.removed(path, unused, grace)
+            text = data_blocks.removed(path, stale, grace)
             if who:
                 dms.dm(who, text, kind="data-removed", login=login)
             client.chat_postMessage(channel=channels["admin"], **rich.message(text))
@@ -548,7 +531,7 @@ def data_rounds(client, dms, data, cfg, slack_of):
 
     def round_():
         with state.locked(settings["seen"], {}) as seen:
-            data_watch(data, seen, time.time(), unused, grace, say)
+            data_watch(data, seen, time.time(), stale, grace, say)
 
     return round_
 

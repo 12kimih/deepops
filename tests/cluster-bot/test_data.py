@@ -1,8 +1,8 @@
 """cluster_bot.data: a shared data request is checked (form, existing entries, the budget
 with what is still downloading), always an administrator's to approve, applied through
-the home server's service; each round tells whose download ended once, and an entry no
-one but its requester said they use gets a notice, then goes after the grace period
-unless someone presses its button."""
+the home server's service; each round tells whose download ended once, and an entry
+nobody used (its files' last use, the service's "used") gets a notice, then goes after
+the grace period unless it is used meanwhile; a failed removal is told once per reason."""
 
 import sys
 import unittest
@@ -79,7 +79,7 @@ class Watch(unittest.TestCase):
     def setUp(self):
         self.said = []
         self.service = Service({"datasets/coco": {"kind": "datasets", "name": "coco", "requester": "alice",
-                                                  "state": "fetching", "asked": 0, "uses": {}}})  # fmt: skip
+                                                  "state": "fetching", "asked": 0}})  # fmt: skip
         self.feature = data.DataFeature(self.service, ["datasets"], "/home/shared")
         self.seen = {}
 
@@ -88,7 +88,7 @@ class Watch(unittest.TestCase):
             self.feature,
             self.seen,
             now,
-            28,
+            60,
             14,
             lambda event, key, entry, **more: self.said.append((event, key)),
         )
@@ -102,7 +102,6 @@ class Watch(unittest.TestCase):
             "requester": "bob",
             "state": "done",
             "ended": 5 * DAY,
-            "uses": {},
         }
         self.service.entries["datasets/old"] = done
         self.assertEqual(self.round(6 * DAY), [])
@@ -110,25 +109,33 @@ class Watch(unittest.TestCase):
         self.assertEqual(self.round(7 * DAY), [("done", "datasets/coco")])
         self.assertEqual(self.round(8 * DAY), [])
 
-    def test_unused_entries_get_a_notice_then_go_unless_someone_uses_them(self):
+    def test_unused_entries_get_a_notice_then_go_unless_used_meanwhile(self):
         self.round(0)
-        self.service.entries["datasets/coco"].update(state="done", ended=DAY)
+        self.service.entries["datasets/coco"].update(state="done", ended=DAY, used=DAY)
         self.round(DAY)
-        self.assertEqual(self.round(28 * DAY), [], "not 28 days since it came")
-        self.assertEqual(self.round(29 * DAY), [("notice", "datasets/coco")])
-        self.assertEqual(self.round(30 * DAY), [], "one notice")
-        # Someone presses the button: a recorded use ends the notice.
-        self.service.entries["datasets/coco"]["uses"]["carol"] = 35 * DAY
-        self.assertEqual(self.round(44 * DAY), [])
+        self.assertEqual(self.round(60 * DAY), [], "not 60 days since its last use")
+        self.assertEqual(self.round(61 * DAY), [("notice", "datasets/coco")])
+        self.assertEqual(self.round(62 * DAY), [], "one notice")
+        # Someone reads it: its access time ends the notice.
+        self.service.entries["datasets/coco"]["used"] = 65 * DAY
+        self.assertEqual(self.round(70 * DAY), [])
         self.assertEqual(self.seen["notices"], {})
-        self.assertEqual(self.round(63 * DAY), [("notice", "datasets/coco")])
+        self.assertEqual(self.round(125 * DAY), [("notice", "datasets/coco")])
         self.service.broken.add("remove")
-        self.assertEqual(self.round(77 * DAY), [("failed_removal", "datasets/coco")])
+        self.assertEqual(self.round(139 * DAY), [("failed_removal", "datasets/coco")])
+        self.assertEqual(self.round(139 * DAY + 600), [], "the same reason is told once, the round retries")
+        self.assertIn(("remove", "datasets", "coco"), self.service.calls[-1:])
         self.service.broken.clear()
-        self.assertEqual(self.round(77 * DAY), [("removed", "datasets/coco")])
+        self.assertEqual(self.round(140 * DAY), [("removed", "datasets/coco")])
         self.assertNotIn("datasets/coco", self.service.entries)
-        self.assertEqual(self.round(78 * DAY), [])
-        self.assertEqual((self.seen["told"], self.seen["notices"]), ({}, {}))
+        self.assertEqual(self.round(141 * DAY), [])
+        self.assertEqual((self.seen["told"], self.seen["notices"], self.seen["failed"]), ({}, {}, {}))
+
+    def test_an_entry_without_a_reading_counts_from_its_arrival(self):
+        self.round(0)
+        self.service.entries["datasets/coco"].update(state="done", ended=10 * DAY)
+        self.assertEqual(self.round(69 * DAY), [("done", "datasets/coco")])
+        self.assertEqual(self.round(71 * DAY), [("notice", "datasets/coco")])
 
     def test_an_unreadable_service_changes_nothing(self):
         self.service.broken.add("list")

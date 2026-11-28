@@ -172,13 +172,13 @@ class Handlers(unittest.TestCase):
         cfg = {
             **CFG,
             "data": {
-                "unused_days": 60,
+                "stale_days": 60,
                 "grace_days": 14,
                 "seen": os.path.join(os.path.dirname(self.prefs), "seen.json"),
             },
         }
 
-        def watch(data, seen, now, unused, grace, say):
+        def watch(data, seen, now, stale, grace, say):
             say("notice", "datasets/coco", {"requester": "alice"}, removal=now)
             say("removed", "datasets/coco", {"requester": "alice"})
             say("done", "datasets/coco", {"requester": "alice"})
@@ -188,6 +188,9 @@ class Handlers(unittest.TestCase):
             app.data_rounds(self.client, self.dms, shared, cfg, {"alice": "UALICE"}.get)()
         self.assertEqual([(k, who, log) for *_, k, who, log in self.dms.to("UALICE")],
                          [("data-unused", "alice", True), ("data-removed", "alice", True), ("data-done", "alice", True)])  # fmt: skip
+        # Use is read from the files: the notice has nothing to press, and no channel post.
+        self.client.chat_postMessage.assert_called_once()  # the removal, to the administrators
+        self.assertEqual(self.client.chat_postMessage.call_args.kwargs["channel"], CFG["channels"]["admin"])
 
     def test_data_opens_its_form_and_checks_it_before_a_request(self):
         shared = mock.Mock(kinds=["datasets", "models"], root="/home/shared")
@@ -211,9 +214,6 @@ class Handlers(unittest.TestCase):
         req = self.engine.submit.call_args.args[0]
         self.assertEqual((req["kind"], req["user"], req["category"], req["url"], req["size"]),
                          ("data", "alice", "datasets", "https://data.example/coco.tar", 20 << 30))  # fmt: skip
-        # A notice's button records a use by whoever pressed it.
-        self.call("action", "data.use", body={"user": {"id": "UALICE"}}, action={"value": "datasets/coco"})
-        shared.run.assert_called_with("use", "datasets", "coco", "alice")
 
     def test_unban_needs_a_person_of_the_roster(self):
         self.call(

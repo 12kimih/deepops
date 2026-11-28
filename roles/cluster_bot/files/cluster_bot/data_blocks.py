@@ -4,7 +4,7 @@ import time
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 
-from .blocks import button, field
+from .blocks import field
 
 KIND_NAMES = {"datasets": "데이터셋", "models": "모델 가중치", "containers": "컨테이너 이미지"}
 
@@ -51,22 +51,14 @@ def _date(ts):
     return time.strftime("%Y-%m-%d", time.localtime(ts))
 
 
-def notice_dm(key, path, unused_days, removal):
-    """The requester's notice: (text, blocks) with the button that keeps it."""
-    text = (f"{path}을(를) {unused_days}일 동안 쓴다고 알린 사람이 없습니다. "
-            f"계속 쓰시려면 아래 버튼을 눌러 주세요. 아니면 {_date(removal)}에 지웁니다.")  # fmt: skip
-    return text, [rich.section(text),
-                  {"type": "actions", "elements": [button("계속 사용", "data.use", key, style="primary")]}]  # fmt: skip
+def notice_dm(path, stale_days, removal):
+    """The requester's notice: (text, blocks). Use is read from the files themselves, so
+    there is nothing to press: using it keeps it, and asking again brings it back."""
+    text = (f"공유 데이터 {path}을(를) {stale_days}일 동안 아무도 쓰지 않아 {_date(removal)}에 정리합니다. "
+            "그 전에 쓰면 그대로 둡니다. 정리한 뒤에도 필요하면 다시 신청해 주세요. 같은 주소에서 같은 파일을 다시 받습니다.")  # fmt: skip
+    return text, [rich.section(text)]
 
 
-def notice_channel(key, path, requester, removal):
-    """The help channel's notice: (text, blocks), anyone who uses it presses the button."""
-    text = (f"공유 데이터 {path} ({requester} 요청)을(를) {_date(removal)}에 지웁니다. "
-            "쓰고 있다면 버튼을 눌러 주세요.")  # fmt: skip
-    return text, [rich.section(text),
-                  {"type": "actions", "elements": [button("저도 사용", "data.use", key)]}]  # fmt: skip
-
-
-def removed(path, unused_days, grace_days):
-    return (f"{path}을(를) 지웠습니다: {unused_days}일 동안 쓴다는 사람이 없었고, "
-            f"알림 뒤 {grace_days}일 안에도 없었습니다.")  # fmt: skip
+def removed(path, stale_days, grace_days):
+    return (f"{path}을(를) 정리했습니다: {stale_days}일 동안 아무도 쓰지 않았고, "
+            f"알림 뒤 {grace_days}일 안에도 쓰지 않았습니다.")  # fmt: skip
