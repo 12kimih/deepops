@@ -33,10 +33,14 @@ works from the record alone and says so.
 
 Every message in a channel goes through post(), and a top-level one says what it is
 (CLASSES): a message kept up to date (keep()), a day log's message (DailyLog), a
-scheduled report, a notice someone must act on, or the answer to a person's request; a
+scheduled report, an administrators' action, or the answer to a person's request; a
 reply is bounded by its parent and says nothing. A top-level post without a class is
 refused, so no tool can open a new stream of channel messages unnoticed (owner,
-2026-11-28: "nothing may flood a channel"). Each post is counted
+2026-11-28: "nothing may flood a channel"). A person is told only by DM: no channel post
+may mention one, in any class; only an administrators' action may mention their group
+(or everyone), and an action carries a key and a repeat, so the same one is posted
+again only after the repeat (found in the channel's history: every sender alike)
+(owner, decision 12, 2026-11-28). Each post is counted
 (slack_posts_total{sender, channel_role, class, place}, with counts; place top, thread
 or folded) for the budget alert (SlackChannelPostsHigh), and past POST_BUDGET top-level
 posts of the bot in a channel within the hour (read from Slack, every sender alike) the
@@ -104,9 +108,17 @@ CLASSES = {
     "kept": "a message kept up to date (keep(), a docs notice)",
     "log": "a day log's message (DailyLog)",
     "report": "a scheduled report (the GPU and disk reports)",
-    "notice": "a notice someone must act on, sent once per its key and repeat",
+    "action": "what an administrator must act on: the only post that may mention their group, "
+    "sent once per its key within its repeat",
     "answer": "the answer to a person's request (the cluster bot)",
 }
+# The metadata event_type of an administrators' action (post(cls="action")): its payload's
+# key is what post() finds an earlier one by, within the action's repeat.
+ACTION = "cluster_action"
+# A mention of a person (no channel post may hold one: a person is told by DM) and of a
+# group or everyone (only an administrators' action may), as text and as rich text.
+PERSON = re.compile(r"<@[UW][A-Z0-9]+")
+GROUP = re.compile(r"<!(?:subteam\^|here\b|channel\b|everyone\b)")
 # The bot's top-level posts in one channel within an hour past which the rest are folded
 # into one message's thread (post()); the budget alert fires at the same count.
 POST_BUDGET = 20
@@ -300,26 +312,65 @@ class Slack:
             print(params.get("text", ""))
         print()
 
-    def post(self, channel, text, blocks=None, thread_ts=None, metadata=None, *, cls=None):
+    def post(
+        self, channel, text, blocks=None, thread_ts=None, metadata=None, *, cls=None, key=None, repeat=None
+    ):
         """The message's ts. METADATA ({"event_type", "event_payload"}, Slack's message
         metadata) marks what the message is, so the bot finds it again exactly. A top-level
         post says what it is (CLS, one of CLASSES) and past POST_BUDGET in the channel this
-        hour goes in the fold's thread; a reply (THREAD_TS) needs no class."""
+        hour goes in the fold's thread; a reply (THREAD_TS) needs no class. No post mentions
+        a person; only an action (cls "action", with its KEY and REPEAT in seconds) may
+        mention a group, and an action whose KEY the bot posted in CHANNEL within REPEAT is
+        not posted again: its ts is returned."""
         if MEMBER.fullmatch(channel):
             raise Error(f"Slack chat.postMessage: {channel} is a person; a message to a person is a dm()")
         if not thread_ts and cls not in CLASSES:
             raise Error(
                 f"Slack chat.postMessage to {channel}: a top-level post says what it is ({', '.join(CLASSES)})"
             )
+        msg = rich.message(text, blocks or None)
+        person, group = mentions(msg)
+        if person:
+            raise Error(
+                f"Slack chat.postMessage to {channel}: a person is told by DM, never mentioned in a channel"
+            )
+        if group and cls != "action":
+            raise Error(
+                f"Slack chat.postMessage to {channel}: only an administrators' action mentions a group"
+            )
+        if cls == "action":
+            if not key or repeat is None or metadata:
+                raise Error(f"Slack chat.postMessage to {channel}: an action carries its key and repeat")
+            earlier = self._acted(channel, key, repeat)
+            if earlier:
+                return earlier
+            metadata = {"event_type": ACTION, "event_payload": {"key": key}}
         place = "thread" if thread_ts else "top"
         if not thread_ts and cls != "log":  # a day log's message is one a day already
             folded = self._fold(channel)
             if folded:
                 thread_ts, place = folded, "folded"
-        ts = self._send(channel, rich.message(text, blocks or None), thread_ts, metadata)
+        ts = self._send(channel, msg, thread_ts, metadata)
         if self.counts is not None and not self.dry_run:
             self.counts.posted(self._role(channel), cls or "reply", place)
         return ts
+
+    def _acted(self, channel, key, repeat, now=None):
+        """The ts of the bot's action KEY in CHANNEL within REPEAT seconds, or None (also
+        when the history cannot be read: the action is posted rather than lost)."""
+        if self.dry_run or repeat <= 0:
+            return None
+        now = time.time() if now is None else now
+        try:
+            ids = own(self)
+            for m in history(self, channel_id(self, channel), oldest=now - repeat):
+                meta = m.get("metadata") or {}
+                payload = meta.get("event_payload") or {}
+                if is_own(m, ids) and meta.get("event_type") == ACTION and payload.get("key") == key:
+                    return m["ts"]
+        except Error as e:
+            print(f"slack: {channel}: earlier actions not read: {e}", file=sys.stderr)
+        return None
 
     def _role(self, channel):
         """CHANNEL's role (PLACES), its ID looked up by the names once; "other" unknown."""
@@ -416,6 +467,29 @@ class Slack:
         return self.call("chat.update", **params)
 
 
+def mentions(msg):
+    """(a person, a group or everyone) mentioned in MSG (rich.message: text and blocks)."""
+    found = {"person": False, "group": False}
+
+    def walk(node):
+        if isinstance(node, list):
+            for n in node:
+                walk(n)
+        elif isinstance(node, dict):
+            kind = node.get("type")
+            found["person"] |= kind == "user"
+            found["group"] |= kind in ("usergroup", "broadcast")
+            if isinstance(node.get("text"), str):
+                found["person"] |= bool(PERSON.search(node["text"]))
+                found["group"] |= bool(GROUP.search(node["text"]))
+            for v in node.values():
+                if isinstance(v, (list, dict)):
+                    walk(v)
+
+    walk([{"text": msg["text"]}, msg["blocks"]])
+    return found["person"], found["group"]
+
+
 def dm_log_title(day, count):
     """The day's message the DM lines are threaded under."""
     return f"DM log {day}: {count} sent to people (each in the thread)"
@@ -431,7 +505,7 @@ def dm_log_entry(kind, login, msg, link=""):
     dm_log_line first, then every block of the DM unchanged, split only where Slack's
     limits force it (pages())."""
     head = dm_log_line(kind, login, link)
-    return pages(rich.plain(head), rich.blocks(head) + list(msg["blocks"]))
+    return pages(rich.plain(head), rich.blocks(head) + rich.quiet(list(msg["blocks"])))
 
 
 def _retry_after(error):

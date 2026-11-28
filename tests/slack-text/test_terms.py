@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 import retired_names  # noqa: E402
 import terms  # noqa: E402
-from cluster_tools import rules, usage_report  # noqa: E402
+from cluster_tools import disk_report, rules, usage_report  # noqa: E402
 
 ENTRIES = terms.load()
 
@@ -193,7 +193,8 @@ class Glossary(unittest.TestCase):
         self.assertEqual(usage_report.IDLE_JOB, terms.term(ENTRIES, "idle_job"))
         for e in ENTRIES:
             for form, name in (e.get("code") or {}).items():
-                self.assertEqual(getattr(usage_report, name), e[form], f"usage_report.{name}")
+                module = next(m for m in (usage_report, disk_report) if hasattr(m, name))
+                self.assertEqual(getattr(module, name), e[form], f"{module.__name__}.{name}")
 
     def test_the_user_docs_get_the_same_list(self):
         spec = importlib.util.spec_from_file_location("site_facts", ROOT / "scripts/docs/site_facts.py")

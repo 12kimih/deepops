@@ -249,6 +249,38 @@ terms:
       - 지난 \{?\w*\}?일 GPU 사용
     why: The weekly summary's card, one fixed name in Slack and the docs; its period goes
       in the header's date.
+  # The disk report's titles (owner, 2026-11-28): nouns, the sentences keep their verbs.
+  - use: 경고 수준을 넘은 사용량
+    title: 경고 수준 초과 사용량
+    code: {title: PAST_TITLE}
+    why: A part of the disk card; in a sentence the verb reads naturally.
+  - use: 경고 수준을 넘은 프로젝트
+    title: 경고 수준 초과 프로젝트
+    code: {title: PROJECTS_TITLE}
+    why: As the people's part, for the projects.
+  - title: 여유 공간 부족
+    code: {title: FILL_TITLE}
+    title_not:
+      - 가득 차 가는
+    why: A filesystem near full, as a part's title (owner, 2026-11-28, on "가득 차 가는 공간").
+  - use: 정리하면 좋을 폴더
+    title: 정리 후보 폴더
+    code: {title: CLEANUP_TITLE}
+    why: The folders unused past the stale period, largest and oldest first.
+  - use: 명부에 없는 계정
+    title: 명부 외 계정
+    code: {title: OTHERS_TITLE}
+    why: root, the services and people who left, on a disk.
+  # A title of a Slack message names a thing, never describes it with a clause (owner,
+  # 2026-11-28: "섹션 헤더/타이틀은 모두 명사형"; 대기 중인 잡 and 실행 중인 잡 are allowed,
+  # 2026-11-27). Scoped to the code that writes Slack messages: the site's admin guides
+  # keep their own headings.
+  - title: 명사형 제목 (관형절 대신 명사 - 경고 수준 초과, 여유 공간 부족)
+    title_not:
+      - "[가-힣](?:는|은|을|던|된|될|(?<![역분])할) "
+    scope: [roles/cluster_tools_lib/, roles/cluster_bot/, roles/slurm_usage_report/]
+    why: A clause in a title ("가득 차 가는 공간", "경고 수준을 넘은 사용량") reads as a sentence
+      cut short; its noun says it.
   # Title idioms (owner, 2026-11-27): a verb phrase that names a thing has a noun for
   # it in a title; refused in titles only, sentences keep them.
   - title: 역할

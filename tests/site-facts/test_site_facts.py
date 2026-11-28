@@ -53,8 +53,13 @@ class Facts(unittest.TestCase):
         self.assertEqual(every["policy"]["stale_days"], 30)
         self.assertEqual(every["policy"]["grace_days"], 14, "the role default where the site sets none")
         self.assertEqual(every["policy"]["cancel_after_hours"], 0, "the role's default: no cancel")
+        self.assertNotIn(
+            "idle_notify", every["policy"], "retired: the owner of a job leaving its GPUs idle is told by DM"
+        )
         self.assertEqual(
-            every["policy"]["idle_notify"], ["mention"], "how idle owners are told, the role default"
+            (every["policy"]["shared_stale_days"], every["policy"]["shared_grace_days"]),
+            (30, 14),
+            "the shared data's cleanup, from the site's stale_days and the default grace",
         )
         self.assertEqual(every["policy"]["leave_grace_days"], 30, "a template over the site's stale_days")
         self.assertIsNone(every["chat"]["admin_group"], "a template is Ansible's to resolve")
@@ -450,8 +455,8 @@ class PublicAllowList(unittest.TestCase):
                 "idle_hours": 2,
                 "cancel_after_hours": 6,
                 "cancel_warn_hours": 1,
-                "idle_notify": ["mention"],
                 "leave_grace_days": 60,
+                "shared_stale_days": 60,
                 "interactive_team_qos": True,
                 "submit_holds_disk": True,
                 "extra": 1,
@@ -475,8 +480,8 @@ class PublicAllowList(unittest.TestCase):
                 "idle_hours",
                 "cancel_after_hours",
                 "cancel_warn_hours",
-                "idle_notify",
                 "leave_grace_days",
+                "shared_stale_days",
                 "interactive_team_qos",
                 "submit_holds_disk",
             },

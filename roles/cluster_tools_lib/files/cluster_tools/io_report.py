@@ -1,8 +1,9 @@
 """io_report: the nodes that drive an NFS export's load, and the jobs that do most I/O on them.
 
     hot = collect(prometheus, mounts, share, minutes, top)
-    user_key(item, user), admin_key(item)  -> notice keys (cluster_tools.notices)
-    dm_text(item, rank, advice), admin_text(items)
+    user_key(item, user)   -> a person's notice key (cluster_tools.notices)
+    node_key(item)         -> a hot node's key in the record of the hour's line
+    dm_text(item, rank, advice)
 
 MOUNTS ({mountpoint: {"read_bps", "write_bps"}}) is what the disk behind each export
 serves, measured (roles/io_fairness' models). A node is hot for a mount and a direction
@@ -13,28 +14,16 @@ estimated share of the node's NFS traffic in that direction over the window
 (job:nfs_*_bytes:rate5m, roles/prometheus rules io-usage.yml: the node's NFS bytes split
 by its jobs' syscall I/O, roles/io_usage), and the notices say it is an estimate. It
 reads Prometheus and changes nothing; cluster_tools.usage_report --io tells the people
-and the administrators. Python 3.9 or newer, standard library only.
+and records the nodes for the status channel's day message. Python 3.9 or newer, standard library only.
 """
 
 from . import rules
 from .render import size
 
 DIRECTIONS = {
-    # direction: (recorded node rate, capacity key, recorded job rate, verb, preposition)
-    "read": (
-        "host_mount:nfs_read_bytes:rate5m",
-        "read_bps",
-        "job:nfs_read_bytes:rate5m",
-        "reading",
-        "from",
-    ),
-    "write": (
-        "host_mount:nfs_write_bytes:rate5m",
-        "write_bps",
-        "job:nfs_write_bytes:rate5m",
-        "writing",
-        "to",
-    ),
+    # direction: (recorded node rate, capacity key, recorded job rate)
+    "read": ("host_mount:nfs_read_bytes:rate5m", "read_bps", "job:nfs_read_bytes:rate5m"),
+    "write": ("host_mount:nfs_write_bytes:rate5m", "write_bps", "job:nfs_write_bytes:rate5m"),
 }
 
 
@@ -48,7 +37,7 @@ def collect(prom, mounts, share, minutes, top):
     hottest first."""
     items = []
     for mount, capacity in sorted(mounts.items()):
-        for direction, (recorded, cap_key, job_rate, _, _) in DIRECTIONS.items():
+        for direction, (recorded, cap_key, job_rate) in DIRECTIONS.items():
             limit = share * capacity[cap_key]
             hot = prom.query(f"min_over_time({recorded}{{mountpoint={quoted(mount)}}}[{minutes}m]) > {limit}")
             for row in hot:
@@ -72,8 +61,9 @@ def user_key(item, user):
     return f"io {user} {item['host']} {item['mount']} {item['direction']}"
 
 
-def admin_key(item):
-    return f"io admin {item['host']} {item['mount']} {item['direction']}"
+def node_key(item):
+    """A hot node's key in the record the hourly line reads (usage_report io_recent)."""
+    return f"{item['host']} {item['mount']} {item['direction']}"
 
 
 def rate(nbytes):
@@ -100,31 +90,3 @@ def dm_text(item, rank, advice):
         f"({rate(job_rate)}: 그 노드가 공유 스토리지와 주고받은 양을 노드 안 잡들의 읽기, 쓰기 호출 양에 비례해 나눈 추정치입니다)."
         f"\n{advice}\n{rules.check_note('io-heavy')}"
     )
-
-
-# The administrators' day log of the hot nodes (cluster_tools.slack.DailyLog): its key and
-# its replies' event_type. A log, not a channel line: the people told are in the DM log.
-LOG, LOGGED = "io-log", "cluster_io_logged"
-
-
-def log_title(day, count):
-    """The I/O log's day message (English: the administrators' channel)."""
-    return f"I/O log {day}: {count} reports of hot nodes (each in the thread)"
-
-
-def admin_text(items):
-    """The administrators' message on the hot nodes, in English: a bullet per node, its
-    top jobs under it."""
-    lines = [f"**Shared storage under heavy I/O** ({len(items)} nodes)"]
-    for item in items:
-        _, _, _, verb, prep = DIRECTIONS[item["direction"]]
-        lines.append(
-            f"- `{item['host']}` {verb} {prep} `{item['mount']}` at {rate(item['rate'])} "
-            f"({share_of(item)}% of the disk) for {item['minutes']} min"
-        )
-        # No job ranked on a hot node means the per-job count is broken there, not that
-        # nobody did it: no one could be told, so the line says what to look at.
-        lines += [f"  - job {job} ({user}): {rate(r)}" for job, user, r in item["jobs"]] or [
-            "  - no job counted, so nobody was told: io-usage counts no job there (alert IoUsageJobsMissing)"
-        ]
-    return "\n".join(lines)

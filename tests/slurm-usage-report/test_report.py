@@ -10,7 +10,7 @@ from unittest import mock
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
-from cluster_tools import rich  # noqa: E402
+from cluster_tools import rich, slack  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
 from fake_slack import FakeDM  # noqa: E402
 
@@ -194,16 +194,6 @@ class IdleTests(unittest.TestCase):
         self.assertEqual([j["id"] for j in idle], ["all-idle"])
         self.assertEqual(jobs[3]["idle_gpus"], 1)
 
-    def test_unknown_gpu_memory_is_not_zero(self):
-        gpu = {"util_max": {}, "util": {}, "mem_gib": {("n", 0): 12.0}}
-        jobs = [
-            self.job("known", 60, [("n", 0)]),
-            self.job("partly", 60, [("n", 0), ("n", 1)]),
-            self.job("unknown", 60, [("n", 9)]),
-        ]
-        report.analyze(jobs, gpu, window=7200, threshold=0)
-        self.assertEqual([report.gib(j) for j in jobs], ["12G", "12G+", "-"])
-
     def test_idle_since_is_kept_and_forgotten_when_no_longer_idle(self):
         state, j = {}, self.job("1", 7200, [("n", 0)])
         report.track_idle([j], state, now=10000, window=7200)
@@ -271,20 +261,24 @@ class RenderTests(unittest.TestCase):
             (f"gpu{k}", "drain", "2026-01-01T00:00:00", "root", "maintenance window") for k in range(100)
         ]
         data["idle"] = jobs[:200]
-        data["due"] = []
-        cfg = {"idle_util_threshold": 0, "idle_hours": 2, "notify": ["mention"], "dashboard_url": ""}
-        (text, summary), thread = report.render(data, cfg, lambda user, mention: user)
+        cfg = {"idle_util_threshold": 0, "idle_hours": 2, "dashboard_url": ""}
+        text, summary = report.status_card(data, cfg)
+        thread = report.details(data, cfg)
         self.assertTrue(text)
-        for _, blocks in [("summary", summary)] + thread:
+        for blocks in [summary] + [b for _, b in thread]:
             self.assertLessEqual(len(blocks), 50)
             for b in blocks:
                 self.assertLessEqual(len(rich.read([b])), 3000)
+        self.assertLessEqual(
+            len(rich.read(summary)), slack.MAX_PAGE, "the card is one message, whatever the size"
+        )
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
         # One noun for these jobs in the notification, the card and the thread (owner,
         # 2026-11-27).
         for shown in (text, rich.read(summary), rich.read(thread[0][1])):
             self.assertIn(report.IDLE_JOB, shown)
         self.assertIn(f"*{report.DOWN_TITLE} (drain, down)*", rich.read(summary))
+        self.assertNotIn("<@", str(summary) + str(thread), "a record names, never mentions")
 
     def test_every_pending_reason_is_shown(self):
         """The waiting jobs' reasons were cut to the two most common."""
@@ -305,65 +299,113 @@ class RenderTests(unittest.TestCase):
                     "mem_gib": 1.0, "mem_known": 1, "idle": idle, "idle_gpus": 1 if idle else 0}  # fmt: skip
 
         jobs = [gpu_job("1", "alice", False), gpu_job("2", "bob", True), gpu_job("3", "carol", False)]
-        data = {"jobs": jobs, "idle": [jobs[1]], "total_gpus": 8, "reasons": [], "now": 0,
-                "pending": {}, "due": []}  # fmt: skip
-        cfg = {"idle_util_threshold": 0, "idle_hours": 2, "notify": ["mention"], "dashboard_url": ""}
-        _, thread = report.render(data, cfg, lambda user, mention: user)
-        body = "\n".join(rich.read(blocks) for _, blocks in thread)
+        data = {"jobs": jobs, "idle": [jobs[1]], "total_gpus": 8, "reasons": [], "now": 0, "pending": {}}
+        cfg = {"idle_util_threshold": 0, "idle_hours": 2, "dashboard_url": ""}
+        body = "\n".join(rich.read(blocks) for _, blocks in report.details(data, cfg))
         people = body[body.index("사람별 실행 중인 GPU 잡") :]
-        for user in ("alice", "bob", "carol"):
-            self.assertIn(user, people)
-        self.assertEqual(people.count("잡 1개"), 3, "one row per person, each with their own job")
+        rows = [
+            line.split()[0]
+            for line in people.splitlines()
+            if line.split() and line.split()[0] in ("alice", "bob", "carol")
+        ]
+        self.assertEqual(rows, ["alice", "bob", "carol"], "one row per person, each with their own job")
+
+
+CONFIG = {"channel": "#gpu", "idle_hours": 2, "idle_util_threshold": 1,
+          "notify_repeat_hours": 24, "cancel_after_hours": 0, "prometheus_url": "",
+          "slack_token": "t", "user_map": {"alice": "UALICE", "bob": "UBOB"}, "email_domain": "",
+          "dm_text": "{jobs}", "admin_channel": "#admin", "admin_mention": "",
+          "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
+          "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}", "disk_repeat_days": 7,
+          "people": [], "holds_on": False, "disk_fill": 0.8, "stale_days": 60,
+          "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
+          "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
+
+
+def idle_job(jid, user):
+    return {"id": jid, "label": jid, "user": user, "gpus": [("gpu1", 0)], "gpu_type": "a10", "runtime": 9000,
+            "qos": "normal", "partition": "p", "util": 0.0, "mem_gib": 1.0, "mem_known": 1, "idle": True,
+            "idle_gpus": 1}  # fmt: skip
 
 
 class RunTests(unittest.TestCase):
-    """report_once: a failure part-way still records what this run did."""
+    """report_once: the day's one message in the status channel, the owners told by DM,
+    and a failure part-way still records what this run did."""
 
-    def test_state_is_saved_when_a_notification_fails(self):
-        idle = [{"id": i, "label": i, "user": u, "gpus": [("gpu1", 0)], "gpu_type": "a10", "runtime": 9000,
-                 "qos": "normal", "partition": "p", "util": 0.0, "mem_gib": 1.0, "mem_known": 1, "idle": True,
-                 "idle_gpus": 1} for i, u in (("1", "alice"), ("2", "bob"))]  # fmt: skip
-        posted = []
+    def run_hours(self, d, hours, idle=(), fail=()):
+        """Run report_once at each of HOURS (Unix times); (DMs [(member, text)], the day
+        messages kept {key: [(card text, [reply texts], record)]}, exit codes)."""
+        dms, kept = [], {}
 
         class Slack(FakeDM):
             token = "t"
+            counts = None
 
             def __init__(self, *_, **__):
                 pass
 
             def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
-                if channel == "UBOB":
+                if channel in fail:
                     raise RuntimeError("Slack chat.postMessage failed: channel_not_found")
-                posted.append(channel)
+                dms.append((channel, text))
                 return "ts"
 
-        with tempfile.TemporaryDirectory() as d:
-            cfg = {"channel": "#gpu", "state_file": f"{d}/state.json", "idle_hours": 2, "idle_util_threshold": 1,
-                   "notify": ["dm"], "notify_repeat_hours": 24, "cancel_after_hours": 0, "prometheus_url": "",
-                   "slack_token": "t", "user_map": {"alice": "UALICE", "bob": "UBOB"}, "email_domain": "",
-                   "dm_text": "{jobs}", "admin_channel": "#admin", "admin_mention": "",
-                   "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
-                   "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
-                   "disk_notify": ["mention"], "disk_repeat_days": 7,
-                   "people": [], "holds_on": False, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
-            "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
-            "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
-            Path(f"{d}/config.json").write_text(json.dumps(cfg))
-            slurm = {"jobs": idle, "nodes": {"gpu1": 1}, "reasons": [], "pending": {}}
+        def keep(slack_, channel, key, card, thread=(), record=None, **_):
+            self.assertEqual(slack.mentions(rich.message(*card)), (False, False), "the card mentions no one")
+            for t, b in thread:
+                self.assertEqual(slack.mentions(rich.message(t, b)), (False, False), "nor its thread")
+            kept.setdefault(key, []).append((card[0], [t for t, _ in thread], record))
+            return {"channel": "C", "ts": key}
+
+        Path(f"{d}/config.json").write_text(json.dumps(dict(CONFIG, state_file=f"{d}/state.json")))
+        slurm = {"jobs": list(idle), "nodes": {"gpu1": 8}, "reasons": [], "pending": {}}
+        codes = []
+        for now in hours:
             with mock.patch.object(sys, "argv", ["r", "--config", f"{d}/config.json"]), \
                     mock.patch.object(report, "collect_slurm", lambda now: dict(slurm, jobs=[dict(j) for j in idle])), \
                     mock.patch.object(report, "collect_gpus", lambda *_: {}), \
                     mock.patch.object(report, "analyze", lambda jobs, *_: jobs), \
+                    mock.patch.object(report, "site_info", lambda: {}), \
+                    mock.patch.object(report, "keep", keep), \
+                    mock.patch.object(report.time, "time", lambda: now), \
                     mock.patch.object(report, "Slack", Slack):  # fmt: skip
-                self.assertEqual(report.main(), 1)
-                state = json.loads(Path(f"{d}/state.json").read_text())
-                # alice was told and is not told again next run; bob was not, so he is retried.
-                self.assertIsNotNone(state["idle"]["1"]["notified"])
-                self.assertIsNone(state["idle"]["2"]["notified"])
-                self.assertEqual(posted.count("UALICE"), 1)
-                report.main()
-                self.assertEqual(posted.count("UALICE"), 1)
-                self.assertEqual(Path(f"{d}/state.json").stat().st_mode & 0o777, 0o600)
+                codes.append(report.main())
+        return dms, kept, codes
+
+    def test_state_is_saved_when_a_notification_fails(self):
+        idle = [idle_job("1", "alice"), idle_job("2", "bob")]
+        with tempfile.TemporaryDirectory() as d:
+            dms, _, codes = self.run_hours(d, [NOW], idle, fail={"UBOB"})
+            self.assertEqual(codes, [1])
+            state = json.loads(Path(f"{d}/state.json").read_text())
+            # alice was told and is not told again next run; bob was not, so he is retried.
+            self.assertIsNotNone(state["idle"]["1"]["notified"])
+            self.assertIsNone(state["idle"]["2"]["notified"])
+            self.assertEqual([m for m, _ in dms].count("UALICE"), 1)
+            dms, _, _ = self.run_hours(d, [NOW + 3600], idle, fail={"UBOB"})
+            self.assertNotIn("UALICE", [m for m, _ in dms])
+            self.assertEqual(Path(f"{d}/state.json").stat().st_mode & 0o777, 0o600)
+
+    def test_one_message_a_day_a_line_an_hour_and_the_days_summary_after_midnight(self):
+        """Decision 12 (2026-11-28): 24 posts a day became one message, edited hourly."""
+        midnight = report.datetime.fromtimestamp(NOW).replace(hour=0, minute=0, second=0).timestamp()
+        hours = [midnight + 3600 * h for h in (2, 3, 4)]
+        with tempfile.TemporaryDirectory() as d:
+            dms, kept, codes = self.run_hours(d, hours, [idle_job("1", "alice")])
+            self.assertEqual(codes, [0, 0, 0])
+            [key] = kept
+            self.assertEqual(len(kept[key]), 3, "the same message, kept three times")
+            card, replies, record = kept[key][-1]
+            self.assertEqual(record, {"channel": "C", "ts": key}, "edited by its record")
+            self.assertTrue(card.startswith(report.DAY_TITLE))
+            lines = [r for r in replies if "할당" in r and "(alice)" in r]
+            self.assertEqual(len(lines), 3, "a line an hour, the owner named as text")
+            self.assertEqual([m for m, _ in dms], ["UALICE"], "told by DM, once (notify_repeat_hours)")
+            dms, kept2, _ = self.run_hours(d, [midnight + 86400 + 600], [idle_job("1", "alice")])
+            summary = kept2[key][0]
+            self.assertTrue(summary[0].startswith(report.DAY_SUMMARY_TITLE), summary[0])
+            self.assertEqual(len(summary[1]), 3, "the hours' lines stay, the details go")
+            self.assertEqual(len([k for k in kept2 if k != key]), 1, "the new day's message")
 
 
 class GpuIndexTests(unittest.TestCase):
@@ -382,13 +424,13 @@ class GpuIndexTests(unittest.TestCase):
 
 class ConfigTests(unittest.TestCase):
     BASE = {"slack_token": "t", "channel": "#c", "prometheus_url": "", "idle_hours": 2,
-            "idle_util_threshold": 0, "notify": ["mention"], "notify_repeat_hours": 6,
+            "idle_util_threshold": 0, "notify_repeat_hours": 6,
             "dm_text": "{jobs} {count} {hours}", "cancel_after_hours": 0, "user_map": {},
             "email_domain": "", "state_file": "/nonexistent", "admin_channel": "#admin", "admin_mention": "",
             "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
             "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
-            "disk_notify": ["mention", "dm"], "disk_repeat_days": 7,
-            "people": ["alice"], "holds_on": False, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
+            "disk_repeat_days": 7,
+            "people": ["alice"], "holds_on": False, "disk_fill": 0.8, "stale_days": 60,
             "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
             "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
 
@@ -405,18 +447,23 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(cfg["io_mounts"], {})
         self.assertEqual(cfg["io_share"], 0.4)
 
+    def test_a_config_with_the_retired_ways_to_tell_still_loads_and_ignores_them(self):
+        """notify, disk_notify and disk_fill_mentions retired (decision 12): a host gets the
+        package before its role rewrites the config."""
+        cfg = self.load(notify=["mention"], disk_notify=["mention"], disk_fill_mentions=3)
+        self.assertEqual(cfg["disk_fill_top"], 5, "the new setting's default, not the old one's value")
+
     def test_a_good_config_loads(self):
         self.assertEqual(self.load()["channel"], "#c")
         self.assertEqual(self.load(cancel_after_hours=24)["cancel_after_hours"], 24)
 
     def test_each_mistake_is_named_before_anything_runs(self):
         for change, word in (({"dm_text": "{user}"}, "dm_text"), ({"dm_text": "{"}, "dm_text"),
-                             ({"notify": ["email"]}, "notify"), ({"idle_hours": "2"}, "idle_hours"),
+                             ({"idle_hours": "2"}, "idle_hours"),
                              ({"cancel_after_hours": 1}, "exceed"),
                              ({"cancel_after_hours": 12, "cancel_warn_hours": 10}, "cancel_warn_hours"),
                              ({"cancel_after_hours": 12, "cancel_warn_text": "{user}"}, "cancel_warn_text"),
-                             ({"cancel_after_hours": 24, "notify": []}, "notify"),
-                             ({"channel": None}, "channel"), ({"disk_notify": ["email"]}, "disk_notify"),
+                             ({"channel": None}, "channel"),
                              ({"disk_repeat_days": -1}, "disk_repeat_days"), ({"people": "alice"}, "people"),
                              ({"io_share": 1.5}, "io_share"), ({"io_minutes": 2}, "io_minutes"),
                              ({"io_mounts": {"/home": {"read_bps": 0, "write_bps": 1}}}, "io_mounts /home")):  # fmt: skip
@@ -430,7 +477,8 @@ class ConfigTests(unittest.TestCase):
                          ' "3": {"since": 5}, "4": {"since": true, "notified": null}}}'):  # fmt: skip
                 Path(f"{d}/s").write_text(text)
                 state = report.load_state(f"{d}/s")
-                self.assertEqual(set(state), {"idle", "told", "users"})
+                self.assertEqual(set(state), {"idle", "told", "users", "day"})
+                self.assertEqual(state["day"], {})
                 self.assertEqual(set(state["idle"]) - {"2"}, set())
 
 
@@ -438,7 +486,7 @@ class CancelTests(unittest.TestCase):
     """Cancelling: any job, batch or interactive, and only once its owner was told and
     warned in earlier runs; one warning per person for all their jobs about to go."""
 
-    CFG = {"notify": ["mention"], "cancel_after_hours": 24, "channel": "#c", "idle_hours": 2,
+    CFG = {"cancel_after_hours": 24, "channel": "#c", "idle_hours": 2,
            "cancel_warn_hours": 1, "cancel_warn_text": "{count}: {jobs} in {hours}h", "dm_text": "{jobs}"}  # fmt: skip
 
     def job(self, jid, notified, warned=None, user="u"):
@@ -452,10 +500,12 @@ class CancelTests(unittest.TestCase):
         self.slack.post.return_value = "ts"
         self.told = {}
         report_data = {"idle": jobs, "due": list(due), "told": self.told}
-        with mock.patch.object(report, "post_report", lambda *a: ("#c", "ts")), \
-                mock.patch.object(report, "slack_id", lambda *a: member), mock.patch.object(report, "run") as run, \
+        self.failures = []
+        with mock.patch.object(report, "slack_id", lambda *a: member), mock.patch.object(report, "run") as run, \
                 mock.patch("sys.stderr"):  # fmt: skip
-            report.act(report_data, dict(self.CFG, **cfg), lambda u, m: u, self.slack, {}, NOW)
+            self.cancelled = report.act(
+                report_data, dict(self.CFG, **cfg), self.slack, {}, NOW, self.failures
+            )
         return [c.args[1] for c in run.call_args_list]
 
     def test_warned_first_then_cancelled_in_a_later_run(self):
@@ -475,16 +525,26 @@ class CancelTests(unittest.TestCase):
         batch = dict(self.job("7", NOW - 3600, warned=NOW - 600), interactive=False)
         self.assertEqual(self.run_act([batch]), ["7"])
 
+    def test_a_cancel_is_told_to_its_owner_by_dm_and_named_in_no_channel(self):
+        self.run_act(
+            [self.job("7", NOW - 3600, warned=NOW - 600), self.job("8", NOW - 3600, warned=NOW - 600)]
+        )
+        self.assertEqual([j["id"] for j in self.cancelled], ["7", "8"])
+        [dm] = self.slack.dm.call_args_list
+        self.assertEqual(dm.kwargs["kind"], "idle-cancelled")
+        self.assertIn("`7`", dm.args[1])
+        self.slack.post.assert_not_called()
+
     def test_told_once_per_person_and_every_job_of_theirs_counts_as_told(self):
         jobs = [self.job("7", None), self.job("8", None)]
-        self.run_act(jobs, due=["u"], notify=["dm"], cancel_after_hours=0)
+        self.run_act(jobs, due=["u"], cancel_after_hours=0)
         self.assertEqual(self.slack.dm.call_count, 1, "one DM for both jobs")
         self.assertEqual(self.told, {"u": NOW})
         self.assertEqual([j["state"]["notified"] for j in jobs], [NOW, NOW])
 
     def test_an_owner_without_a_slack_member_is_not_counted_as_told(self):
         j = self.job("7", None)
-        self.run_act([j], due=["u"], member="", notify=["dm"])
+        self.run_act([j], due=["u"], member="")
         self.assertIsNone(j["state"]["notified"])
         self.assertEqual(self.told, {})
 

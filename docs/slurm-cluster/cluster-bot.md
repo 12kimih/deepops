@@ -54,14 +54,19 @@ log_failed in its textfile in `node_exporter_unprivileged_dir`
 usage report also stamps its hourly run (`SlackDmSenderStale`).
 
 Every channel post goes through `cluster_tools.slack` too, and a top-level one says what
-it is (`CLASSES`: a message kept up to date, a day log's message, a scheduled report, a
-notice someone must act on, the answer to a request) or is refused; a reply is bounded
-by its parent. Each post counts in `slack_posts_total` by channel role, class and place.
+it is (`CLASSES`: a message kept up to date, a day log's message, a scheduled report, an
+administrators' action, the answer to a request) or is refused; a reply is bounded by its
+parent. A person is told only by DM: no channel post mentions one (the help channel's
+lines on a request name the person as text), and only an administrators' action (a held
+request, missing scopes, a shared entry that could not be removed, and the usage
+report's weekly idlers and mass access-time refreshes) mentions their group, each posted
+once per its key within its repeat, read from the channel (owner decision 12,
+2026-11-28). Each post counts in `slack_posts_total` by channel role, class and place.
 Past 20 top-level posts of the bot in one channel within the hour (`POST_BUDGET`, read
 from Slack, every sender together), the rest of the hour go in the thread of one message
 saying so, and `SlackChannelPostsHigh` names the channel; what the administrators need
-not act on (new bans, deletes, hot I/O nodes, the DMs) goes in day logs, one message a
-day each.
+not act on (new bans, deletes, removed shared entries, the DMs) goes in day logs, one
+message a day each, mentioning no one.
 
 What a newcomer needs before the first login (`cluster_bot_connect`: the SSH host and
 port and the guide from `cluster_info`, the portal's `open_ondemand_url`

@@ -54,7 +54,7 @@ def log_entry(name, channel, message):
     the deleted MESSAGE whole, as it showed."""
     head = f"**{escape(name)}** deleted a bot message in <#{channel}>"
     shown = message.get("blocks") or rich.blocks(escape(message.get("text") or "(empty)"))
-    return pages(rich.plain(head), rich.blocks(head) + list(shown))
+    return pages(rich.plain(head), rich.blocks(head) + rich.quiet(list(shown)))
 
 
 def whose(message, ids, known):

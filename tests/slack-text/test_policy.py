@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 from cluster_bot import bans, bans_blocks, data_blocks, remove, scopes  # noqa: E402
 from cluster_bot import blocks as bot_blocks  # noqa: E402
 from cluster_bot.requests import Failed, Outcome  # noqa: E402
-from cluster_tools import cards, disk_report, emoji, io_report, rich, slack  # noqa: E402
+from cluster_tools import cards, disk_report, emoji, rich, slack  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
 
 HANGUL = re.compile(r"[가-힣]")
@@ -31,8 +31,6 @@ TEMPLATE = ROOT / "roles/alertmanager/files/slack.tmpl"
 # channel, checked as English below; the rest are read by people.
 ADMIN_SHOWN = ("ban list", "new bans", "held, administrators")
 BAN = {"ip": "203.0.113.7", "host": "gpu1", "jail": "sshd", "since": "2026-11-25 10:00"}
-HOT = {"host": "n1", "mount": "/home", "direction": "write", "rate": 4e8, "capacity": 8e8, "minutes": 15,
-       "jobs": [("10", "alice", 3e8)]}  # fmt: skip
 
 _spec = importlib.util.spec_from_file_location("bot_messages", ROOT / "tests/cluster-bot/test_messages.py")
 bot_messages = importlib.util.module_from_spec(_spec)
@@ -71,8 +69,6 @@ def admin_messages():
     yield "delete entry", remove.log_entry("alice", "C1", {"text": "x", "blocks": rich.blocks("x")})
     yield "dm log", slack.dm_log_title("2026-11-28", 3)
     yield "dm log line", slack.dm_log_line("disk", "alice", "https://slack.example/p1")
-    yield "io log", io_report.log_title("2026-11-28", 1)
-    yield "io hot nodes", io_report.admin_text([HOT, {**HOT, "jobs": []}])
     yield "repeaters", report.render_repeaters(
         ["bob"], {"bob": [{"idle": 90, "held": 120}] * 2},
         [{"label": "1", "user": "bob", "gpus": [("n1", 0)]}],
@@ -87,10 +83,12 @@ def admin_messages():
 def korean_messages():
     """(name, message) of what people read: the status channel's reports and the bot."""
     yield "weekly", report.render_week([{"user": "alice", "held": 120, "idle": 90}], 5)
-    cfg = {"idle_util_threshold": 5, "idle_hours": 2, "notify": ["mention"], "cancel_after_hours": 6}
+    cfg = {"idle_util_threshold": 5, "idle_hours": 2, "cancel_after_hours": 6}
     data = {"jobs": [], "idle": [], "total_gpus": 8, "now": 0, "reasons": [], "pending": {}}
-    card, thread = report.render(data, cfg, lambda u, m: u)
-    yield "hourly", card
+    yield "hourly", report.status_card(data, cfg)
+    yield "hourly line", report.hour_line(data, hot=[("n1", ["alice"])])
+    yield "hourly details", report.details(data, cfg)
+    yield "day summary", report.day_summary("2026-11-28", [report.day_sample(data)])
     for name, message in bot_messages.messages():
         if not name.startswith(ADMIN_SHOWN):
             yield name, message
@@ -118,7 +116,7 @@ class Language(unittest.TestCase):
     def test_a_log_mentions_no_one(self):
         """A day log is read when wanted; a mention would ring for an entry no one acts on."""
         for name, message in admin_messages():
-            if "log" in name or "entry" in name or name in ("new bans", "io hot nodes"):
+            if "log" in name or "entry" in name or name == "new bans":
                 with self.subTest(name):
                     self.assertNotRegex(shown(message), r"<[@!]", name)
 

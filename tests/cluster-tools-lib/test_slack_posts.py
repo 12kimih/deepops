@@ -55,13 +55,13 @@ class Posts(unittest.TestCase):
             self.slack.post("#admin", "x")
         with self.assertRaisesRegex(slack.Error, "says what it is"):
             self.slack.post("#admin", "x", cls="chatter")
-        ts = self.slack.post("#admin", "x", cls="notice")
+        ts = self.slack.post("#admin", "x", cls="answer")
         self.slack.post("#admin", "y", thread_ts=ts)
         self.assertEqual(len(self.ch.posts("CADMIN")), 1)
         self.assertEqual(len(self.ch.thread(ts)), 1)
 
     def test_each_post_is_counted_by_role_class_and_place(self):
-        ts = self.slack.post("#admin", "x", cls="notice")
+        ts = self.slack.post("#admin", "x", cls="answer")
         self.slack.post("#admin", "y", thread_ts=ts)
         self.slack.post("#status", "z", cls="report")
         self.slack.post("#other", "w", cls="answer")
@@ -71,16 +71,16 @@ class Posts(unittest.TestCase):
         def at(role, cls, place):
             return tuple(sorted((*base, ("channel_role", role), ("class", cls), ("place", place))))
 
-        self.assertEqual(got[at("admin", "notice", "top")], 1)
+        self.assertEqual(got[at("admin", "answer", "top")], 1)
         self.assertEqual(got[at("admin", "reply", "thread")], 1)
         self.assertEqual(got[at("status", "report", "top")], 1)
         self.assertEqual(got[at("other", "answer", "top")], 1, "a channel not in places")
 
     def test_past_the_budget_the_rest_of_the_hour_goes_in_one_thread(self):
         for i in range(slack.POST_BUDGET):
-            self.slack.post("#admin", f"notice {i}", cls="notice")
-        a = self.slack.post("#admin", "one more", cls="notice")
-        b = self.slack.post("#admin", "and another", cls="notice")
+            self.slack.post("#admin", f"notice {i}", cls="answer")
+        a = self.slack.post("#admin", "one more", cls="answer")
+        b = self.slack.post("#admin", "and another", cls="answer")
         top = self.ch.posts("CADMIN")
         self.assertEqual(len(top), slack.POST_BUDGET + 1, "one fold message, no more top-level posts")
         fold = top[-1]
@@ -95,16 +95,16 @@ class Posts(unittest.TestCase):
 
     def test_a_day_log_is_never_folded_and_no_history_never_stops_a_post(self):
         for i in range(slack.POST_BUDGET):
-            self.slack.post("#admin", f"notice {i}", cls="notice")
+            self.slack.post("#admin", f"notice {i}", cls="answer")
         self.slack.post("#admin", "DM log", cls="log")
         self.assertEqual(self.ch.posts("CADMIN")[-1]["text"], "DM log")
         blind = Poster(FakeChannel(no_history=True))
         for i in range(slack.POST_BUDGET + 2):
-            blind.post("#admin", f"notice {i}", cls="notice")
+            blind.post("#admin", f"notice {i}", cls="answer")
         self.assertEqual(len(blind.ch.posts("CADMIN")), slack.POST_BUDGET + 2, "counted, not folded")
 
     def test_every_class_and_the_folds_text_are_named(self):
-        self.assertEqual(set(slack.CLASSES), {"kept", "log", "report", "notice", "answer"})
+        self.assertEqual(set(slack.CLASSES), {"kept", "log", "report", "action", "answer"})
         self.assertEqual(set(slack.FOLD_TEXT), set(slack.LANGUAGE.values()))
         for text in slack.FOLD_TEXT.values():
             self.assertEqual(rich.problems(rich.blocks(text.format(n=1))), [])
@@ -113,6 +113,55 @@ class Posts(unittest.TestCase):
 # A post sent around Slack.post: Bolt's client method, or the API method called by name
 # (a scope list naming the method is no call).
 AROUND = re.compile(r"\bchat_postMessage\(|\bcall\(\s*\"chat\.postMessage\"")
+
+
+class Mentions(unittest.TestCase):
+    """Decision 12 (2026-11-28): a person is told only by DM; only an administrators'
+    action mentions their group, once per its key within its repeat."""
+
+    def setUp(self):
+        self.ch = FakeChannel()
+        self.slack = Poster(self.ch)
+
+    def test_no_post_mentions_a_person_in_any_class_or_a_reply(self):
+        ts = self.slack.post("#admin", "x", cls="report")
+        for kw in ({"cls": c} for c in slack.CLASSES):
+            with self.subTest(**kw), self.assertRaisesRegex(slack.Error, "told by DM"):
+                self.slack.post("#admin", "<@U123> look", **kw, key="k", repeat=1)
+        with self.assertRaisesRegex(slack.Error, "told by DM"):
+            self.slack.post("#admin", "x", rich.blocks("hi <@U123>"), thread_ts=ts)
+
+    def test_only_an_action_mentions_a_group_and_carries_its_key_and_repeat(self):
+        for cls in ("kept", "log", "report", "answer"):
+            with self.subTest(cls), self.assertRaisesRegex(slack.Error, "only an administrators' action"):
+                self.slack.post("#admin", "<!subteam^S1> look", cls=cls)
+        with self.assertRaisesRegex(slack.Error, "only an administrators' action"):
+            self.slack.post("#admin", "<!here> look", cls="report")
+        with self.assertRaisesRegex(slack.Error, "key and repeat"):
+            self.slack.post("#admin", "<!subteam^S1> look", cls="action")
+        self.slack.post("#admin", "<!subteam^S1> look", cls="action", key="k", repeat=3600)
+
+    def test_an_action_is_posted_once_within_its_repeat_by_any_sender(self):
+        a = self.slack.post("#admin", "<!subteam^S1> scopes", cls="action", key="scopes x", repeat=3600)
+        b = Poster(self.ch).post("#admin", "<!subteam^S1> scopes", cls="action", key="scopes x", repeat=3600)
+        self.assertEqual(a, b)
+        self.slack.post("#admin", "<!subteam^S1> other", cls="action", key="scopes y", repeat=3600)
+        self.assertEqual(len(self.ch.posts("CADMIN")), 2)
+        self.slack.post("#admin", "<!subteam^S1> again", cls="action", key="scopes x", repeat=0)
+        self.assertEqual(len(self.ch.posts("CADMIN")), 3, "no repeat: posted each time")
+
+    def test_a_log_copy_shows_who_was_named_and_rings_no_one(self):
+        blocks = rich.blocks("<@U123> and <!subteam^S9> and <!here>")
+        shown = rich.read(rich.quiet(blocks))
+        self.assertEqual(shown, "@U123 and @S9 and @here")
+        self.assertEqual(slack.mentions(rich.message("x", rich.quiet(blocks))), (False, False))
+        context = [
+            {
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": "by <@U1|kim> for <!subteam^S2|ops>"}],
+            }
+        ]
+        self.assertEqual(rich.quiet(context)[0]["elements"][0]["text"], "by @U1 for @S2")
 
 
 def calls(tree):

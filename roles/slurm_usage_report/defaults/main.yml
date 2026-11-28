@@ -1,7 +1,9 @@
 ---
-# Hourly Slurm GPU usage report to Slack, and nudges for jobs whose GPUs sit idle, a
-# weekly per-person summary of GPU-hours held and left idle, and a daily disk usage
-# report. Runs on a host with the Slurm client commands and access to Prometheus. No-op
+# Hourly Slurm GPU usage report to Slack (one message a day in the status channel,
+# edited every hour, the hour's line in its thread, the day's summary after midnight),
+# DMs to the owners of jobs whose GPUs sit idle, a weekly summary of GPU-hours held and
+# left idle, and a daily disk usage report. The status channel names people as text and
+# never mentions anyone; a person is told only by DM (owner, decision 12). Runs on a host with the Slurm client commands and access to Prometheus. No-op
 # until the Slack bot token (slack_bot_token in roles/slack_defaults) is set; the app's
 # scopes are the generated manifest's (cluster_bot.commands API_SCOPES).
 
@@ -24,18 +26,17 @@ slurm_usage_report_repeat_weeks: 2
 # The daily disk usage report (systemd OnCalendar), from the disk quota metrics
 # (roles/disk_quota; without them it posts nothing): each counted filesystem's disk, its
 # people (every one, in the thread) with their day's growth and levels, the projects,
-# and everyone past a warn level, told as disk_notify says (mention, dm, both or []).
+# and everyone past a warn level, named on the card as text.
 slurm_usage_report_disk_schedule: "*-*-* 09:00:00"
-slurm_usage_report_disk_notify: [mention]
-# A person is told when they first pass a level, every day at a hard limit (their writes
-# fail), and again every repeat_days while past the same warn level (0: every day). The
-# card lists everyone past a level every day, mentioning only those told.
+# A person past a level gets a DM when they first pass it, every day at a hard limit
+# (their writes fail), and again every repeat_days while past the same warn level (0:
+# every day). The card names everyone past a level every day.
 slurm_usage_report_disk_repeat_days: 7
 # A filesystem at least cluster_disk_fill_fraction full: its this many largest people are
-# named on the card every day, mentioned at most every disk_repeat_days. The thread also
+# named on the card every day and get a DM at most every disk_repeat_days. The thread also
 # lists each filesystem's folders worth cleaning (cluster_cleanup_top of them, from the
 # scans of roles/disk_quota and roles/scratch_space).
-slurm_usage_report_disk_fill_mentions: 5
+slurm_usage_report_disk_fill_top: 5
 # The people the disk report ranks (the roster's active logins); everyone else on a disk
 # (root, the services, people who left) is one line. [] ranks every user.
 slurm_usage_report_people: "{{ people | people_active | list | sort }}"
@@ -46,16 +47,15 @@ slurm_usage_report_prometheus_url: "http://localhost:{{ prometheus_port }}"
 # The thresholds of the rule on jobs leaving their GPUs idle (idle_hours, idle_util_threshold, cancel_after_hours,
 # cancel_warn_hours) and the I/O notices' (io_share, io_minutes, io_top_jobs):
 # roles/slurm_usage_report_defaults, which `usage` reads too (cluster_tools.rules).
-# How the owners of such jobs are told, once per person for all of them: any of
-# mention (in the report thread) and dm; [] lists the jobs without telling anyone. Told
-# when a job of theirs first turns idle, then every notify_repeat_hours while any stays
-# idle (cluster_tools.notices); 0 (the default) tells them on every hourly report while
-# it lasts (owner, 2026-11-23): the cancel below bounds how long that goes on.
-slurm_usage_report_notify: [mention]
+# The owners of such jobs get a DM, once per person for all of them, when a job of
+# theirs first turns idle, then every notify_repeat_hours while any stays idle
+# (cluster_tools.notices); 0 (the default) tells them on every hourly report while it
+# lasts (owner, 2026-11-23): the cancel below bounds how long that goes on. The day
+# message's hourly line names them as text.
 slurm_usage_report_notify_repeat_hours: 0
 # The texts below are written in cluster_tools.rich's Markdown (**bold**, `code`,
 # [text](url), - lists): they are sent as Slack rich text, shown as written.
-# The DM (with dm in notify): {jobs} (one line each), {count}, {hours} (idle_hours).
+# The DM: {jobs} (one line each), {count}, {hours} (idle_hours).
 slurm_usage_report_dm_text: |-
   잡 {count}개가 할당받은 GPU를 {hours}시간 넘게 쓰지 않고 있습니다:
   {jobs}
@@ -69,9 +69,8 @@ slurm_usage_report_cancel_warn_text: |-
 # The I/O notices (systemd OnCalendar, every 5 minutes): a node whose NFS traffic to a
 # measured export (io_fairness_models, roles/io_defaults) stayed above io_share of what
 # the disk serves for io_minutes; the users of its io_top_jobs jobs by I/O are sent a
-# DM ending in io_advice and the node goes in the administrators' day log (admin_channel:
-# one message a day, the reports in its thread), at once and every io_repeat_hours
-# while it lasts. No models, no notices.
+# DM ending in io_advice, at once and every io_repeat_hours while it lasts, and the node
+# with its users is named in the day message's hourly line. No models, no notices.
 slurm_usage_report_io_schedule: "*:0/5"
 slurm_usage_report_io_repeat_hours: 6
 slurm_usage_report_io_advice: >-

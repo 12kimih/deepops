@@ -4,6 +4,9 @@
 # this role and a deploy stops on it; scripts/deepops/config_lint.py reports a document
 # or config that still names one. Add a name here when a setting is renamed or removed.
 retired_settings:
+  slurm_usage_report_notify: nothing (owner decision 12, 2026-11-28); the owners of jobs leaving their GPUs idle always get a DM, and the status channel names them as text, never a mention
+  slurm_usage_report_disk_notify: nothing (owner decision 12, 2026-11-28); a person past a disk level always gets a DM, and the disk card names them as text, never a mention
+  slurm_usage_report_disk_fill_mentions: slurm_usage_report_disk_fill_top in roles/slurm_usage_report (the largest people of a fuller filesystem get a DM, never a mention)
   shared_space_data_unused_days: shared_space_data_stale_days in roles/shared_space_defaults (cluster_user_stale_days by default); a shared data entry's use is read from its files' access times, never recorded by a button
   cluster_bot_retired_bot_ids: cluster_bot_known_integrations in roles/cluster_bot, a mapping of bot_id to what the integration is; Slack lets the bot delete only its own messages, so `cluster-bot tidy` lists an integration's to delete by hand
   cluster_tools_environment: user_environment in roles/user_environment_defaults (the one list of the users' environment; a value may differ inside jobs)

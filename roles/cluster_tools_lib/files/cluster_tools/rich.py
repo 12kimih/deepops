@@ -14,6 +14,8 @@ set explicitly; nothing is left for Slack to parse.
     header(text)    -> a header block: a part's title
     problems(message) -> what a message would show raw (a marker Slack or this module
                        did not read), empty when it shows as written
+    quiet(blocks)   -> blocks with every mention turned into its text, as a log copies
+                       a message
 
 The Markdown, the same the user docs' notices use (cluster-docs scripts/notices.py):
 
@@ -384,6 +386,26 @@ def section(text, accessory=None):
             "accessory": accessory,
         }
     return {"type": "section", "text": {"type": "mrkdwn", "text": shown}, "accessory": accessory}
+
+
+def quiet(blocks):
+    """BLOCKS with every mention (a person, a group, everyone) turned into its text, as a
+    log copies a message: the copy shows who was named, and rings no one."""
+    if isinstance(blocks, list):
+        return [quiet(b) for b in blocks]
+    if not isinstance(blocks, dict):
+        return blocks
+    kind = blocks.get("type")
+    if kind == "user":
+        return {"type": "text", "text": f"@{blocks['user_id']}"}
+    if kind == "usergroup":
+        return {"type": "text", "text": f"@{blocks['usergroup_id']}"}
+    if kind == "broadcast":
+        return {"type": "text", "text": f"@{blocks['range']}"}
+    out = {k: quiet(v) if isinstance(v, (list, dict)) else v for k, v in blocks.items()}
+    if kind == "mrkdwn" and isinstance(out.get("text"), str):
+        out["text"] = re.sub(r"<([@!])(?:subteam\^)?([A-Za-z0-9]+)(?:\|[^>]*)?>", r"@\2", out["text"])
+    return out
 
 
 def read(blocks_):

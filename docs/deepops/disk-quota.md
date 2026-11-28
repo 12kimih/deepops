@@ -114,11 +114,11 @@ The usage report's daily disk report (`slurm_usage_report_disk_schedule`,
 figures each morning: every counted filesystem, its largest people and their day's growth,
 the projects, and everyone past a warn level, so the people concerned hear about it. A
 filesystem at least `cluster_disk_fill_fraction` (0.8) full names its
-`slurm_usage_report_disk_fill_mentions` largest people on the card every day, with a
-mention at most every `slurm_usage_report_disk_repeat_days`. The thread lists each
+`slurm_usage_report_disk_fill_top` largest people on the card every day, each sent a DM
+at most every `slurm_usage_report_disk_repeat_days`; the card never mentions anyone. The thread lists each
 filesystem's folders worth cleaning: a folder (one level below a home or a collaboration
 folder) unused past `cluster_user_stale_days`, the largest and longest unused first,
-`cluster_cleanup_top` of them, never with a mention (`cluster_tools.cleanup`).
+`cluster_cleanup_top` of them (`cluster_tools.cleanup`).
 `disk_quota_scan` names the base directories of each filesystem to weigh
 (`{"/home": ["/home/*"]}`); the walk takes hours on a large filesystem, so a weekly timer
 runs it at low priority (`disk_quota_scan_on_calendar`). The scratch space is weighed by

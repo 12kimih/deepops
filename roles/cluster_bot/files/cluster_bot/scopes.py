@@ -29,6 +29,8 @@ from cluster_tools.slack import Error, Slack, mentioning
 from . import commands
 
 TEXTFILE = "cluster-bot-scopes.prom"
+# The same scopes missing are said again at most daily (cluster_tools.slack, an action).
+SCOPES_REPEAT = 86400
 
 
 def missing(needed, granted):
@@ -82,7 +84,8 @@ def run(cfg, slack, out_dir, state_path, now):
         text = message(lacking, before, cfg.get("manifest", ""))
         if text:
             said, blocks = mentioning(cfg.get("admin_mention", ""), text)
-            slack.post(cfg["channels"]["admin"], said, blocks, cls="notice")
+            slack.post(cfg["channels"]["admin"], said, blocks, cls="action",
+                       key="scopes " + (",".join(lacking) or "whole"), repeat=SCOPES_REPEAT)  # fmt: skip
         write_atomic(state, json.dumps({"reported": lacking}) + "\n", mode=0o600)
     return lacking
 

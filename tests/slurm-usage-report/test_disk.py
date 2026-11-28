@@ -92,10 +92,6 @@ def site():
     return Prom(now, before)
 
 
-def who(user, mention):
-    return f"@{user}" if mention else user
-
-
 def text_of(blocks):
     return rich.read([b for b in blocks if b["type"] != "header"])
 
@@ -152,20 +148,24 @@ class LevelTests(unittest.TestCase):
 class RenderTests(unittest.TestCase):
     def test_card_and_thread(self):
         data = disk_report.collect(site(), NOW)
-        (text, card), thread = disk_report.render(data, who)
+        (text, card), thread = disk_report.render(data)
         self.assertIn("login:/ 75%", text)
-        self.assertIn("경고 수준을 넘은 사용량 2건", text)
+        self.assertIn("경고 수준 초과 2건", text)
         body = text_of(card)
-        self.assertIn("login:/    ████████░░  75%  400G   100G  +10G", body)
-        self.assertIn(":small_red_triangle: @bob login:/에서: 21G, 한도(20G)에 닿았습니다", body)
+        # Owner 2026-11-28: a part per filesystem, its gauge, then its people as bullets,
+        # named as text (the status channel mentions no one: decision 12).
+        login = body[body.index("login:/\n") : body.index("nfs:/home\n")]
+        self.assertIn("`████████░░  75%` 100G 남음 (크기 400G), 하루 사이 +10G", login)
         self.assertIn(
-            ":small_orange_diamond: @alice login:/에서: 18G, 경고 수준(15G)을 넘었습니다 (한도 20G)", body
+            f"{disk_report.PAST_TITLE}\n- :small_red_triangle: bob: 21G, 한도(20G)에 닿았습니다", login
         )
-        self.assertNotIn("@carol", body)
+        self.assertIn("- :small_orange_diamond: alice: 18G, 경고 수준(15G)을 넘었습니다 (한도 20G)", login)
+        self.assertNotIn("carol", body)
+        self.assertNotIn("<@", str(card), "a record never mentions")
         self.assertIn("nfs (마지막", body, "a host not reported lately is named")
         self.assertNotIn("login (last", body)
         details = text_of(thread[0][1])
-        self.assertIn("계정 3개, 많이 쓰는 순", details)
+        self.assertIn("login:/ 사용자별 사용량 (계정 3개)", details)
         self.assertIn("carol", details, "every person, none cut")
         self.assertNotIn("외 ", details)
         self.assertIn("alice   18G     +3G", details)
@@ -173,19 +173,17 @@ class RenderTests(unittest.TestCase):
         for blocks in [card] + [b for _, b in thread]:
             self.assertLessEqual(len(blocks), 50)
 
-    def test_a_filling_filesystem_names_its_largest_people_mentioned_when_due(self):
+    def test_a_filling_filesystem_names_its_largest_people_as_bullets(self):
         data = disk_report.collect(site(), NOW)
         self.assertEqual(disk_report.fill_rows(data, 0.8), [], "75% full is below 80%")
         fill = disk_report.fill_rows(data, 0.7, n=2)
         self.assertEqual(
             [(k, u) for k, _, u in fill], [(("login", "/"), [("bob", 21 * G), ("alice", 18 * G)])]
         )
-        (_, card), _ = disk_report.render(
-            data, who, fill=fill, fill_mention={disk_report.fill_key(("login", "/"))}
-        )
-        self.assertIn(":small_orange_diamond: login:/ 75% 사용 중: @bob 21G, @alice 18G", text_of(card))
-        (_, card), _ = disk_report.render(data, who, fill=fill, fill_mention=set())
-        self.assertIn("75% 사용 중: bob 21G, alice 18G", text_of(card), "named every day, mentioned when due")
+        (_, card), _ = disk_report.render(data, fill=fill)
+        self.assertIn("여유 공간 부족 (75% 사용, 가장 많이 쓰는 분)\n- bob: 21G\n- alice: 18G", text_of(card),
+                      "a bullet each, named as text, never a comma run")  # fmt: skip
+        self.assertIn("DM으로", text_of(card), "the card says how they are told")
 
     def test_a_project_past_its_warn_level_is_on_the_card(self):
         # The shared data's budget (cluster_tools.shared_data): 20G hard, warned at 90%.
@@ -197,16 +195,16 @@ class RenderTests(unittest.TestCase):
             row(20 * G, host="nfs", filesystem="/home", project="shared-data", kind="hard"),
             row(18 * G, host="nfs", filesystem="/home", project="shared-data", kind="warn"),
         ]
-        (_, card), _ = disk_report.render(disk_report.collect(prom, NOW), who)
+        (_, card), _ = disk_report.render(disk_report.collect(prom, NOW))
         body = text_of(card)
-        self.assertIn("경고 수준을 넘은 프로젝트", body)
+        self.assertIn(disk_report.PROJECTS_TITLE, body)
         self.assertIn(
             ":small_orange_diamond: shared-data nfs:/home에서: 19G, 경고 수준(18G)을 넘었습니다 (한도 20G)",
             body,
         )
         self.assertNotIn("/home/shared/datasets*", body, "7G of a 10G limit is past nothing")
 
-    def test_folders_worth_cleaning_in_the_thread_never_mentioned(self):
+    def test_folders_worth_cleaning_in_the_thread(self):
         prom = site()
         prom.now["disk_cleanup_candidate_bytes"] = [
             row(300 * G, host="nfs", filesystem="/home", path="/home/alice/old", user="alice")
@@ -215,32 +213,33 @@ class RenderTests(unittest.TestCase):
             row(120, host="nfs", filesystem="/home", path="/home/alice/old", user="alice")
         ]
         data = disk_report.collect(prom, NOW)
-        _, thread = disk_report.render(data, who, stale_days=60)
+        _, thread = disk_report.render(data, stale_days=60)
         details = text_of(thread[0][1])
-        self.assertIn("nfs:/home: 정리하면 좋을 폴더 (60일 넘게 쓰지 않은 것", details)
+        self.assertIn(f"nfs:/home {disk_report.CLEANUP_TITLE}", details)
+        self.assertIn("60일 넘게 쓰지 않은 폴더, 크고 오래된 순", details)
         self.assertIn("/home/alice/old  alice  300G  120일", details)
-        self.assertNotIn("@alice", details.split("정리하면 좋을 폴더")[1])
 
     def test_people_ranked_everyone_else_in_a_table_of_their_own(self):
         data = disk_report.collect(site(), NOW)
         data["users"][("login", "/", "root")] = dict(data["users"][("login", "/", "carol")], used=160 * G)
         data["users"][("login", "/", "mysql")] = dict(data["users"][("login", "/", "carol")], used=16 * G)
-        _, thread = disk_report.render(data, who, people={"alice", "bob", "carol"})
+        _, thread = disk_report.render(data, people={"alice", "bob", "carol"})
         details = text_of(thread[0][1])
-        self.assertIn("3명, 많이 쓰는 순", details)
-        people, others = details.split("명부에 없는 계정")
+        self.assertIn("login:/ 사용자별 사용량 (3명)", details)
+        people, others = details.split(f"login:/ {disk_report.OTHERS_TITLE}")
         self.assertNotIn("root", people, "root is not ranked with the people")
-        self.assertIn(" (root, 서비스, 떠난 분) 2개, 합계 176G", others)
+        self.assertIn(" (2개, 합계 176G)", others)
+        self.assertIn("명부에 없는 계정: root, 서비스 계정, 떠난 분의 계정입니다.", others)
         self.assertIn("root   160G", others)
         self.assertIn("mysql  16G", others)
-        _, thread = disk_report.render(data, who)
-        self.assertIn("계정 5개, 많이 쓰는 순", text_of(thread[0][1]), "no roster: everyone is ranked")
+        _, thread = disk_report.render(data)
+        self.assertIn("사용자별 사용량 (계정 5개)", text_of(thread[0][1]), "no roster: everyone is ranked")
 
     def test_a_hard_limit_says_what_it_means_for_slurm(self):
         data = disk_report.collect(site(), NOW)
-        (_, card), _ = disk_report.render(data, who, holds=True)
+        (_, card), _ = disk_report.render(data, holds=True)
         self.assertIn(". 공간을 비우실 때까지 새 Slurm 잡을 제출할 수 없습니다", text_of(card))
-        (_, card), _ = disk_report.render(data, who)
+        (_, card), _ = disk_report.render(data)
         self.assertNotIn("Slurm", text_of(card), "no holds: nothing said")
         bob = disk_report.over_warn(data)[0]
         self.assertIn("지금은 그곳에 쓸 수 없습니다. 공간을 비우실 때까지 새 Slurm 잡을 제출할 수 없습니다.",
@@ -259,7 +258,7 @@ class RenderTests(unittest.TestCase):
         bob, alice = disk_report.over_warn(data)
         self.assertEqual(bob[4][0][3], "hard", "past the announced hard: told daily, as at a hard limit")
         self.assertFalse(disk_report.enforced(bob[3]))
-        (_, card), _ = disk_report.render(data, who, holds=True)
+        (_, card), _ = disk_report.render(data, holds=True)
         text = text_of(card)
         self.assertIn(
             f"{start} 적용되는 한도(20G)를 넘었습니다. {start}는 한도에 닿아 있는 동안 새 Slurm 잡을", text
@@ -291,15 +290,17 @@ class RenderTests(unittest.TestCase):
 
 
 class RunTests(unittest.TestCase):
-    """usage_report --disk: posts the report, notes everyone past a level when asked,
-    and posts nothing when no disk usage is counted."""
+    """usage_report --disk: posts the report naming everyone past a level as text, tells
+    each by DM when due (decision 12: never a mention), and posts nothing when no disk
+    usage is counted."""
 
     CFG = dict(channel="#status", dm_log_channel="", prometheus_url="", slack_token="t", email_domain="",
-               user_map={"alice": "UALICE", "bob": "UBOB"}, disk_notify=["mention", "dm"],
-               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, disk_fill=0.8, disk_fill_mentions=5, stale_days=60,
+               user_map={"alice": "UALICE", "bob": "UBOB"},
+               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, disk_fill=0.8, disk_fill_top=5,
+               stale_days=60,
                admin_channel="#admins", admin_mention="<!subteam^SADMINS>")  # fmt: skip
 
-    def run_disk(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
+    def run_disk(self, prom, *extra, state=None, now=NOW):
         """(posts [(channel, text, blocks as text)], the failure, disk.json): one run at
         NOW, keeping its state in the directory STATE (a fresh one when None)."""
         posted = []
@@ -310,7 +311,7 @@ class RunTests(unittest.TestCase):
             def __init__(self, *_, **__):
                 pass
 
-            def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
+            def post(self, channel, text, blocks=None, thread_ts=None, cls=None, key=None, repeat=None):
                 if channel == "UBOB":
                     raise RuntimeError("Slack chat.postMessage failed: channel_not_found")
                 posted.append((channel, text, rich.read(blocks)))
@@ -318,7 +319,7 @@ class RunTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as fresh:
             d = state or fresh
-            cfg = dict(self.CFG, state_file=f"{d}/state.json", disk_notify=list(notify))
+            cfg = dict(self.CFG, state_file=f"{d}/state.json")
             args = mock.Mock(dry_run=False, to=None)
             for flag in extra:
                 setattr(args, *flag)
@@ -342,30 +343,35 @@ class RunTests(unittest.TestCase):
         self.assertIn("notifying bob", error)
         self.assertEqual(saved["users"]["alice"]["id"], "UALICE")
 
-    def test_told_once_then_again_when_due_and_the_card_mentions_only_them(self):
+    def test_told_by_dm_once_then_again_when_due_and_named_on_the_card_every_day(self):
         with tempfile.TemporaryDirectory() as d:
-            posted, _, saved = self.run_disk(site(), notify=["mention"], state=d)
-            self.assertEqual(set(saved["told"]), {"login / alice", "login / bob"})
-            self.assertEqual(saved["told"]["login / bob"], NOW)
-            self.assertIn("<@UALICE> (alice)", posted[0][2])
-            # The next day: bob is still at his hard limit, alice past the same warn level.
-            posted, _, _ = self.run_disk(site(), notify=["mention"], state=d, now=NOW + disk_report.DAY)
-            self.assertIn("<@UBOB> (bob)", posted[0][2])
-            self.assertNotIn("<@UALICE>", posted[0][2])
-            self.assertIn(
-                ":small_orange_diamond: alice login:/에서", posted[0][2], "still listed, not mentioned"
-            )
+            posted, _, saved = self.run_disk(site(), state=d)
+            self.assertEqual(set(saved["told"]), {"login / alice"}, "bob's DM failed: not told")
+            self.assertEqual([p[0] for p in posted if p[0].startswith("U")], ["UALICE"])
+            self.assertNotIn("<@", posted[0][2])
+            # The next day: bob is still at his hard limit (tried again), alice past the
+            # same warn level (not again within disk_repeat_days); both named on the card.
+            posted, error, _ = self.run_disk(site(), state=d, now=NOW + disk_report.DAY)
+            self.assertIn("notifying bob", error)
+            self.assertEqual([p[0] for p in posted if p[0].startswith("U")], [])
+            self.assertIn(":small_orange_diamond: alice:", posted[0][2])
+            self.assertIn(":small_red_triangle: bob:", posted[0][2])
 
-    def test_a_filling_filesystem_mentions_its_people_at_most_weekly(self):
+    def test_a_filling_filesystems_largest_people_get_a_dm_at_most_weekly(self):
         with tempfile.TemporaryDirectory() as d:
-            self.CFG = dict(RunTests.CFG, disk_fill=0.7)
-            posted, _, saved = self.run_disk(site(), notify=[], state=d)
+            self.CFG = dict(RunTests.CFG, disk_fill=0.7, user_map={"alice": "UALICE", "carol": "UCAROL"})
+            posted, _, saved = self.run_disk(site(), state=d)
             self.assertEqual(saved["told"]["fill login /"], NOW)
-            self.assertIn("75% 사용 중: <@UBOB> (bob)", posted[0][2])
-            posted, _, _ = self.run_disk(site(), notify=[], state=d, now=NOW + disk_report.DAY)
-            self.assertIn("75% 사용 중: bob", posted[0][2], "named the next day, not mentioned")
-            posted, _, _ = self.run_disk(site(), notify=[], state=d, now=NOW + 7 * disk_report.DAY)
-            self.assertIn("75% 사용 중: <@UBOB> (bob)", posted[0][2], "mentioned again a week on")
+            fill_dms = [p for p in posted if "공간이 75% 찼습니다" in p[1]]
+            self.assertEqual(
+                {p[0] for p in fill_dms}, {"UALICE", "UCAROL"}, "every largest person with a member"
+            )
+            self.assertIn("- bob: 21G", posted[0][2], "named on the card")
+            posted, _, _ = self.run_disk(site(), state=d, now=NOW + disk_report.DAY)
+            self.assertFalse([p for p in posted if "찼습니다" in p[1]], "not again the next day")
+            self.assertIn("- bob: 21G", posted[0][2], "named every day")
+            posted, _, _ = self.run_disk(site(), state=d, now=NOW + 7 * disk_report.DAY)
+            self.assertTrue([p for p in posted if "찼습니다" in p[1]], "again a week on")
             self.CFG = RunTests.CFG
 
     def test_a_preview_sends_and_records_nothing(self):
@@ -373,11 +379,6 @@ class RunTests(unittest.TestCase):
         self.assertEqual({p[0] for p in posted}, {"UME"})
         self.assertIsNone(error)
         self.assertIsNone(saved)
-
-    def test_no_notes_without_dm(self):
-        posted, error, _ = self.run_disk(site(), notify=["mention"])
-        self.assertEqual({p[0] for p in posted}, {"#status"})
-        self.assertIsNone(error)
 
     def test_scratch_cleanup_tells_each_person_once_per_date_and_admins_of_a_burst(self):
         prom = site()
@@ -401,9 +402,6 @@ class RunTests(unittest.TestCase):
             # The next day, the same date: told already.
             posted, _, _ = self.run_disk(prom, state=d, now=NOW + disk_report.DAY)
             self.assertFalse([p for p in posted if "스크래치 공간" in p[1] and p[0] == "UALICE"])
-        # A DM whatever disk_notify says: it is a person's files going, not the disk card.
-        posted, _, _ = self.run_disk(prom, notify=["mention"])
-        self.assertEqual(len([p for p in posted if p[0] == "UALICE" and "스크래치 공간" in p[1]]), 1)
 
     def test_a_deferral_for_running_jobs_is_said_in_the_notice(self):
         prom = site()

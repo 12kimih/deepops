@@ -103,9 +103,9 @@ slurm_ha_state_save_location: "/sw/slurm"
 #  dashboard_url: "{{ grafana_root_url }}"
 #  docs_url: "{{ cluster_info.docs_url | default('') }}"
 
-# Hourly GPU usage report and idle-GPU nudges, a weekly per-person summary of GPU-hours
-# held and left idle, and a daily disk usage report (roles/slurm_usage_report), posted to
-# slack_channels.status. notify: any of mention, dm ([] = list only).
+# Hourly GPU usage report (one message a day, edited hourly), a weekly summary of
+# GPU-hours held and left idle, and a daily disk usage report (roles/slurm_usage_report),
+# posted to slack_channels.status, naming people as text; each person is told by DM.
 # cancel_after_hours 0 = never. user_map: Slurm user -> Slack member ID (profile > Copy
 # member ID) or email; here from the people roster's slack attribute (PEOPLE in all.yml).
 # Someone over both repeat_idle thresholds for repeat_weeks weeks running is reported to
@@ -114,20 +114,17 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_usage_report_repeat_idle_gpu_hours: 50
 #slurm_usage_report_repeat_idle_share: 0.5
 #slurm_usage_report_repeat_weeks: 2
-#slurm_usage_report_notify: [mention]
 #slurm_usage_report_cancel_after_hours: 0
 #slurm_usage_report_user_map: "{{ slack_members }}"
 # The daily disk usage report, from the disk quota metrics (slurm_enable_disk_quota):
 # each counted filesystem, its people (every one, in the thread), the projects, and
-# everyone past a warn level (disk_notify: mention, dm, both or []), told at once, daily
-# at a hard limit, and every disk_repeat_days while past the same warn level (0: every
-# day).
+# everyone past a warn level, told by DM at once, daily at a hard limit, and every
+# disk_repeat_days while past the same warn level (0: every day).
 #slurm_usage_report_disk_schedule: "*-*-* 09:00:00"
-#slurm_usage_report_disk_notify: [mention]
 #slurm_usage_report_disk_repeat_days: 7
 # The I/O notices: a node whose NFS traffic to a measured export (io_fairness_models)
 # stays above io_share of the disk's throughput for io_minutes; the users of its top
-# jobs by I/O get a DM ending in io_advice; the node goes in the administrators' day log.
+# jobs by I/O get a DM ending in io_advice; the day message's hourly line names the node.
 #slurm_usage_report_io_share: 0.4
 #slurm_usage_report_io_minutes: 15
 #slurm_usage_report_io_repeat_hours: 6

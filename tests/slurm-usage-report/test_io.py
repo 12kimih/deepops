@@ -58,14 +58,14 @@ class Collect(unittest.TestCase):
         self.assertIn('topk(3, sum by (job_id, user) (avg_over_time(job:nfs_write_bytes:rate5m{host="n1"}[15m])))',
                       prom.asked[2])  # fmt: skip
 
-    def test_a_hot_node_with_no_job_counted_says_the_count_is_broken(self):
+    def test_a_hot_node_with_no_job_counted_says_so_in_the_hours_line(self):
         """Slurm 26.05's job cgroups carried no job_<id>, so io-usage counted no job for 8
-        days and the admins read only "no job counted" (2026-11-27)."""
-        item = {"host": "n1", "mount": "/home", "direction": "read", "rate": 9e8, "capacity": 1e9,
-                "minutes": 15, "jobs": []}  # fmt: skip
-        text = io_report.admin_text([item])
-        self.assertIn("nobody was told", text)
-        self.assertIn("IoUsageJobsMissing", text)
+        days (2026-11-27): nobody can be told, and the record says why (the alert
+        IoUsageJobsMissing names it to the administrators)."""
+        data = {"jobs": [], "idle": [], "total_gpus": 8, "now": NOW, "pending": {}}
+        line = report.hour_line(data, hot=[("n1", [])])
+        self.assertIn("I/O 과다 `n1` (잡 집계 없음)", line)
+        self.assertIn("I/O 과다 `n1` (alice, bob)", report.hour_line(data, hot=[("n1", ["alice", "bob"])]))
 
     def test_below_the_share_is_nothing(self):
         self.assertEqual(io_report.collect(Prom(), MOUNTS, 0.6, 15, 3), [])
@@ -87,12 +87,6 @@ class Collect(unittest.TestCase):
             "the rule's own check, last",
         )
         self.assertIn("2번째로 많이 쓴 잡이 `11`", io_report.dm_text(item, 1, ""))
-        self.assertEqual(
-            io_report.admin_text([item]),
-            "**Shared storage under heavy I/O** (1 nodes)\n"
-            "- `n1` writing to `/home` at 400M/s (50% of the disk) for 15 min\n"
-            "  - job 10 (alice): 300M/s\n  - job 11 (bob): 50M/s\n  - job 12 (root): 1M/s",
-        )
 
 
 class Run(unittest.TestCase):
@@ -110,25 +104,16 @@ class Run(unittest.TestCase):
                 pass
 
             def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
+                assert not str(channel).startswith("#"), "nothing in a channel"
                 if channel in fail:
                     raise RuntimeError("Slack chat.postMessage failed: channel_not_found")
                 posted.append((channel, text))
                 return "ts"
 
-        class Log:
-            """The administrators' day log (cluster_tools.slack.DailyLog): its entries."""
-
-            def __init__(self, channel, key, title, logged):
-                self.channel = channel
-
-            def record(self, slack, entry):
-                posted.append((f"log {self.channel}", entry[0][0]))
-
         cfg = dict(self.CFG, state_file=f"{state}/state.json")
         args = mock.Mock(dry_run=False, to=to)
         with (
             mock.patch.object(report, "Prometheus", lambda url: prom),
-            mock.patch.object(report, "DailyLog", Log),
             mock.patch.object(report, "Slack", Slack),
             mock.patch.object(report.time, "time", lambda: now),
         ):
@@ -140,20 +125,25 @@ class Run(unittest.TestCase):
         saved = Path(f"{state}/io.json")
         return posted, error, json.loads(saved.read_text()) if saved.exists() else None
 
-    def test_the_top_jobs_users_and_the_admins_are_told_once_then_when_due(self):
+    def test_the_top_jobs_users_are_told_once_then_when_due_and_the_node_recorded(self):
+        """Decision 12 (2026-11-28): the people by DM; the node and its users go in the
+        status channel's hourly line (io.json "recent"), nothing in the admin channel."""
         with tempfile.TemporaryDirectory() as d:
             posted, error, saved = self.run_io(Prom(), d)
             self.assertIsNone(error)
-            self.assertEqual(
-                sorted(p[0] for p in posted), ["UALICE", "UBOB", "log #admins"], "root's job: admins only"
-            )
-            self.assertNotIn("#admins", dict(posted), "the day log, never a channel line")
+            self.assertEqual(sorted(p[0] for p in posted), ["UALICE", "UBOB"], "root's job: no DM")
             self.assertIn("가장 많이 쓴 잡", dict(posted)["UALICE"])
-            self.assertEqual(len(saved["told"]), 3)
+            self.assertEqual(len(saved["told"]), 2)
+            [node] = saved["recent"].values()
+            self.assertEqual((node["host"], node["users"], node["t"]), ("n1", ["alice", "bob", "root"], NOW))
+            with mock.patch.dict(self.CFG, state_file=f"{d}/state.json"):
+                self.assertEqual(report.io_recent(self.CFG, NOW - 3600), [("n1", ["alice", "bob", "root"])])
+                self.assertEqual(report.io_recent(self.CFG, NOW + 1), [], "only what was hot since")
             again, _, _ = self.run_io(Prom(), d, now=NOW + 3600)
             self.assertEqual(again, [], "within io_repeat_hours")
-            later, _, _ = self.run_io(Prom(), d, now=NOW + 7 * 3600)
-            self.assertEqual(len(later), 3)
+            later, _, saved = self.run_io(Prom(), d, now=NOW + 7 * 3600)
+            self.assertEqual(len(later), 2)
+            self.assertEqual(len(saved["recent"]), 1, "one record per hot node")
 
     def test_once_it_cools_the_next_hot_spell_is_told_at_once(self):
         with tempfile.TemporaryDirectory() as d:
@@ -161,20 +151,20 @@ class Run(unittest.TestCase):
             _, _, saved = self.run_io(Prom(hot=False), d, now=NOW + 600)
             self.assertEqual(saved["told"], {})
             posted, _, _ = self.run_io(Prom(), d, now=NOW + 1200)
-            self.assertEqual(len(posted), 3)
+            self.assertEqual(len(posted), 2)
 
     def test_one_failed_dm_does_not_stop_the_others(self):
         with tempfile.TemporaryDirectory() as d:
             posted, error, saved = self.run_io(Prom(), d, fail={"UBOB"})
             self.assertIn("notifying bob", error)
-            self.assertEqual(sorted(p[0] for p in posted), ["UALICE", "log #admins"])
+            self.assertEqual(sorted(p[0] for p in posted), ["UALICE"])
             self.assertNotIn(io_report.user_key({"host": "n1", "mount": "/home", "direction": "write"}, "bob"),
                              saved["told"])  # fmt: skip
 
     def test_a_preview_posts_the_summary_there_and_records_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             posted, _, saved = self.run_io(Prom(), d, to="UME")
-            self.assertEqual([p[0] for p in posted], ["UME"])
+            self.assertEqual([p[0] for p in posted], ["UME", "UME"], "each DM, previewed")
             self.assertIsNone(saved)
 
     def test_no_measured_mount_does_nothing(self):

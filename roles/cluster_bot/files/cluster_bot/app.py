@@ -37,7 +37,7 @@ from datetime import date
 from pathlib import Path
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
-from cluster_tools.slack import DailyLog, DmCounts, DmLog, Slack, mentioning, pages  # the cluster's library
+from cluster_tools.slack import DailyLog, DmCounts, DmLog, Slack, escape, mentioning, pages  # the library
 
 from . import (
     accounts_blocks,
@@ -75,6 +75,11 @@ BAN_WATCH_EVERY = 300
 DATA_WATCH_EVERY = 600
 NOTICES_EVERY = 900
 GUIDES_EVERY = 900
+# How long an administrators' action stands before the same one may be posted again
+# (cluster_tools.slack.Slack.post, cls "action"): a held request until it is decided (its
+# key is the request's own), a removal that failed for one reason once a week.
+HELD_REPEAT = 30 * 86400
+DATA_FAILED_REPEAT = 7 * 86400
 
 
 def load(path):
@@ -113,12 +118,18 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
     def dm(slack_id, text, blocks=None, *, kind, log):
         dms.dm(slack_id, text, blocks, kind=kind, login=user_of(slack_id) or slack_id, log=log)
 
+    def name_of(slack_id, req=None):
+        """Who asked, as text: a channel names a person, never mentions one (decision 12);
+        a newcomer has no login yet, so the one asked for."""
+        return escape(user_of(slack_id) or (req or {}).get("user") or slack_id)
+
     def tell(client, slack_id, outcome, log=False):
-        """The outcome: a line in the help channel (the request's thread when it has one)
-        and a DM to the person who asked, logged (LOG) when it comes later than the ask."""
+        """The outcome: a line in the help channel (the request's thread when it has one),
+        naming the person as text, and a DM to them, logged (LOG) when it comes later than
+        the ask."""
         req = outcome.request
         thread = req.get("thread_ts")
-        text = f"<@{slack_id}> {engine.describe(req)}: {outcome.text}" if req else outcome.text
+        text = f"{name_of(slack_id, req)}: {engine.describe(req)}: {outcome.text}" if req else outcome.text
         dms.post(channels["help"], text, thread_ts=thread, cls=None if thread else "answer")
         dm(slack_id, outcome.text, kind="request", log=log)
 
@@ -128,7 +139,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         if outcome.status == "held":
             approvers = engine.approvers(outcome.key)
             first = dms.post(
-                channels["help"], f"<@{slack_id}> {engine.describe(req)}: 승인 대기", cls="answer"
+                channels["help"], f"{name_of(slack_id, req)}: {engine.describe(req)}: 승인 대기", cls="answer"
             )
             # Held for some people (a project's owners): each gets the buttons in a DM;
             # otherwise the administrators, in their channel.
@@ -136,10 +147,10 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             for place in places:
                 if place == channels["admin"]:
                     text, blocks = mentioning(cfg["admin_mention"], *shared.held_admin(
-                        user_of(slack_id) or f"<@{slack_id}>", engine.describe_en(req), outcome.key))  # fmt: skip
-                    dms.post(place, text, blocks, cls="notice")
+                        name_of(slack_id, req), engine.describe_en(req), outcome.key))  # fmt: skip
+                    dms.post(place, text, blocks, cls="action", key=f"held {outcome.key}", repeat=HELD_REPEAT)
                 else:
-                    blocks = shared.held(f"<@{slack_id}>", outcome.text, outcome.key)
+                    blocks = shared.held(name_of(slack_id, req), outcome.text, outcome.key)
                     dm(place, outcome.text, blocks, kind="approval", log=True)
             engine.note(outcome.key, slack_id=slack_id, thread_ts=first)
             dm(slack_id, outcome.text, kind="request", log=False)
@@ -456,9 +467,9 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             return
         approved = action["action_id"] == "request.approve"
         if approved:
-            outcome = engine.approve(action["value"], f"<@{admin}>")
+            outcome = engine.approve(action["value"], name_of(admin))
         else:
-            outcome = engine.deny(action["value"], f"<@{admin}>")
+            outcome = engine.deny(action["value"], name_of(admin))
         text = outcome.text
         # Held for the administrators in their channel (English, no mention); for an owner, in a DM (D...).
         if not body["channel"]["id"].startswith("D"):
@@ -540,7 +551,8 @@ def data_rounds(dms, data, cfg, slack_of):
             )
         elif event == "failed_removal":
             text, blocks = mentioning(cfg["admin_mention"], data_blocks.failed_removal_admin(path, error), [])
-            dms.post(channels["admin"], text, blocks, cls="notice")
+            dms.post(channels["admin"], text, blocks, cls="action", key=f"data not removed {key} {error}",
+                     repeat=DATA_FAILED_REPEAT)  # fmt: skip
 
     def round_():
         with state.locked(settings["seen"], {}) as seen:

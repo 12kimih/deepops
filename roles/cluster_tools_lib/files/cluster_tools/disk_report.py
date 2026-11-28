@@ -1,10 +1,11 @@
 """disk_report: the daily disk usage report, from the disk quota metrics.
 
     data = collect(prometheus, now)        -> what every counted filesystem holds, or None
-    (text, blocks), thread = render(data, who, people=..., mention=..., fill=...)
+    (text, blocks), thread = render(data, people=..., holds=..., fill=...)
     fill_rows(data, fraction, people, n)   -> [(disk key, fill, [(user, used)])] of the
                                               filesystems at least FRACTION full
     fill_key(disk key)                     -> the key of a filesystem's fill notice
+    fill_dm_text(disk key, fill, used)     -> its DM to one of the largest people
     over_warn(data)                        -> the people past a warn level, with figures
     row_key(row)                           -> the key of a person's notices (cluster_tools.notices)
     purge = collect_purge(prometheus)      -> each person's files the scratch cleanup lists
@@ -17,13 +18,13 @@ day's growth and their levels, and everyone else (root, the services, people who
 in a table of their own; the
 projects (directory trees with one limit). Everyone past a warn level is named: the
 warn level only notifies, and the hard limit is the one the kernel enforces, at once.
-A person is told (mentioned, or sent a DM) when they first pass a level, every day at
-a hard limit, and again every repeat_days while past the same warn level; the card
-lists everyone past a level every day. A filesystem at least the fill fraction full
-names its largest people on the card every day, with a mention when its fill notice is
+A person is told by DM when they first pass a level, every day at a hard limit, and
+again every repeat_days while past the same warn level; the card names everyone past a
+level every day, as text, never a mention. A filesystem at least the fill fraction full
+names its largest people on the card every day, each told by DM when its fill notice is
 due (cluster_tools.notices: at most every repeat_days). The thread lists each
 filesystem's folders worth cleaning (cluster_tools.cleanup's metrics: unused past the
-stale period, the largest and longest unused first), never with a mention. It reads
+stale period, the largest and longest unused first). It reads
 Prometheus and changes nothing;
 cluster_tools.usage_report --disk posts it.
 Python 3.9 or newer, standard library only.
@@ -33,10 +34,15 @@ from datetime import datetime
 
 from . import cards, rules
 from .render import size
-from .cards import gauges
-from .slack import bar, pages, table
+from .slack import bar, escape, pages, table
 
 DAY = 86400
+# The card's and the thread's titles, nouns (the glossary's title forms; owner 2026-11-28).
+PAST_TITLE = "경고 수준 초과 사용량"
+PROJECTS_TITLE = "경고 수준 초과 프로젝트"
+FILL_TITLE = "여유 공간 부족"
+CLEANUP_TITLE = "정리 후보 폴더"
+OTHERS_TITLE = "명부 외 계정"
 # When a host's usage is older than this, the report says so (the alert fires at an hour).
 STALE = 3600
 # A daily timer runs a little earlier or later each day: a notice due every N days may
@@ -241,19 +247,6 @@ def change(now, before):
     return "0" if abs(d) < 1024**2 else ("+" if d > 0 else "") + size(d)
 
 
-DISK_HEADER = ("위치", "사용", "크기", "남음", "하루 사이")
-
-
-def disk_row(key, disk):
-    """A disk's row of the card's gauge table (DISK_HEADER): how full, its size, what is
-    free and how its use changed in a day; dashes without figures (node_exporter)."""
-    if not disk["size"] or disk["avail"] is None:
-        return (where(*key), bar(None), "-", "-", "수치 없음")
-    used = disk["size"] - disk["avail"]
-    day = change(used, disk["size"] - disk["avail_before"]) if disk["avail_before"] is not None else "-"
-    return (where(*key), bar(100 * used / disk["size"]), size(disk["size"]), size(disk["avail"]), day)
-
-
 def _level(entry, kind):
     return size(entry[kind]) if entry[kind] else "-"
 
@@ -303,53 +296,66 @@ def hold_note(holds, entry):
     return f"{starts_text(entry)}는 한도에 닿아 있는 동안 새 Slurm 잡을 제출할 수 없습니다"
 
 
-def past_line(row, who, mention=True, note=""):
-    place, amount, state, hard = describe(row)
+def past_line(row, note=""):
+    """A person past a level on the card, named as text (a record never mentions)."""
+    _, amount, state, hard = describe(row)
     if hard and note:
         state += f". {note}"
-    return f"{cards.mark('act' if hard else 'warn')}{who(row[2], mention)} {place}에서: {amount}, {state}"
+    return f"- {cards.mark('act' if hard else 'warn')}{escape(row[2])}: {amount}, {state}"
 
 
-def render(data, who, *, people=(), mention=None, holds=False, fill=None, fill_mention=(), stale_days=0):
-    """The summary card (text, blocks) and the thread [(text, blocks)]: every disk and
-    everyone past a level on the card; each filesystem's people, every one, everyone else, the
-    projects and the folders worth cleaning in the thread. With no PEOPLE (no roster)
-    every user is ranked. Of those past a level, the keys in MENTION (row_key) are
-    mentioned; None mentions them all. HOLDS (hold_note) says what a hard limit means for
-    their Slurm jobs. FILL (fill_rows) names the largest people of each fuller
-    filesystem, mentioned where its fill_key is in FILL_MENTION."""
+def disk_line(disk):
+    """A disk's gauge and figures on one line: how full, what is free of its size, the
+    day's change; "수치 없음" without node_exporter's figures."""
+    if not disk["size"] or disk["avail"] is None:
+        return f"`{bar(None)}` 수치 없음"
+    used = disk["size"] - disk["avail"]
+    line = f"`{bar(100 * used / disk['size'])}` {size(disk['avail'])} 남음 (크기 {size(disk['size'])})"
+    if disk["avail_before"] is not None:
+        line += f", 하루 사이 {change(used, disk['size'] - disk['avail_before'])}"
+    return line
+
+
+def fill_of(disk):
+    """How full DISK is (0-1), None without figures."""
+    if not disk["size"] or disk["avail"] is None:
+        return None
+    return (disk["size"] - disk["avail"]) / disk["size"]
+
+
+def render(data, *, people=(), holds=False, fill=None, stale_days=0):
+    """The summary card (text, blocks) and the thread [(text, blocks)]. The card has a
+    part per filesystem: its gauge, everyone past a level there and, when it is at least
+    the fill fraction full, its largest people (FILL: fill_rows), each a bullet named as
+    text: the status channel is a public record and never mentions anyone (decision 12,
+    2026-11-28; the people are told by DM). Then the projects past a level. HOLDS
+    (hold_note) says what a hard limit means for Slurm jobs. The thread holds each
+    filesystem's people, every one, everyone else, the projects and the folders worth
+    cleaning. With no PEOPLE (no roster) every user is ranked."""
     stamp = datetime.fromtimestamp(data["now"]).strftime("%Y-%m-%d")
     rows = over_warn(data)
-    full = []
-    for key, disk in data["disks"].items():
-        if disk["size"] and disk["avail"] is not None:
-            full.append(f"{where(*key)} {100 * (disk['size'] - disk['avail']) / disk['size']:.0f}%")
+    filling = {key: users for key, _, users in fill or ()}
+    full = [f"{where(*k)} {100 * f:.0f}%" for k, d in data["disks"].items() if (f := fill_of(d)) is not None]
     text = f"디스크 사용량 {stamp}: " + (", ".join(full) or "디스크 수치 없음")
     if rows:
-        text += f", 경고 수준을 넘은 사용량 {len(rows)}건"
-    card = [cards.title("디스크 사용량", stamp)]
-    card += cards.part("디스크", gauges(DISK_HEADER, [disk_row(k, d) for k, d in data["disks"].items()]))
-    if rows:
-        card += cards.part(
-            "경고 수준을 넘은 사용량",
-            "\n".join(
-                past_line(r, who, mention is None or row_key(r) in mention, hold_note(holds, r[3]))
-                for r in rows
-            ),
+        text += f", 경고 수준 초과 {len(rows)}건"
+    card = [cards.title("디스크 사용량", stamp, report=True)]
+    for key, disk in data["disks"].items():
+        mine = [r for r in rows if tuple(r[:2]) == tuple(key)]
+        frac = fill_of(disk)
+        lines = [disk_line(disk)]
+        if mine:
+            lines += [f"**{PAST_TITLE}**", *(past_line(r, hold_note(holds, r[3])) for r in mine)]
+        if key in filling:
+            lines += [f"**{FILL_TITLE}** ({100 * frac:.0f}% 사용, 가장 많이 쓰는 분)"]
+            lines += [f"- {escape(u)}: {size(used)}" for u, used in filling[key]]
+        state = (
+            "act" if any(r[4][0][3] == "hard" for r in mine) else ("warn" if mine or key in filling else "")
         )
+        card += cards.part(where(*key), "\n".join(lines), state)
     shared = projects_past(data)
     if shared:
-        card += cards.part("경고 수준을 넘은 프로젝트", "\n".join(shared))
-    if fill:
-        card += cards.part(
-            "가득 차 가는 공간",
-            "가장 많이 쓰시는 분들께 부탁드립니다. 비울 수 있는 것을 비워 주세요.\n"
-            + "\n".join(
-                f"{cards.mark('warn')}**{where(*key)}** {100 * frac:.0f}% 사용 중: "
-                + ", ".join(f"{who(u, fill_key(key) in fill_mention)} {size(used)}" for u, used in users)
-                for key, frac, users in fill
-            ),
-        )
+        card += cards.part(PROJECTS_TITLE, "\n".join(shared))
     stale = sorted(
         f"{h} (마지막 {datetime.fromtimestamp(t).strftime('%m-%d %H:%M')})"
         for h, t in data["reported"].items()
@@ -359,6 +365,8 @@ def render(data, who, *, people=(), mention=None, holds=False, fill=None, fill_m
     announced = sorted({starts_text(e) for e in data["users"].values() if e["hard"] and not enforced(e)})
     if announced:
         notes.append(f"아직 적용되지 않은 한도는 {', '.join(announced)} 적용되니, 그전에 공간을 비워 주세요.")
+    if fill:
+        notes.append("여유 공간이 부족한 곳은 가장 많이 쓰시는 분들께 DM으로 부탁드립니다.")
     if stale:
         notes.append(f"최근 보고가 없어 예전 수치입니다: {', '.join(stale)}.")
     card.append(cards.note(" ".join(notes)))
@@ -381,16 +389,17 @@ def render(data, who, *, people=(), mention=None, holds=False, fill=None, fill_m
                 for u, e in mine
             ]
             detail += cards.part(
-                f"{where(*key)}: {count(len(mine))}, 많이 쓰는 순",
+                f"{where(*key)} 사용자별 사용량 ({count(len(mine))})",
                 table(("사용자", "사용량", "하루", "경고", "한도"), body),
             )
         if others:
             body = [(u, size(e["used"]), change(e["used"], e["before"])) for u, e in others]
             total = size(sum(e["used"] for _, e in others))
             detail += cards.part(
-                f"{where(*key)}: 명부에 없는 계정 (root, 서비스, 떠난 분) {len(others)}개, 합계 {total}",
+                f"{where(*key)} {OTHERS_TITLE} ({len(others)}개, 합계 {total})",
                 table(("계정", "사용량", "하루"), body),
             )
+            detail.append(cards.note("명부에 없는 계정: root, 서비스 계정, 떠난 분의 계정입니다."))
     if data["projects"]:
         body = [
             (
@@ -403,18 +412,24 @@ def render(data, who, *, people=(), mention=None, holds=False, fill=None, fill_m
             )
             for (h, f, p), e in sorted(data["projects"].items())
         ]
+        detail += cards.part("프로젝트", table(("프로젝트", "위치", "사용량", "하루", "경고", "한도"), body))
+        detail.append(cards.note("프로젝트: 한도 하나를 함께 쓰는 디렉터리"))
+    for key, rows_ in sorted((data.get("cleanup") or {}).items()):
+        body = [(c["path"], c["user"], size(c["bytes"]), f"{c['unused_days']}일") for c in rows_]
         detail += cards.part(
-            "프로젝트 (한도 하나를 함께 쓰는 디렉터리)",
-            table(("프로젝트", "위치", "사용량", "하루", "경고", "한도"), body),
+            f"{where(*key)} {CLEANUP_TITLE}", table(("폴더", "주인", "크기", "안 쓴 기간"), body)
         )
-    for key, rows in sorted((data.get("cleanup") or {}).items()):
-        body = [(c["path"], c["user"], size(c["bytes"]), f"{c['unused_days']}일") for c in rows]
-        detail += cards.part(
-            f"{where(*key)}: 정리하면 좋을 폴더 ({stale_days}일 넘게 쓰지 않은 것, 크고 오래된 순)",
-            table(("폴더", "주인", "크기", "안 쓴 기간"), body),
-        )
+        detail.append(cards.note(f"{stale_days}일 넘게 쓰지 않은 폴더, 크고 오래된 순"))
     thread = pages("디스크 사용량 자세히", detail)
     return (text, card), thread
+
+
+def fill_dm_text(key, frac, used):
+    """The DM to one of the largest people of a filesystem at least the fill fraction full."""
+    return (
+        f"{where(*key)} 공간이 {100 * frac:.0f}% 찼습니다. 이곳을 가장 많이 쓰시는 분 가운데 한 분이라 알려 드립니다"
+        f" (지금 {size(used)}). 비울 수 있는 것을 비워 주세요.\n{HOW}"
+    )
 
 
 def dm_text(row, note=""):

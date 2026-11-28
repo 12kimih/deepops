@@ -30,7 +30,7 @@ def form(kinds):
                 "(압축 파일은 풀지 않습니다: 작은 파일이 많으면 공유 스토리지가 느려집니다)."),
             field("category", "종류", {"type": "static_select", "options": [_option(k) for k in kinds]}),
             field("name", "이름 (폴더 이름: 영문 소문자, 숫자, . _ -)", {"type": "plain_text_input", "max_length": 64}),
-            field("url", "공개된 https 주소", text),
+            field("url", "공개 https 주소", text),
             field("size", "크기 (예: 120G, 1.5T)", text),
             field("sha256", "sha256 (출처가 알려 주면)", text, optional=True),
             field("purpose", "용도", {"type": "plain_text_input", "multiline": True}),

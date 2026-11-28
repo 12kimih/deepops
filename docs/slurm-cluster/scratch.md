@@ -87,8 +87,7 @@ symbolic link and enters no other filesystem.
 
 - The same list is a file in your directory, `/scratch/<login>/.purge-list` (date, size
   and path per line), rewritten every day and gone when nothing of yours is due.
-- The daily disk report sends you one DM for each new removal date, whatever the disk
-  report's own notices are set to (`slurm_usage_report_disk_notify`): how many files, how
+- The daily disk report sends you one DM for each new removal date: how many files, how
   much, the date, and that `usage disk` lists them.
 
 ### The rule

@@ -6,7 +6,6 @@ read the same way (owner, 2026-11-27: "structured, eye-catching, easy to read").
                                   a usage report, emoji.REPORT first)
     part(label, body, state)   -> rich text: a short bold label (its state's mark first), the body
     facts(pairs)               -> a section of up to ten (label, value, state) side by side
-    gauges(header, rows)       -> a fixed-width table (slack.table) for a gauge column (slack.bar)
     note(text)                 -> small print: an explanation, never a list or a step
     step(text)                 -> the "what you can do" line, last; its command from cluster_tools.rules
     notice(rule_id, text)      -> (text, blocks) of a DM about a rule, titled with the rule's name
@@ -18,7 +17,6 @@ Python 3.9 or newer, standard library only.
 """
 
 from . import emoji, rich, rules
-from .slack import table
 
 MAX_FACTS = 10  # fields of one section (Slack)
 
@@ -47,11 +45,6 @@ def facts(pairs):
     if len(pairs) > MAX_FACTS:
         raise ValueError(f"{len(pairs)} facts: a section holds at most {MAX_FACTS}")
     return rich.fields(*(f"**{label}**\n{mark(state)}{value}" for label, value, state in pairs))
-
-
-def gauges(header, rows):
-    """ROWS under HEADER as one fixed-width table, so gauges (slack.bar) and figures line up."""
-    return table(header, rows)
 
 
 def note(text):

@@ -141,8 +141,9 @@ PUBLIC = {
         "idle_hours",
         "cancel_after_hours",
         "cancel_warn_hours",
-        "idle_notify",
         "leave_grace_days",
+        "shared_stale_days",
+        "shared_grace_days",
         "interactive_team_qos",
         "submit_holds",
         "submit_holds_disk",
@@ -210,8 +211,11 @@ POLICY = {
     "idle_hours": "slurm_usage_report_idle_hours",
     "cancel_after_hours": "slurm_usage_report_cancel_after_hours",
     "cancel_warn_hours": "slurm_usage_report_cancel_warn_hours",
-    "idle_notify": "slurm_usage_report_notify",  # mention (in the report thread), dm; [] none
     "leave_grace_days": "people_leave_grace_days",
+    # The shared data's cleanup (roles/shared_space): an entry no one read for
+    # shared_stale_days is announced, and removed shared_grace_days after.
+    "shared_stale_days": "shared_space_data_stale_days",
+    "shared_grace_days": "shared_space_data_grace_days",
     "submit_holds": "slurm_enable_submit_holds",  # past a membership's end, no submitting
     "submit_holds_disk": "submit_holds_disk",  # a person at a disk hard limit cannot submit
 }

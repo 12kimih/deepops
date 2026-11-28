@@ -262,27 +262,32 @@ pass with `sudo gpu-diag-idle run /etc/gpu-diag-idle.json --dry-run`; run one wi
 ## Slack usage report
 
 `playbooks/slurm-cluster/slurm-usage-report.yml` installs a systemd timer on the
-monitoring host that posts a GPU usage report to Slack every hour
-(`slurm_usage_report_schedule`). The top-level message is a summary card (GPUs allocated,
-average utilisation, jobs leaving their GPUs idle, pending jobs, drained nodes, and a
-link to `grafana_root_url`); the thread lists those jobs, drain/down nodes with
-reasons, pending jobs per user, and every running GPU job per user as a table with a
-utilisation bar and GPU memory.
+monitoring host that reports GPU usage to the status channel every hour
+(`slurm_usage_report_schedule`). The status channel is a public record that names people
+as text and never mentions anyone; a person is told only by DM (owner decision 12). Each
+day has one message ("GPU 사용 현황", kept by `cluster_tools.slack.keep`), edited every
+hour with the state now: GPUs allocated, average utilisation, the jobs leaving their GPUs
+idle by owner, drained and down nodes with reasons, pending jobs per user, each person's
+running GPUs, and a link to `grafana_root_url`. Each run adds one line to its thread:
+the hour, GPUs allocated and used, waiting jobs, and by name the owners of jobs leaving
+their GPUs idle, the jobs cancelled for it and the users of nodes whose I/O was heavy.
+The first run after midnight edits the last day's message once more into the day's
+summary ("일간 GPU 사용": peak and mean GPUs allocated, mean use, the jobs leaving their GPUs
+idle and each owner's idle GPU-hours, the cancellations).
 
 A job leaves its GPUs idle (named in Slack by `IDLE_JOB` in `cluster_tools.usage_report`)
 when it has run for `slurm_usage_report_idle_hours` and every GPU it holds stayed at or
 under `slurm_usage_report_idle_util_threshold` percent the whole time
-(DCGM `DCGM_FI_DEV_GPU_UTIL_RATIO`, shown in percent). `slurm_usage_report_notify` lists how its owner hears about
-it: `mention` in the report thread, `dm`, both, or `[]` for neither. Each person is told
-once for all such jobs (one line in the thread, one mention, one DM), when a job of
-theirs first turns idle and then every `slurm_usage_report_notify_repeat_hours` while any
-stays idle (0, the default: on every report); the thread lists those jobs either way.
+(DCGM `DCGM_FI_DEV_GPU_UTIL_RATIO`, shown in percent). Its owner gets one DM for all
+such jobs when a job of theirs first turns idle and then every
+`slurm_usage_report_notify_repeat_hours` while any stays idle (0, the default: on every
+report); the day message names them either way.
 `slurm_usage_report_cancel_after_hours` cancels any job, batch or interactive, whose GPUs
-sat idle that long (0 = never) and says so in the report thread. A job is cancelled only
-after its owner was told of it in an earlier report and warned
-`slurm_usage_report_cancel_warn_hours` ahead (one DM for all their jobs about to go), so
-the setting must exceed `slurm_usage_report_idle_hours` and needs
-`slurm_usage_report_notify`; the deploy checks the config and stops on a mistake.
+sat idle that long (0 = never), tells the owner by DM and names it in the hour's line. A
+job is cancelled only after its owner was told of it by DM in an earlier report and
+warned `slurm_usage_report_cancel_warn_hours` ahead (one DM for all their jobs about to
+go), so the setting must exceed `slurm_usage_report_idle_hours`; the deploy checks the
+config and stops on a mistake.
 
 Every Monday (`slurm_usage_report_weekly_schedule`) it also posts the week ("주간 GPU
 사용"): the GPU-hours jobs held and how many sat idle (at or under the idle threshold
@@ -290,24 +295,26 @@ for the minute), then the five people with the most GPU-hours and the five with 
 most idle hours, as plain names: it mentions no one. It touches no job; seeing the
 numbers is the point. Someone over both `slurm_usage_report_repeat_idle_gpu_hours`
 and `slurm_usage_report_repeat_idle_share` in each of `slurm_usage_report_repeat_weeks`
-weeks running is reported to the administrators' channel (`slack_channels.admin`) with each
-week's numbers, their jobs now and the steps to take. The weekly run is its own timer and
+weeks running is an administrators' action in their channel (`slack_channels.admin`, the
+group mentioned once a week at most) with each week's numbers, their jobs now and the
+steps to take. The weekly run is its own timer and
 keeps its own state file (`weekly.json` beside the hourly one's); `--weekly` with
 `--dry-run` or `--to` previews it.
 
 Every morning (`slurm_usage_report_disk_schedule`) it posts the day's disk usage, from
 the disk quota metrics ([disk-quota.md](../deepops/disk-quota.md); without them it posts
-nothing). The card has each counted filesystem's disk (how full, what is free, how the
-use changed in a day) and everyone past a warn level or at a hard limit, worst first.
+nothing). The card has a part per counted filesystem: its gauge (how full, what is
+free, how the use changed in a day), everyone past a warn level or at a hard limit there,
+worst first, and, when it is at least `cluster_disk_fill_fraction` full, its
+`slurm_usage_report_disk_fill_top` largest people, each named as text.
 The thread lists each filesystem's people, every one, largest first (the roster's active
 logins, `slurm_usage_report_people`), with their day's growth and levels; everyone else
 there (root, the services, people who left) in a table of their own; and the projects.
-The thread takes as many replies as Slack's limits need: no list is cut. `slurm_usage_report_disk_notify` says
-how the people past a level hear about it: `mention` on the card, `dm`, both, or `[]`.
-They are told when they first pass a level, every day while at a hard limit (their
-writes fail), and again every `slurm_usage_report_disk_repeat_days` while past the
-same warn level (0: every day); the card lists everyone past a level every day, mentioning
-only those told. Who was told when is kept in `disk.json` beside the hourly state.
+The thread takes as many replies as Slack's limits need: no list is cut. The people past
+a level get a DM when they first pass it, every day while at a hard limit (their writes
+fail), and again every `slurm_usage_report_disk_repeat_days` while past the same warn
+level (0: every day); a fuller filesystem's largest people get one at most every
+`slurm_usage_report_disk_repeat_days`. The card names everyone past a level every day. Who was told when is kept in `disk.json` beside the hourly state.
 A host whose usage was not reported in the last hour is named, since its figures are
 older. `--disk` with `--dry-run` or `--to` previews it.
 

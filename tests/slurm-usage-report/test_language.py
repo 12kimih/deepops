@@ -25,7 +25,7 @@ disk_fixture = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(disk_fixture)
 
 # Names, not words: what the cluster and its tools are called.
-NAMES = {"GPU", "QoS", "Slurm", "Grafana", "drain", "down", "node_exporter", "normal"}
+NAMES = {"GPU", "QoS", "Slurm", "Grafana", "DM", "drain", "down", "node_exporter", "normal"}
 FIXTURE = {
     "alice",
     "bob",
@@ -60,10 +60,6 @@ def strings(node):
     return node if isinstance(node, str) else ""
 
 
-def who(user, mention):
-    return f"<@U{user.upper()}>" if mention else user
-
-
 def a_job(jid, user, idle):
     return {"id": jid, "label": jid, "user": user, "gpus": [("n1", 0), ("n1", 1)], "gpu_type": "a10",
             "runtime": 9000, "qos": "normal", "util": 0.0 if idle else 50.0, "mem_gib": None, "mem_known": 0,
@@ -96,17 +92,23 @@ class Language(unittest.TestCase):
                 "reasons": [("n2", "drain", "2026-01-01T00:00:00", "root", "maintenance")],
                 "pending": {"carol": {"jobs": 1, "gpus": 2, "reasons": Counter({"Priority": 1}), "wait": 60}},
                 "dashboard_url": "https://grafana.example/"}  # fmt: skip
-        cfg = {"idle_util_threshold": 5, "idle_hours": 2, "notify": ["mention"], "cancel_after_hours": 6}
-        (text, summary), thread = report.render(data, cfg, who)
+        cfg = {"idle_util_threshold": 5, "idle_hours": 2, "cancel_after_hours": 6}
+        text, summary = report.status_card(data, cfg)
+        line = report.hour_line(data, jobs[:1], [("n1", ["carol"]), ("n2", [])])
+        thread = [(rich.plain(line), rich.blocks(line)), *report.details(data, cfg)]
+        sample = report.day_sample(data, jobs[:1])
+        day = report.day_summary("2026-11-28", [sample, sample], "https://grafana.example/")
         self.assertShown("card", (text, summary))
+        self.assertShown("day summary", day)
         for _, blocks in thread:
             self.assertShown("thread", blocks)
-        self.assertShown("cancel", report.cancelled_note(jobs[:1], cfg, who))
+        self.assertShown("cancel", report.cancelled_text(jobs[:1], cfg))
         self.assertKorean("text", text)
         self.assertKorean("card", strings(summary))
+        self.assertKorean("day summary", strings(day))
         for _, blocks in thread:
             self.assertKorean("thread", strings(blocks))
-        self.assertKorean("cancel", strings(report.cancelled_note(jobs[:1], cfg, who)))
+        self.assertKorean("cancel", report.cancelled_text(jobs[:1], cfg))
 
     def test_the_weekly_summary(self):
         rows = [{"user": "alice", "held": 120, "idle": 90}, {"user": "bob", "held": 10, "idle": 0}]
@@ -123,8 +125,10 @@ class Language(unittest.TestCase):
         for prom, holds in ((disk_fixture.site(), False), (disk_fixture.site(), True), (announced, True)):
             data = disk_report.collect(prom, disk_fixture.NOW)
             fill = disk_report.fill_rows(data, 0.7)
-            (text, card), thread = disk_report.render(data, who, people={"alice", "bob"}, holds=holds, fill=fill,
+            (text, card), thread = disk_report.render(data, people={"alice", "bob"}, holds=holds, fill=fill,
                                                       stale_days=60)  # fmt: skip
+            for key, frac, users in fill:
+                self.assertKorean("fill DM", disk_report.fill_dm_text(key, frac, users[0][1]))
             self.assertShown("disk card", (text, card))
             for _, blocks in thread:
                 self.assertShown("disk thread", blocks)

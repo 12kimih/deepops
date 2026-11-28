@@ -54,7 +54,7 @@ sys.modules.setdefault(
 from cluster_tools import rich  # noqa: E402
 from cluster_bot import app  # noqa: E402
 from cluster_tools import job_notice  # noqa: E402
-from cluster_tools.slack import CLASSES, MEMBER  # noqa: E402
+from cluster_tools.slack import CLASSES, MEMBER, mentions  # noqa: E402
 
 
 class DMs(FakeDM):
@@ -71,13 +71,19 @@ class DMs(FakeDM):
     def _send(self, channel, text, blocks=None):
         return "1.0"
 
-    def post(self, channel, text, blocks=None, thread_ts=None, metadata=None, *, cls=None):
+    def post(
+        self, channel, text, blocks=None, thread_ts=None, metadata=None, *, cls=None, key=None, repeat=None
+    ):
         """A channel post as cluster_tools.slack.Slack.post takes it: a top-level one
-        declares its class."""
-        if not thread_ts and cls not in CLASSES:
-            raise AssertionError(f"a top-level post to {channel} without a class")
-        self.posts.append({"channel": channel, **rich.message(text, blocks or None), "thread_ts": thread_ts,
-                           "cls": cls})  # fmt: skip
+        declares its class, none mentions a person, only an action (with its key and
+        repeat) mentions a group."""
+        msg = rich.message(text, blocks or None)
+        person, group = mentions(msg)
+        if (not thread_ts and cls not in CLASSES) or person or (group and cls != "action"):
+            raise AssertionError(f"a post to {channel} the library refuses: {cls} {msg['text']!r}")
+        if cls == "action" and not (key and repeat is not None):
+            raise AssertionError("an action without its key and repeat")
+        self.posts.append({"channel": channel, **msg, "thread_ts": thread_ts, "cls": cls, "key": key})
         return "1.0"
 
     def to(self, member):
@@ -169,7 +175,11 @@ class Handlers(unittest.TestCase):
                                "UALICE", "unban.submit")  # fmt: skip
         self.call("view", "unban.submit", body=body, view=view)
         posts = {p["channel"]: p for p in self.dms.posts}
-        self.assertEqual((posts["#admin"]["cls"], posts["#help"]["cls"]), ("notice", "answer"))
+        self.assertEqual((posts["#admin"]["cls"], posts["#help"]["cls"]), ("action", "answer"))
+        self.assertEqual(posts["#admin"]["key"], "held k1", "held once, by the request's key")
+        self.assertTrue(
+            posts["#help"]["text"].startswith("alice: "), "the person named as text, never mentioned"
+        )
         admin = posts["#admin"]
         self.assertTrue(admin["text"].startswith("<!subteam^SADMINS> "))
         self.assertEqual(
@@ -307,7 +317,7 @@ class Handlers(unittest.TestCase):
         self.call(
             "action", "request.approve", body=body, action={"action_id": "request.approve", "value": "k"}
         )
-        self.engine.approve.assert_called_once_with("k", "<@UBOSS>")
+        self.engine.approve.assert_called_once_with("k", "boss")
         # One of the people a request is held for (a project's owner) decides it too.
         self.engine.approve.reset_mock()
         self.engine.approvers.return_value = ["alice"]
@@ -315,7 +325,7 @@ class Handlers(unittest.TestCase):
         self.call(
             "action", "request.approve", body=body, action={"action_id": "request.approve", "value": "k"}
         )
-        self.engine.approve.assert_called_once_with("k", "<@UALICE>")
+        self.engine.approve.assert_called_once_with("k", "alice")
 
     def test_a_decision_reaches_the_asker_as_a_logged_notice_the_answer_to_asking_not(self):
         self.engine.submit.return_value = mock.Mock(status="held", text="held", key="k1", request={})

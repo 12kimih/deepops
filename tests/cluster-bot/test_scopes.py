@@ -26,7 +26,8 @@ class FakeSlack:
             raise Error(self.error)
         return set(self.granted)
 
-    def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
+    def post(self, channel, text, blocks=None, thread_ts=None, cls=None, key=None, repeat=None):
+        assert cls == "action" and key and repeat, "missing scopes are an administrators' action"
         self.posts.append((channel, text))
 
 
