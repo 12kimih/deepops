@@ -31,6 +31,19 @@ and keeps the full text in the thread, one reply per page, edited in place and t
 extra ones deleted. Without the history scopes (the app manifest not imported yet) it
 works from the record alone and says so.
 
+Every message in a channel goes through post(), and a top-level one says what it is
+(CLASSES): a message kept up to date (keep()), a day log's message (DailyLog), a
+scheduled report, a notice someone must act on, or the answer to a person's request; a
+reply is bounded by its parent and says nothing. A top-level post without a class is
+refused, so no tool can open a new stream of channel messages unnoticed (owner,
+2026-11-28: "nothing may flood a channel"). Each post is counted
+(slack_posts_total{sender, channel_role, class, place}, with counts; place top, thread
+or folded) for the budget alert (SlackChannelPostsHigh), and past POST_BUDGET top-level
+posts of the bot in a channel within the hour (read from Slack, every sender alike) the
+rest go in the thread of one message saying so (fold), so even a tool gone wrong posts
+at most one more top-level message an hour. PLACES ({channel: role}, slack_channels)
+names a channel's role, for the count and the fold's language (LANGUAGE).
+
 Every message to a person goes through dm(), never post(), which refuses a member ID: so
 each DM is in the journal (one "dm KIND LOGIN" line) and, unless sent with log=False,
 logged for the administrators (DmLog: in a daily thread of their channel, no mention,
@@ -86,6 +99,26 @@ BAR_WIDTH = 10
 DM_LOGGED = "cluster_dm_logged"
 # How often the count is read again after an edit, while another sender's edit races it.
 DM_LOG_RECOUNT = 3
+# What a top-level post in a channel is (post(cls=...)); a reply needs none.
+CLASSES = {
+    "kept": "a message kept up to date (keep(), a docs notice)",
+    "log": "a day log's message (DailyLog)",
+    "report": "a scheduled report (the GPU and disk reports)",
+    "notice": "a notice someone must act on, sent once per its key and repeat",
+    "answer": "the answer to a person's request (the cluster bot)",
+}
+# The bot's top-level posts in one channel within an hour past which the rest are folded
+# into one message's thread (post()); the budget alert fires at the same count.
+POST_BUDGET = 20
+# The language the cluster writes in each channel role (slack_channels) and in a DM
+# (owner, 2026-11-28): the administrators' channel all English, so it reads as one; every
+# place people read, Korean. A text copied into a log (a DM, a deleted message) stays as
+# it was sent. The tests hold every message to its place's language.
+LANGUAGE = {"admin": "en", "status": "ko", "help": "ko", "announce": "ko", "dm": "ko"}
+FOLD_TEXT = {
+    "en": "More than {n} messages within the hour: the rest of this hour's are in this thread.",
+    "ko": "한 시간에 메시지가 {n}개를 넘어, 이번 시간의 나머지는 이 스레드에 있습니다.",
+}
 
 
 class Error(RuntimeError):
@@ -128,8 +161,7 @@ class DailyLog:
         found = find(slack, cid, key, oldest=start)
         if found:
             return min(found, key=float)
-        mine = slack.call("chat.postMessage", channel=cid, text=self.title(day, 0),
-                          metadata=json.dumps(marked(key)))["ts"]  # fmt: skip
+        mine = slack.post(cid, self.title(day, 0), metadata=marked(key), cls="log")
         oldest = min(find(slack, cid, key, oldest=start) + [mine], key=float)
         if oldest != mine:
             delete(slack, cid, mine)
@@ -169,12 +201,13 @@ def _day_start(now):
 
 
 class DmCounts:
-    """What a sender's DMs came to, for Prometheus: the textfile PATH (every sender's in
-    node_exporter_unprivileged_dir, root's and the service accounts' alike) holds
-    slack_dm_messages_total{sender, kind, result} (result: sent, failed, log_failed) and,
+    """What a sender's DMs and posts came to, for Prometheus: the textfile PATH (every
+    sender's in node_exporter_unprivileged_dir, root's and the service accounts' alike)
+    holds slack_dm_messages_total{sender, kind, result} (result: sent, failed,
+    log_failed), slack_posts_total{sender, channel_role, class, place} (Slack.post) and,
     for a sender that runs on a timer, slack_dm_last_success_timestamp_seconds{sender}: its last
     run, so a sender that stops shows (SlackDmSenderStale). A count that cannot be
-    written is said on stderr and never stops the DM."""
+    written is said on stderr and never stops the message."""
 
     RESULTS = ("sent", "failed", "log_failed")
 
@@ -183,6 +216,10 @@ class DmCounts:
 
     def add(self, kind, result):
         self._write(add={key("slack_dm_messages_total", sender=self.sender, kind=kind, result=result): 1})
+
+    def posted(self, role, cls, place):
+        name = key("slack_posts_total", sender=self.sender, channel_role=role, **{"class": cls}, place=place)
+        self._write(add={name: 1})
 
     def ran(self, now=None):
         self._write(
@@ -201,9 +238,10 @@ class DmCounts:
 
 
 class Slack:
-    def __init__(self, token, dry_run=False, timeout=TIMEOUT, dm_log=None, counts=None):
+    def __init__(self, token, dry_run=False, timeout=TIMEOUT, dm_log=None, counts=None, places=None):
         self.token, self.dry_run, self.timeout, self.dm_log = token, dry_run, timeout, dm_log
         self.counts = counts  # DmCounts, or None
+        self.places = dict(places or {})  # {channel name or ID: role (slack_channels' key)}
 
     def call(self, method, **params):
         if self.dry_run and method != "users.lookupByEmail":
@@ -262,12 +300,69 @@ class Slack:
             print(params.get("text", ""))
         print()
 
-    def post(self, channel, text, blocks=None, thread_ts=None, metadata=None):
+    def post(self, channel, text, blocks=None, thread_ts=None, metadata=None, *, cls=None):
         """The message's ts. METADATA ({"event_type", "event_payload"}, Slack's message
-        metadata) marks what the message is, so the bot finds it again exactly."""
+        metadata) marks what the message is, so the bot finds it again exactly. A top-level
+        post says what it is (CLS, one of CLASSES) and past POST_BUDGET in the channel this
+        hour goes in the fold's thread; a reply (THREAD_TS) needs no class."""
         if MEMBER.fullmatch(channel):
             raise Error(f"Slack chat.postMessage: {channel} is a person; a message to a person is a dm()")
-        return self._send(channel, rich.message(text, blocks or None), thread_ts, metadata)
+        if not thread_ts and cls not in CLASSES:
+            raise Error(
+                f"Slack chat.postMessage to {channel}: a top-level post says what it is ({', '.join(CLASSES)})"
+            )
+        place = "thread" if thread_ts else "top"
+        if not thread_ts and cls != "log":  # a day log's message is one a day already
+            folded = self._fold(channel)
+            if folded:
+                thread_ts, place = folded, "folded"
+        ts = self._send(channel, rich.message(text, blocks or None), thread_ts, metadata)
+        if self.counts is not None and not self.dry_run:
+            self.counts.posted(self._role(channel), cls or "reply", place)
+        return ts
+
+    def _role(self, channel):
+        """CHANNEL's role (PLACES), its ID looked up by the names once; "other" unknown."""
+        if channel in self.places:
+            return self.places[channel]
+        if not channel.startswith("#") and any(c.startswith("#") for c in self.places):
+            ids = self.__dict__.setdefault("_place_ids", {})
+            if not ids:
+                for name, role in self.places.items():
+                    try:
+                        ids[channel_id(self, name) if name.startswith("#") else name] = role
+                    except Error:
+                        continue
+            return ids.get(channel, "other")
+        return "other"
+
+    def _fold(self, channel, now=None):
+        """The ts of this hour's fold in CHANNEL when the bot posted POST_BUDGET top-level
+        messages there within the hour (every sender: read from Slack), posted by this call
+        when needed; None below the budget, or when the channel or its history cannot be
+        read (the post goes on; the count and its alert still see it)."""
+        if self.dry_run:
+            return None
+        now = time.time() if now is None else now
+        try:
+            cid = channel_id(self, channel)
+            ids = own(self)
+            recent = [m for m in history(self, cid, oldest=now - 3600)
+                      if is_own(m, ids) and m.get("thread_ts", m.get("ts")) == m.get("ts")]  # fmt: skip
+            if len(recent) < POST_BUDGET:
+                return None
+            key = f"fold {time.strftime('%Y-%m-%d %H', time.localtime(now))}"
+            found = [m["ts"] for m in recent if _key(m) == (key, 0)]
+            if found:
+                return found[0]
+            text = FOLD_TEXT[LANGUAGE.get(self._role(channel), "en")].format(n=POST_BUDGET)
+            ts = self._send(cid, rich.message(text), None, marked(key))
+        except Error as e:
+            print(f"slack: {channel}: posts not folded: {e}", file=sys.stderr)
+            return None
+        if self.counts is not None:
+            self.counts.posted(self._role(channel), "fold", "top")
+        return ts
 
     def _send(self, channel, msg, thread_ts=None, metadata=None):
         """Post MSG (rich.message: {"text", "blocks"}) as it is; its ts."""
@@ -652,7 +747,7 @@ def keep(slack, channel, key, card, thread=(), record=None, *, legacy=None, pin=
     def post_card(why=""):
         if why:
             log(f"{key}: the message {record.get('ts')} {why}; posting it again")
-        ts = slack.post(cid, card[0], card[1], metadata=marked(key))
+        ts = slack.post(cid, card[0], card[1], metadata=marked(key), cls="kept")
         _pin(ts)
         return {"ts": ts}
 

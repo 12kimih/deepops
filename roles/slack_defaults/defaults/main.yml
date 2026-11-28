@@ -14,7 +14,7 @@ slack_members: "{{ people | people_attr('slack') }}"
 slack_email_domain: ""
 
 # The channels by what they are for, and the language the cluster writes there
-# (cluster_tools.cards.LANGUAGE; a DM to a person is Korean):
+# (cluster_tools.slack.LANGUAGE; a DM to a person is Korean):
 #   status    what everyone may look at: the hourly and weekly GPU usage, storage (Korean)
 #   admin     what an administrator has to act on, and the day logs (English)
 #   help      where people ask for help and make requests (accounts, unbans, shared data) (Korean)

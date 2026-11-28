@@ -332,7 +332,7 @@ def apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log):
                 with state.locked(seen_path, {}) as seen:
                     seen[nid] = {"date": n["date"], "ts": a["ts"], "digest": n["digest"]}
             elif a["do"] == "post":
-                ts = slack.post(channel, n["text"], n["blocks"], metadata=metadata(nid))
+                ts = slack.post(channel, n["text"], n["blocks"], metadata=metadata(nid), cls="kept")
                 log(describe(a))
                 with state.locked(seen_path, {}) as seen:
                     seen[nid] = {"date": n["date"], "ts": ts, "digest": n["digest"]}
@@ -460,7 +460,7 @@ def main(argv=None):
     docs = cfg.get("notices") or {}
     if not (docs.get("url") and docs.get("channel")):
         parser.error(f"{args.config}: no notices url or channel")
-    slack = Slack(Path(cfg["bot_token_file"]).read_text().strip())
+    slack = Slack(Path(cfg["bot_token_file"]).read_text().strip(), places={docs["channel"]: "announce"})
     said = []
 
     def say(line):

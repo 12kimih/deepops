@@ -82,7 +82,7 @@ def run(cfg, slack, out_dir, state_path, now):
         text = message(lacking, before, cfg.get("manifest", ""))
         if text:
             said, blocks = mentioning(cfg.get("admin_mention", ""), text)
-            slack.post(cfg["channels"]["admin"], said, blocks)
+            slack.post(cfg["channels"]["admin"], said, blocks, cls="notice")
         write_atomic(state, json.dumps({"reported": lacking}) + "\n", mode=0o600)
     return lacking
 
@@ -93,7 +93,7 @@ def main(argv=None):
         print(__doc__.splitlines()[2].strip(), file=sys.stderr)
         return 2
     cfg = json.loads(Path(argv[0]).read_text())
-    slack = Slack(Path(cfg["bot_token_file"]).read_text().strip())
+    slack = Slack(Path(cfg["bot_token_file"]).read_text().strip(), places={cfg["channels"]["admin"]: "admin"})
     try:
         lacking = run(cfg, slack, argv[1], argv[2], time.time())
     except Error as e:

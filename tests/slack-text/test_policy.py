@@ -1,6 +1,6 @@
 """What every Slack message the cluster sends holds to (owner, 2026-11-28):
 
-- Its language is its place's (cluster_tools.cards.LANGUAGE): the administrators' channel
+- Its language is its place's (cluster_tools.slack.LANGUAGE): the administrators' channel
   all English, the places people read Korean. A text copied into a log stays as sent.
 - An emoji only where cluster_tools.emoji puts one: no large circles, no pointer before
   every step, no icon before a log's title.
@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
-from cluster_bot import bans, bans_blocks, remove, scopes  # noqa: E402
+from cluster_bot import bans, bans_blocks, data_blocks, remove, scopes  # noqa: E402
 from cluster_bot import blocks as bot_blocks  # noqa: E402
 from cluster_bot.requests import Failed, Outcome  # noqa: E402
 from cluster_tools import cards, disk_report, emoji, io_report, rich, slack  # noqa: E402
@@ -79,6 +79,9 @@ def admin_messages():
         {"repeat_weeks": 2, "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5},
     )  # fmt: skip
     yield "scratch refresh", disk_report.burst_text(("n1", "alice"), 300)
+    yield "data log", data_blocks.log_title("2026-11-28", 1)
+    yield "data log entry", data_blocks.removed_admin("/home/shared/datasets/x", 60, 14)
+    yield "data not removed", data_blocks.failed_removal_admin("/home/shared/datasets/x", "SSH failed")
 
 
 def korean_messages():
@@ -95,8 +98,8 @@ def korean_messages():
 
 class Language(unittest.TestCase):
     def test_the_places_languages_are_named_once(self):
-        self.assertEqual(cards.LANGUAGE["admin"], "en")
-        self.assertEqual({cards.LANGUAGE[r] for r in ("status", "help", "announce", "dm")}, {"ko"})
+        self.assertEqual(slack.LANGUAGE["admin"], "en")
+        self.assertEqual({slack.LANGUAGE[r] for r in ("status", "help", "announce", "dm")}, {"ko"})
 
     def test_the_administrators_channel_is_english(self):
         for name, message in admin_messages():

@@ -59,6 +59,26 @@ def notice_dm(path, stale_days, removal):
     return text, [rich.section(text)]
 
 
+# The administrators' day log of the removed entries (cluster_tools.slack.DailyLog): its
+# key and its replies' event_type. A record, not a notice: nobody has to act on it.
+LOG, LOGGED = "data-log", "cluster_data_logged"
+
+
+def log_title(day, count):
+    """The data log's day message (English: the administrators' channel)."""
+    return f"Data log {day}: {count} shared entries removed (each in the thread)"
+
+
+def removed_admin(path, stale_days, grace_days):
+    """The data log's line on a removed entry (English)."""
+    return f"Removed {path}: no file read in {stale_days} days, nor within {grace_days} days of the notice"
+
+
+def failed_removal_admin(path, error):
+    """The administrators' notice of an entry that could not be removed (English)."""
+    return f"Shared data not removed: {path}: {error}"
+
+
 def removed(path, stale_days, grace_days):
     return (f"{path}을(를) 정리했습니다: {stale_days}일 동안 아무도 쓰지 않았고, "
             f"알림 뒤 {grace_days}일 안에도 쓰지 않았습니다.")  # fmt: skip

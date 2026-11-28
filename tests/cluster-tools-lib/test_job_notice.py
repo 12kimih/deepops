@@ -27,7 +27,7 @@ class FakeSlack(FakeDM):
     def dm_channel(self, member):
         return "D" + member
 
-    def post(self, channel, text, blocks=None, thread_ts=None):
+    def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
         FakeSlack.calls.append(("post", channel, text))
         return f"ts{len(FakeSlack.calls)}"
 

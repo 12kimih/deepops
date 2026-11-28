@@ -26,7 +26,7 @@ class FakeSlack:
             raise Error(self.error)
         return set(self.granted)
 
-    def post(self, channel, text, blocks=None):
+    def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
         self.posts.append((channel, text))
 
 

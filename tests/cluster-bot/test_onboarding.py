@@ -23,7 +23,7 @@ class DMs(FakeDM):
     def __init__(self):
         self.posts = []
 
-    def post(self, channel, text, blocks=None):
+    def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
         self.posts.append((channel, text))
         return "1.0"
 

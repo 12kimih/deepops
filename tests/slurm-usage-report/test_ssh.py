@@ -62,7 +62,7 @@ class Run(unittest.TestCase):
             def __init__(self, *_, **__):
                 pass
 
-            def post(self, channel, text, blocks=None, thread_ts=None):
+            def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
                 posted.append((channel, text))
                 return "ts"
 

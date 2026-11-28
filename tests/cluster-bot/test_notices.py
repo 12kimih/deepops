@@ -71,7 +71,7 @@ class FakeSlack:
             return pins_call(self.pins, method, p)
         return {"ok": True}
 
-    def post(self, channel, text, blocks=None, metadata=None):
+    def post(self, channel, text, blocks=None, metadata=None, cls=None):
         if text in self.fail:
             raise RuntimeError("slack down")
         self.n += 1

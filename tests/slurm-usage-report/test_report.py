@@ -331,7 +331,7 @@ class RunTests(unittest.TestCase):
             def __init__(self, *_, **__):
                 pass
 
-            def post(self, channel, text, blocks=None, thread_ts=None):
+            def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
                 if channel == "UBOB":
                     raise RuntimeError("Slack chat.postMessage failed: channel_not_found")
                 posted.append(channel)

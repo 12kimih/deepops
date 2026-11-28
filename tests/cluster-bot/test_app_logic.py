@@ -24,7 +24,7 @@ class Client(FakeDM):
     def __init__(self, fail=False):
         self.sent, self.fail = [], fail
 
-    def post(self, channel, text, blocks=None):
+    def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
         if self.fail:
             raise RuntimeError("Slack is down")
         self.sent.append({"channel": channel, "text": text, "blocks": blocks})

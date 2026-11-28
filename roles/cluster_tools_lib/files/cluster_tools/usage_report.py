@@ -455,10 +455,12 @@ def client(cfg, args):
     """The Slack client of a run: its DMs logged for the administrators in a daily thread
     of dm_log_channel (cluster_tools.slack.DmLog), the one every sender shares, read
     from Slack (no channel, not logged), and counted in the textfile dm_metrics
-    (cluster_tools.slack.DmCounts; none, not counted)."""
+    (cluster_tools.slack.DmCounts; none, not counted), its posts by channel role."""
     dm_log = DmLog(cfg["dm_log_channel"]) if cfg["dm_log_channel"] else None
     counts = DmCounts(cfg["dm_metrics"], SENDER) if cfg.get("dm_metrics") else None
-    return Slack(cfg["slack_token"], args.dry_run, dm_log=dm_log, counts=counts)
+    places = {c: role for c, role in ((cfg.get("channel"), "status"), (cfg.get("admin_channel"), "admin"),
+                                      (cfg.get("dm_log_channel"), "admin")) if c}  # fmt: skip
+    return Slack(cfg["slack_token"], args.dry_run, dm_log=dm_log, counts=counts, places=places)
 
 
 def preview_channel(slack, to):
@@ -469,9 +471,9 @@ def preview_channel(slack, to):
     return slack.dm_channel(to) if MEMBER.fullmatch(to) else to
 
 
-def to_channel(slack, to, channel, text, blocks=None):
+def to_channel(slack, to, channel, text, blocks=None, *, cls):
     """Post TEXT to the --to preview target, else to CHANNEL."""
-    slack.post(preview_channel(slack, to) or channel, text, blocks)
+    slack.post(preview_channel(slack, to) or channel, text, blocks, cls=cls)
 
 
 # --- Main -----------------------------------------------------------------------
@@ -742,14 +744,14 @@ def weekly(cfg, args):
     weeks = state.get("weeks", {})
     preview = args.dry_run or bool(args.to)
     text, blocks = render_week(rows, cfg["idle_util_threshold"])
-    to_channel(slack, args.to, cfg["channel"], text, blocks)
+    to_channel(slack, args.to, cfg["channel"], text, blocks, cls="report")
     remember_week(weeks, rows, now)
     heavy = repeaters(weeks, cfg)
     if heavy and (cfg["admin_channel"] or args.to):
         text, blocks = mentioning(
             cfg["admin_mention"], *render_repeaters(heavy, weeks, collect_slurm(now)["jobs"], cfg)
         )
-        to_channel(slack, args.to, cfg["admin_channel"], text, blocks)
+        to_channel(slack, args.to, cfg["admin_channel"], text, blocks, cls="notice")
     if not preview:
         write_atomic(path, json.dumps({"weeks": weeks}), mode=0o600)
 
@@ -770,7 +772,7 @@ def side_state(cfg, name):
 
 def post_thread(slack, channel, card, thread):
     """Post the card (text, blocks) and its thread [(text, blocks)]; the card's ts."""
-    ts = slack.post(channel, *card)
+    ts = slack.post(channel, *card, cls="report")
     for t, blocks in thread:
         slack.post(channel, t, blocks, thread_ts=ts)
     return ts
@@ -866,7 +868,7 @@ def io(cfg, args):
     failures = []
     if args.to:
         if hot:
-            to_channel(slack, args.to, "", io_report.admin_text(hot))
+            to_channel(slack, args.to, "", io_report.admin_text(hot), cls="notice")
         return
     for item, rank, user in people:
         key = io_report.user_key(item, user)
@@ -953,7 +955,7 @@ def ssh(cfg, args):
                                         int(window.get(host, 0) // 60), until=until)))  # fmt: skip
     if args.to:
         for _, _, text in texts:
-            to_channel(slack, args.to, "", text)
+            to_channel(slack, args.to, "", text, cls="notice")
         return
     failures = []
     preview = args.dry_run
@@ -999,7 +1001,9 @@ def purge_notices(cfg, slack, cache, state, now, preview):
             elif key in bursts and cfg["admin_channel"]:
                 k, n = bursts[key]
                 slack.post(
-                    cfg["admin_channel"], *mentioning(cfg["admin_mention"], disk_report.burst_text(k, n))
+                    cfg["admin_channel"],
+                    *mentioning(cfg["admin_mention"], disk_report.burst_text(k, n)),
+                    cls="notice",
                 )
                 told[key] = int(now)
         except (RuntimeError, OSError) as e:

@@ -54,20 +54,30 @@ sys.modules.setdefault(
 from cluster_tools import rich  # noqa: E402
 from cluster_bot import app  # noqa: E402
 from cluster_tools import job_notice  # noqa: E402
-from cluster_tools.slack import MEMBER  # noqa: E402
+from cluster_tools.slack import CLASSES, MEMBER  # noqa: E402
 
 
 class DMs(FakeDM):
     """The bot's DM sender: each DM as (member, text, blocks, kind, login, log)."""
 
     def __init__(self):
-        self.sent = []
+        self.sent, self.posts = [], []
 
     def dm(self, member, text, blocks=None, *, kind, login, log=True):
         self.sent.append((member, text, blocks, kind, login, log))
-        return super().dm(member, text, blocks, kind=kind, login=login, log=log)
+        channel = self.dm_channel(member)
+        return channel, self._send(channel, text, blocks)
 
-    def post(self, channel, text, blocks=None):
+    def _send(self, channel, text, blocks=None):
+        return "1.0"
+
+    def post(self, channel, text, blocks=None, thread_ts=None, metadata=None, *, cls=None):
+        """A channel post as cluster_tools.slack.Slack.post takes it: a top-level one
+        declares its class."""
+        if not thread_ts and cls not in CLASSES:
+            raise AssertionError(f"a top-level post to {channel} without a class")
+        self.posts.append({"channel": channel, **rich.message(text, blocks or None), "thread_ts": thread_ts,
+                           "cls": cls})  # fmt: skip
         return "1.0"
 
     def to(self, member):
@@ -104,10 +114,11 @@ class Handlers(unittest.TestCase):
         self.addCleanup(self.no_dm_bypasses_the_sender)
 
     def no_dm_bypasses_the_sender(self):
-        """The bot's own client posts to channels only: every DM is cluster_tools.slack's
-        dm(), which logs the notices for the administrators."""
-        to = [c.kwargs["channel"] for c in self.client.chat_postMessage.call_args_list]
-        self.assertEqual([c for c in to if MEMBER.fullmatch(c)], [], "a DM sent around Slack.dm()")
+        """Every message goes through cluster_tools.slack: a DM through dm(), which logs
+        the notices for the administrators, a channel post through post(), declared and
+        counted; the bot's own client posts nothing."""
+        self.client.chat_postMessage.assert_not_called()
+        self.assertEqual([p for p in self.dms.posts if MEMBER.fullmatch(p["channel"])], [], "a DM as a post")
 
     def call(self, kind, name, **kw):
         """As Bolt calls a listener: only the arguments it declares."""
@@ -154,11 +165,11 @@ class Handlers(unittest.TestCase):
 
     def test_a_request_held_for_the_administrators_mentions_them_there_only(self):
         self.engine.submit.return_value = mock.Mock(status="held", text="held", key="k1", request={})
-        self.client.chat_postMessage.return_value = {"ts": "1.0", "channel": "C"}
         body, view = submitted({"ip": {"v": {"value": "192.0.2.1"}}, "reason": {"v": {"value": None}}},
                                "UALICE", "unban.submit")  # fmt: skip
         self.call("view", "unban.submit", body=body, view=view)
-        posts = {c.kwargs["channel"]: c.kwargs for c in self.client.chat_postMessage.call_args_list}
+        posts = {p["channel"]: p for p in self.dms.posts}
+        self.assertEqual((posts["#admin"]["cls"], posts["#help"]["cls"]), ("notice", "answer"))
         admin = posts["#admin"]
         self.assertTrue(admin["text"].startswith("<!subteam^SADMINS> "))
         self.assertEqual(
@@ -184,13 +195,26 @@ class Handlers(unittest.TestCase):
             say("done", "datasets/coco", {"requester": "alice"})
 
         shared = mock.Mock(root="/home/shared")
-        with mock.patch.object(app, "data_watch", watch):
-            app.data_rounds(self.client, self.dms, shared, cfg, {"alice": "UALICE"}.get)()
+        logged = []
+
+        class Log:
+            """The administrators' data log (cluster_tools.slack.DailyLog)."""
+
+            def __init__(self, channel, key, title, kind):
+                self.channel = channel
+
+            def record(self, slack, entry):
+                logged.append((self.channel, entry[0][0]))
+
+        with mock.patch.object(app, "data_watch", watch), mock.patch.object(app, "DailyLog", Log):
+            app.data_rounds(self.dms, shared, cfg, {"alice": "UALICE"}.get)()
         self.assertEqual([(k, who, log) for *_, k, who, log in self.dms.to("UALICE")],
                          [("data-unused", "alice", True), ("data-removed", "alice", True), ("data-done", "alice", True)])  # fmt: skip
-        # Use is read from the files: the notice has nothing to press, and no channel post.
-        self.client.chat_postMessage.assert_called_once()  # the removal, to the administrators
-        self.assertEqual(self.client.chat_postMessage.call_args.kwargs["channel"], CFG["channels"]["admin"])
+        # Use is read from the files: the notice has nothing to press, and no channel post;
+        # the removal is a record in the administrators' day log, in English.
+        self.assertEqual(self.dms.posts, [])
+        self.assertEqual(logged, [(CFG["channels"]["admin"], "Removed /home/shared/datasets/coco: no file read in "
+                                   "60 days, nor within 14 days of the notice")])  # fmt: skip
 
     def test_data_opens_its_form_and_checks_it_before_a_request(self):
         shared = mock.Mock(kinds=["datasets", "models"], root="/home/shared")
@@ -296,7 +320,6 @@ class Handlers(unittest.TestCase):
     def test_a_decision_reaches_the_asker_as_a_logged_notice_the_answer_to_asking_not(self):
         self.engine.submit.return_value = mock.Mock(status="held", text="held", key="k1", request={})
         self.engine.approvers.return_value = ["boss"]  # held for a project's owner: buttons by DM
-        self.client.chat_postMessage.return_value = {"ts": "1.0", "channel": "C"}
         body, view = submitted({"ip": {"v": {"value": "192.0.2.1"}}, "reason": {"v": {"value": None}}},
                                "UALICE", "unban.submit")  # fmt: skip
         self.call("view", "unban.submit", body=body, view=view)

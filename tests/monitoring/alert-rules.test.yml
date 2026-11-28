@@ -1518,6 +1518,27 @@ tests:
               summary: "job-notice on ctl sent job DMs it could not log"
               description: "The DM reached the person, but the administrators' DM log thread does not show it. `journalctl -u job-notice*` on the host says why (the bot not in the log channel, the history scopes missing: ClusterBotScopeMissing)."
 
+  - name: more than 20 top-level posts in a channel within the hour warns, replies do not count
+    interval: 5m
+    input_series:
+      - series: 'slack_posts_total{host="ctl", instance="ctl:9100", sender="cluster-bot", channel_role="admin", class="notice", place="top"}'
+        values: '0+1x12 12+3x12'
+      - series: 'slack_posts_total{host="ctl", instance="ctl:9100", sender="cluster-bot", channel_role="admin", class="reply", place="thread"}'
+        values: '0+50x24'
+      - series: 'slack_posts_total{host="n1", instance="n1:9100", sender="slurm-usage-report", channel_role="admin", class="notice", place="folded"}'
+        values: '0x12 0+1x12'
+    alert_rule_test:
+      - eval_time: 1h
+        alertname: SlackChannelPostsHigh
+        exp_alerts: []
+      - eval_time: 2h
+        alertname: SlackChannelPostsHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, channel_role: admin}
+            exp_annotations:
+              summary: "More than 20 top-level Slack posts in the admin channel within the hour"
+              description: "A tool is flooding the channel; the rest of the hour is folded into one message's thread. `sum by (sender, class) (increase(slack_posts_total{channel_role=\"admin\"}[1h]))` names the sender and what it posts."
+
   - name: a sender on a timer that stops running warns
     interval: 10m
     input_series:

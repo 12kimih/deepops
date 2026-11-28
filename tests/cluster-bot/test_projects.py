@@ -145,7 +145,7 @@ class Deployed(unittest.TestCase):
         sent = []
 
         class DMs(FakeDM):
-            def post(self, channel, text, blocks=None):
+            def post(self, channel, text, blocks=None, thread_ts=None, cls=None):
                 sent.append((channel, text))
                 return "1.0"
 

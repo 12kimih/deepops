@@ -21,11 +21,6 @@ from . import emoji, rich, rules
 from .slack import table
 
 MAX_FACTS = 10  # fields of one section (Slack)
-# The language the cluster writes in each channel role (slack_channels) and in a DM
-# (owner, 2026-11-28): the administrators' channel all English, so it reads as one; every
-# place people read, Korean. A text copied into a log (a DM, a deleted message) stays as
-# it was sent. The tests hold every message to its place's language.
-LANGUAGE = {"admin": "en", "status": "ko", "help": "ko", "announce": "ko", "dm": "ko"}
 
 
 def mark(state):

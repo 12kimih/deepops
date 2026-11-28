@@ -155,7 +155,15 @@ class FakeChannel:
             return {"ok": True, "ts": ts, "channel": self.cid(p["channel"])}
         return {"ok": True}
 
-    def post(self, channel, text, blocks=None, thread_ts=None, metadata=None):
+    def post(self, channel, text, blocks=None, thread_ts=None, metadata=None, *, cls=None):
+        from cluster_tools.slack import CLASSES, Error
+
+        if not thread_ts and cls not in CLASSES:  # as cluster_tools.slack.Slack.post refuses
+            raise Error(f"Slack chat.postMessage to {channel}: a top-level post says what it is")
+        return self.wire(channel, text, blocks, thread_ts, metadata)
+
+    def wire(self, channel, text, blocks=None, thread_ts=None, metadata=None):
+        """chat.postMessage itself, below Slack.post's rule: what Slack._send sends."""
         ts = self.add(text, channel, metadata=metadata, thread_ts=thread_ts, blocks=blocks)
         self.log.append(("post", text))
         return ts

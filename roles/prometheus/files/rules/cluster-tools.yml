@@ -31,6 +31,20 @@ groups:
             The DM reached the person, but the administrators' DM log thread does not show
             it. `journalctl -u {{ $labels.sender }}*` on the host says why (the bot not in
             the log channel, the history scopes missing: ClusterBotScopeMissing).
+      # Every channel post is counted (cluster_tools.slack.Slack.post: channel role, class,
+      # place); the bot's top-level posts in a channel past POST_BUDGET (20) within the hour,
+      # every sender together, mean a tool flooding it: past that the library already
+      # folds them into one message's thread, so this says which tool to fix.
+      - alert: SlackChannelPostsHigh
+        expr: >-
+          sum by (channel_role) (increase(slack_posts_total{place!="thread"}[1h])) > 20
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 20 top-level Slack posts in the {{ $labels.channel_role }} channel within the hour"
+          description: >-
+            A tool is flooding the channel; the rest of the hour is folded into one message's
+            thread. `sum by (sender, class) (increase(slack_posts_total{channel_role="{{ $labels.channel_role }}"}[1h]))`
+            names the sender and what it posts.
       # A sender on a timer writes its last run: one that stops tells no one, silently.
       - alert: SlackDmSenderStale
         expr: time() - slack_dm_last_success_timestamp_seconds > 3 * 3600

@@ -37,7 +37,7 @@ from datetime import date
 from pathlib import Path
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
-from cluster_tools.slack import DmCounts, DmLog, Slack, mentioning  # the cluster's library (PYTHONPATH)
+from cluster_tools.slack import DailyLog, DmCounts, DmLog, Slack, mentioning, pages  # the cluster's library
 
 from . import (
     accounts_blocks,
@@ -85,11 +85,15 @@ def load(path):
 
 
 def messenger(cfg):
-    """The DMs' sender: cluster_tools.slack.Slack with the administrators' DM log and
-    the DM counts (cfg dm_log {channel, metrics})."""
+    """The bot's sender of every DM and channel post: cluster_tools.slack.Slack with the
+    administrators' DM log, the counts (cfg dm_log {channel, metrics}) and each channel's
+    role (channels, guides), so every post is declared, counted and folded alike."""
     log = cfg["dm_log"]
+    places = {name: role for role, name in ((cfg.get("guides") or {}).get("channels") or {}).items() if name}
+    places.update({name: role for role, name in cfg["channels"].items() if name})
     return Slack(cfg["bot_token"], dm_log=DmLog(log["channel"]) if log["channel"] else None,
-                 counts=DmCounts(log["metrics"], "cluster-bot") if log.get("metrics") else None)  # fmt: skip
+                 counts=DmCounts(log["metrics"], "cluster-bot") if log.get("metrics") else None,
+                 places=places)  # fmt: skip
 
 
 def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
@@ -115,7 +119,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         req = outcome.request
         thread = req.get("thread_ts")
         text = f"<@{slack_id}> {engine.describe(req)}: {outcome.text}" if req else outcome.text
-        client.chat_postMessage(channel=channels["help"], thread_ts=thread, **rich.message(text))
+        dms.post(channels["help"], text, thread_ts=thread, cls=None if thread else "answer")
         dm(slack_id, outcome.text, kind="request", log=log)
 
     def submit(client, slack_id, req):
@@ -123,9 +127,8 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         outcome = engine.submit(req)
         if outcome.status == "held":
             approvers = engine.approvers(outcome.key)
-            first = client.chat_postMessage(
-                channel=channels["help"],
-                **rich.message(f"<@{slack_id}> {engine.describe(req)}: 승인 대기"),
+            first = dms.post(
+                channels["help"], f"<@{slack_id}> {engine.describe(req)}: 승인 대기", cls="answer"
             )
             # Held for some people (a project's owners): each gets the buttons in a DM;
             # otherwise the administrators, in their channel.
@@ -134,11 +137,11 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
                 if place == channels["admin"]:
                     text, blocks = mentioning(cfg["admin_mention"], *shared.held_admin(
                         user_of(slack_id) or f"<@{slack_id}>", engine.describe_en(req), outcome.key))  # fmt: skip
-                    client.chat_postMessage(channel=place, **rich.message(text, blocks))
+                    dms.post(place, text, blocks, cls="notice")
                 else:
                     blocks = shared.held(f"<@{slack_id}>", outcome.text, outcome.key)
                     dm(place, outcome.text, blocks, kind="approval", log=True)
-            engine.note(outcome.key, slack_id=slack_id, thread_ts=first["ts"])
+            engine.note(outcome.key, slack_id=slack_id, thread_ts=first)
             dm(slack_id, outcome.text, kind="request", log=False)
         else:
             tell(client, slack_id, outcome)
@@ -512,9 +515,9 @@ def every(seconds, name, round_):
     threading.Thread(target=loop, name=name, daemon=True).start()
 
 
-def data_rounds(client, dms, data, cfg, slack_of):
-    """The shared data's round (cluster_bot.data.watch), its channel messages sent through
-    CLIENT and its DMs, logged, through DMS (cluster_tools.slack.Slack)."""
+def data_rounds(dms, data, cfg, slack_of):
+    """The shared data's round (cluster_bot.data.watch), its channel messages and its DMs,
+    logged, through DMS (cluster_tools.slack.Slack)."""
     settings, channels = cfg["data"], cfg["channels"]
     stale, grace = settings["stale_days"], settings["grace_days"]
 
@@ -531,10 +534,13 @@ def data_rounds(client, dms, data, cfg, slack_of):
             text = data_blocks.removed(path, stale, grace)
             if who:
                 dms.dm(who, text, kind="data-removed", login=login)
-            client.chat_postMessage(channel=channels["admin"], **rich.message(text))
+            line = data_blocks.removed_admin(path, stale, grace)
+            DailyLog(channels["admin"], data_blocks.LOG, data_blocks.log_title, data_blocks.LOGGED).record(
+                dms, pages(line, rich.blocks(line))
+            )
         elif event == "failed_removal":
-            text, blocks = mentioning(cfg["admin_mention"], f"{path}을(를) 지우지 못했습니다: {error}", [])
-            client.chat_postMessage(channel=channels["admin"], **rich.message(text, blocks or None))
+            text, blocks = mentioning(cfg["admin_mention"], data_blocks.failed_removal_admin(path, error), [])
+            dms.post(channels["admin"], text, blocks, cls="notice")
 
     def round_():
         with state.locked(settings["seen"], {}) as seen:
@@ -618,7 +624,7 @@ def main(argv=None):
 
         every(BAN_WATCH_EVERY, "ban watch", watch_round)
     if data is not None:
-        data_round = data_rounds(app.client, dms, data, cfg, slack_of)
+        data_round = data_rounds(dms, data, cfg, slack_of)
         every(DATA_WATCH_EVERY, "shared data", data_round)
     docs = cfg.get("notices") or {}
     if docs.get("url") and docs.get("channel"):
