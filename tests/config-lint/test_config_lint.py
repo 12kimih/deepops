@@ -256,13 +256,7 @@ class Copies(Configs):
         self.assertEqual(out, [f"{site}/helm/mine.yml", f"{ROOT}/config.example/helm/metallb.yml"])
 
 
-class Repository(unittest.TestCase):
-    def test_this_repository_is_clean(self):
-        with mock.patch.dict(os.environ, {}):
-            self.assertEqual(
-                cl.check_commented() + cl.check_redundant() + cl.check_dead() + cl.check_doc_paths()
-                + cl.check_doc_vars(), []
-            )  # fmt: skip
+# This repository itself is checked by scripts/check.sh's config_lint step, every check.
 
 
 class DocVars(unittest.TestCase):
@@ -439,10 +433,6 @@ class Shadow(unittest.TestCase):
         self.assertEqual(len(found), 3, found)
         self.assertTrue(any("config/group_vars: all/, all.yml" in f for f in found), found)
         self.assertTrue(any("config.example/group_vars: k8s.yaml, k8s.yml" in f for f in found), found)
-
-    def test_this_repository_is_clean(self):
-        with mock.patch.multiple(cl, EXAMPLE=ROOT / "config.example", CONFIG=ROOT / "config"):
-            self.assertEqual(cl.check_shadow(), [])
 
 
 if __name__ == "__main__":

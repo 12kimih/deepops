@@ -365,19 +365,32 @@ def check_dead():
             texts += [
                 (f"config/{rel}", tree.text(rel) or "") for rel in tree.files() if f"config/{rel}" not in keys
             ]
+    # {word: the keys of the texts it stands in as a whole word}: a name made only of word
+    # characters is read where it is one (a regex per name over every text took a minute).
+    where = {}
+    for k, text in texts:
+        for word in set(WORD.findall(text)):
+            where.setdefault(word, set()).add(k)
     for key, shown, private, found, own, k8s in named:
         # Its own definition does not count, but another value in the same file that
         # templates it does (the part after "name:").
         rest = "\n".join(re.sub(r"^#?[A-Za-z_]\w*:", "", raw) for raw in own.splitlines())
+        rest_words = set(WORD.findall(rest))
         for name, line in found.items():
             if name in READ_ELSEWHERE or (k8s and name in k8s_words):
                 continue
-            pattern = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
             # Another config is no reader: config.example shows a setting, it does not read
             # the site's, and the site's copy does not read the example's.
-            readers = (text for k, text in texts if k != key and config_of(k) in (None, config_of(key)))
-            if pattern.search(rest) or any(pattern.search(text) for text in readers):
-                continue
+            if WORD.fullmatch(name):
+                if name in rest_words or any(
+                    k != key and config_of(k) in (None, config_of(key)) for k in where.get(name, ())
+                ):
+                    continue
+            else:
+                pattern = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
+                readers = (text for k, text in texts if k != key and config_of(k) in (None, config_of(key)))
+                if pattern.search(rest) or any(pattern.search(text) for text in readers):
+                    continue
             problems.append(
                 f"dead: {shown}:{line}" + (": nothing reads it" if private else f": nothing reads {name}")
             )
@@ -426,6 +439,8 @@ NOT_OURS = {
     "roles/galaxy": "where Galaxy installs roles, git-ignored (roles/requirements.yml)",
 }
 CODE = re.compile(r"\.(py|ya?ml|sh|j2|cfg|toml)$|^scripts/|/files/")
+# A whole word (check_dead): a name made only of word characters stands where it is one.
+WORD = re.compile(r"\w+")
 
 
 def comment_lines(rel, text):
