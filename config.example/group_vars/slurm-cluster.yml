@@ -297,7 +297,7 @@ nfs_exports:
 # unit with ProtectHome= cannot namespace over an autofs /home and exits 226/NAMESPACE,
 # which takes networkd, logind, polkit and timedated down with it.
 # See docs/slurm-cluster/slurm-nfs.md and `man 5 nfs`.
-#nfs_mount_options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
+#nfs_mount_options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,_netdev,nofail
 nfs_mounts:
   - mountpoint: /home
     server: '{{ groups["slurm-master"][0] }}'

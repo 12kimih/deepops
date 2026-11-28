@@ -162,7 +162,9 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
    results back.
 
 2. **Client mount options.** The default `nfs_mount_options` is now
-   `rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.
+   `rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,_netdev,nofail`,
+   with no atime option: nfs(5) says they have no effect on NFS mounts, and the access
+   times the cleanups read are the server filesystem's (`relatime` there, never `noatime`).
    `vers=4.2` uses COMPOUND ops; `nconnect=16` opens 16 TCP connections per mount to beat
    the single-flow limit. **The default targets a 100GbE+ fabric** -- NetApp shows
    `nconnect` reaching ~line rate (~11 GB/s) on a single 100G NIC at 16 connections. On

@@ -18,8 +18,10 @@ nfs_mounts: []
 #
 # _netdev keeps the unit in remote-fs.target (and after the network), nofail keeps a
 # dead server from holding up the boot. Sized for a 100GbE+ fabric; see
-# docs/slurm-cluster/slurm-nfs.md for the tuning knobs and `man 5 nfs`.
-nfs_mount_options: "rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail"
+# docs/slurm-cluster/slurm-nfs.md for the tuning knobs and `man 5 nfs`. No atime option:
+# nfs(5) says they have no effect on NFS mounts; the server's filesystem keeps the access
+# times (its own mount options, roles/host_baseline), which the cleanups read.
+nfs_mount_options: "rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,_netdev,nofail"
 
 # Install a unit that lazily detaches the NFS mounts at shutdown, so a server rebooting
 # alongside its clients cannot stall them. Lets the mounts stay `hard`; `soft` would
