@@ -59,7 +59,7 @@ class JobNotice(unittest.TestCase):
     def test_a_notice_reaches_the_users_dm(self):
         self.assertEqual(self.run_notice("alice"), 0)
         self.assertEqual(FakeSlack.calls[0][:2], ("post", "DUALICE"))
-        self.assertIn("`42` train, COMPLETED, 01:02:03", FakeSlack.calls[0][2])
+        self.assertIn("- `42` train: COMPLETED, 01:02:03", FakeSlack.calls[0][2])
         self.assertNotIn("exit", FakeSlack.calls[0][2], "a zero exit code is not shown")
 
     def test_only_the_jobs_own_user_is_told_never_whom_mail_user_names(self):
@@ -94,7 +94,7 @@ class JobNotice(unittest.TestCase):
         self.run_notice("alice", env=failed, now=1200)
         self.assertEqual([c[0] for c in FakeSlack.calls], ["post", "update"])
         self.assertIn("2건", FakeSlack.calls[1][3])
-        self.assertIn("`43` train, FAILED, 01:02:03, exit 1", FakeSlack.calls[1][3])
+        self.assertIn("- `43` train: FAILED, 01:02:03, exit 1", FakeSlack.calls[1][3])
         self.run_notice("alice", now=1700)  # past the window: a new message
         self.assertEqual(FakeSlack.calls[2][0], "post")
 

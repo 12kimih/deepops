@@ -25,7 +25,7 @@ class Cards(unittest.TestCase):
     def test_a_part_leads_with_its_state_mark_and_bold_label(self):
         (block,) = cards.part("디스크", "본문", "warn")
         first = block["elements"][0]["elements"]
-        self.assertEqual(first[0], {"type": "emoji", "name": "large_yellow_circle"})
+        self.assertEqual(first[0], {"type": "emoji", "name": "small_orange_diamond"})
         self.assertIn({"type": "text", "text": "디스크", "style": {"bold": True}}, first)
 
     def test_facts_stay_within_a_section(self):

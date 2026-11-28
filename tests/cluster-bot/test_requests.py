@@ -38,6 +38,9 @@ class Echo(requests.Feature):
     def describe(self, req):
         return f"echo {req['n']}"
 
+    def describe_en(self, req):
+        return f"echo {req['n']}"
+
 
 class EngineTests(unittest.TestCase):
     def setUp(self):
@@ -56,6 +59,15 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(again.approve(held.key, "boss").status, "done")
         self.assertEqual(self.echo.applied, [3, 30])
         self.assertEqual(again.approve(held.key, "boss").text, "이미 처리된 요청입니다.")
+
+    def test_the_same_request_asked_again_while_held_is_held_once(self):
+        """A person pressing submit twice posted two approval messages."""
+        first = self.engine.submit({"kind": "echo", "user": "a", "n": 30})
+        again = self.engine.submit({"kind": "echo", "user": "a", "n": 30})
+        self.assertEqual((first.status, again.status), ("held", "refused"))
+        self.assertIn("이미 승인을 기다리고", again.text)
+        self.assertEqual(len(state.read(self.path, {})), 1)
+        self.assertEqual(self.engine.submit({"kind": "echo", "user": "a", "n": 31}).status, "held", "another")
 
     def test_two_approvals_at_once_apply_it_once(self):
         # Slack handlers run on threads: both approvals read the held request before

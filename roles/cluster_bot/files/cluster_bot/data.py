@@ -98,6 +98,10 @@ class DataFeature(Feature):
         return (f"공유 데이터 {req['category']}/{req['name']} ({human(req['size'])}, {req['url']}): "
                 f"{req.get('purpose') or '목적 없음'}")  # fmt: skip
 
+    def describe_en(self, req):
+        return (f"shared data {req['category']}/{req['name']} ({human(req['size'])}, {req['url']}): "
+                f"{req.get('purpose') or 'no purpose given'}")  # fmt: skip
+
 
 def last_use(entry):
     """When the entry was last used: the service's reading of its files ("used"), else

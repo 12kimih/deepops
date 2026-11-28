@@ -114,6 +114,9 @@ class JoinFeature(RosterFeature):
     def describe(self, req):
         return f"새 계정 {req['user']} ({req['account']})"
 
+    def describe_en(self, req):
+        return f"new account {req['user']} ({req['account']})"
+
 
 class LeaveFeature(RosterFeature):
     """req: user (the login that leaves), ends (their last day, YYYY-MM-DD), asked_by.
@@ -140,3 +143,6 @@ class LeaveFeature(RosterFeature):
 
     def describe(self, req):
         return f"계정 정리 {req['user']} (마지막 날 {req['ends']})"
+
+    def describe_en(self, req):
+        return f"account {req['user']} leaves (last day {req['ends']})"

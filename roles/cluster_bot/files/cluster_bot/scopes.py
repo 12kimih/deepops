@@ -50,20 +50,21 @@ def textfile(lacking, now):
 
 
 def message(lacking, before, manifest):
-    """What the administrators are told, or None: the scopes missing now (LACKING), or
-    that none is any more (BEFORE: what was said last)."""
+    """What the administrators are told, in English (their channel), or None: the scopes
+    missing now (LACKING), one bullet each, or that none is any more (BEFORE: what was
+    said last)."""
     if lacking:
-        listed = ", ".join(f"`{s}`" for s in lacking)
+        listed = "\n".join(f"- `{s}`" for s in lacking)
         return (
-            f"봇 토큰에 이 권한이 없습니다: {listed}. 이 권한이 필요한 기능은 실패합니다 "
-            f"(`missing_scope`). Slack 앱 설정의 App Manifest에 `{manifest}`의 내용을 넣고 "
-            "앱을 다시 설치하세요."
+            f"**The bot's token lacks {len(lacking)} scopes**\n{listed}\n"
+            f"The features that need them fail (`missing_scope`). Put the content of `{manifest}` "
+            "in the Slack app's App Manifest and reinstall the app."
         )
     if before:
         return (
-            "봇 토큰에 필요한 권한이 이제 모두 있습니다 (없던 것: "
+            "**The bot's token has every scope it needs again** (it lacked "
             + ", ".join(f"`{s}`" for s in before)
-            + ")."
+            + ")"
         )
     return None
 

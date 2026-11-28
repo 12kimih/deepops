@@ -85,37 +85,46 @@ class Watch(unittest.TestCase):
         self.feature, self.slack, self.seen, self.said = bans.UnbanFeature(self.hosts), FakeChannel(), {}, []
 
     def round(self):
-        bans.watch(self.feature, self.slack, "#admin", "<!subteam^SADMINS>", self.seen, self.said.append)
+        bans.watch(self.feature, self.slack, "#admin", self.seen, self.said.append)
 
     def lists(self):
-        return [m for m in self.slack.posts() if m["text"].startswith("현재")]
+        return [m for m in self.slack.posts() if m["text"].startswith(("Banned addresses", "현재"))]
+
+    def day_logs(self):
+        return [m for m in self.slack.posts() if m["text"].startswith("Ban log ")]
+
+    def logged(self):
+        """What the day logs' threads show."""
+        return "\n".join(rich.read(r["blocks"]) for d in self.day_logs() for r in self.slack.thread(d["ts"]))
 
     def test_the_first_look_learns_what_is_banned_and_lists_it_once(self):
         self.round()
         self.assertEqual(
             [m["text"] for m in self.slack.posts()],
-            ["현재 차단된 주소 1개"],
-            "no notice for bans made before",
+            ["Banned addresses: 1"],
+            "no log for bans made before",
         )
         self.assertEqual(self.slack.pins, {self.lists()[0]["ts"]})
         self.round()
         self.assertEqual(len(self.slack.posts()), 1, "the list is edited in place")
 
-    def test_new_bans_are_told_in_one_notice_every_one_in_its_thread(self):
+    def test_new_bans_go_in_the_days_log_every_one_mentioning_no_one(self):
         self.round()
         wave = [{"ip": f"198.51.100.{i}", "jail": "sshd", "since": f"2026-11-22 10:{i // 60:02d}:{i % 60:02d}"}
                 for i in range(200)]  # fmt: skip
         self.hosts["node1"].banned = wave
         self.round()
-        notice = next(m for m in self.slack.posts() if m["text"].endswith("새로 차단된 주소 200개"))
-        self.assertTrue(
-            notice["text"].startswith("<!subteam^SADMINS> "), "the notice mentions the administrators"
-        )
-        shown = "\n".join(rich.read(r["blocks"]) for r in self.slack.thread(notice["ts"]))
+        (day,) = self.day_logs()
+        shown = self.logged()
+        self.assertIn("New bans: 200", shown)
         self.assertTrue(all(b["ip"] in shown for b in wave), "every new ban, none cut")
+        self.assertNotIn("<!", shown + day["text"], "a log mentions no one")
         (listed,) = self.lists()
-        self.assertEqual(listed["text"], "현재 차단된 주소 201개")
-        self.assertNotIn("SADMINS", listed["text"], "the pinned list mentions no one")
+        self.assertEqual(listed["text"], "Banned addresses: 201")
+        self.hosts["node1"].banned = wave + [{**BAN, "ip": "198.51.100.250"}]
+        self.round()
+        self.assertEqual(len(self.day_logs()), 1, "one message a day")
+        self.assertIn(": 2 rounds", self.day_logs()[0]["text"])
 
     def test_the_list_is_a_summary_and_its_thread_every_ban(self):
         """2026-11-26: "외 17개 (가장 최근 40개만 보입니다)", and a body far too long."""
@@ -127,8 +136,8 @@ class Watch(unittest.TestCase):
         body = rich.read(listed["blocks"])
         self.assertNotIn("외 ", body)
         self.assertNotIn("가장 최근 40", body)
-        self.assertIn("호스트별: login 250개", body)
-        self.assertIn("가장 최근: `203.0.113.249`", body)
+        self.assertIn("By host\n- login: 250", body)
+        self.assertIn("Newest: `203.0.113.249`", body)
         self.assertLess(len(body), 600, "the body is a summary")
         replies = self.slack.thread(listed["ts"])
         shown = "\n".join(rich.read(r["blocks"]) for r in replies)
@@ -165,12 +174,12 @@ class Watch(unittest.TestCase):
         self.round()
         self.assertIn("login sshd 192.0.2.7", self.seen["bans"])
         (listed,) = self.lists()
-        self.assertEqual(listed["text"], "현재 차단된 주소 1개", "listed as last seen")
+        self.assertEqual(listed["text"], "Banned addresses: 1", "listed as last seen")
         self.assertIn("login", rich.read(listed["blocks"]))
         self.hosts["login"].down = False
         self.round()
         self.assertEqual(
-            [m["text"] for m in self.slack.posts()], ["현재 차단된 주소 1개"], "back again is not new"
+            [m["text"] for m in self.slack.posts()], ["Banned addresses: 1"], "back again is not new"
         )
 
     def test_a_first_round_that_read_no_host_tells_nothing_new_after(self):
@@ -182,26 +191,24 @@ class Watch(unittest.TestCase):
         for h in self.hosts.values():
             h.down = False
         self.round()
-        self.assertEqual([m["text"] for m in self.slack.posts()], ["현재 차단된 주소 1개"], "no notice")
+        self.assertEqual([m["text"] for m in self.slack.posts()], ["Banned addresses: 1"], "no log")
         self.hosts["node1"].banned = [{**BAN, "ip": "198.51.100.9"}]
         self.round()
-        self.assertTrue(any(m["text"].endswith("새로 차단된 주소 1개") for m in self.slack.posts()))
+        self.assertIn("New bans: 1", self.logged())
 
     def test_a_host_read_for_the_first_time_tells_nothing_new(self):
         self.hosts["node1"].down = True
         self.round()
         self.hosts["node1"].down, self.hosts["node1"].banned = False, [{**BAN, "ip": "198.51.100.9"}]
         self.round()
-        self.assertFalse(
-            any("새로" in m["text"] for m in self.slack.posts()), "what it banned before is not new"
-        )
+        self.assertEqual(self.day_logs(), [], "what it banned before is not new")
 
     def test_a_record_from_before_read_keeps_telling_new_bans(self):
         self.round()
         del self.seen["read"]
         self.hosts["login"].banned = [BAN, {**BAN, "ip": "198.51.100.9"}]
         self.round()
-        self.assertTrue(any(m["text"].endswith("새로 차단된 주소 1개") for m in self.slack.posts()))
+        self.assertIn("New bans: 1", self.logged())
 
     def test_a_deleted_list_is_posted_again(self):
         self.round()
@@ -264,23 +271,23 @@ DENIED = (
 class Reasons(unittest.TestCase):
     def test_each_failure_is_one_short_line_with_what_to_do(self):
         cases = (
-            (255, DENIED, "봇의 키가 허용되지 않았습니다", "cluster-bot.yml"),
+            (255, DENIED, "the bot's key is not accepted", "cluster-bot.yml"),
             (
                 255,
                 "Host key verification failed.\n",
-                "호스트 키가 봇이 아는 것과 다릅니다",
+                "the host key differs from the one the bot knows",
                 "cluster-bot.yml",
             ),
             (
                 255,
                 "ssh: connect to host 192.0.2.10 port 22: Connection timed out\n",
-                "접속되지 않습니다",
+                "cannot connect",
                 "sshd",
             ),
             (
                 2,
                 "cluster-bot-serve: this host offers no 'bans'\n",
-                "호스트가 이 서비스를 제공하지 않습니다",
+                "the host does not offer this service",
                 "cluster-bot.yml",
             ),
             (2, "cluster-bans: not banned 203.0.113.8\n", "not banned 203.0.113.8", ""),
@@ -298,7 +305,7 @@ class Reasons(unittest.TestCase):
         errors["login"] = remote.failure(255, "Connection refused")
         self.assertEqual(
             bans.bans_blocks.by_reason(errors),
-            "gpu[1-8],master: 봇의 키가 허용되지 않았습니다; login: 접속되지 않습니다",
+            "gpu[1-8],master: the bot's key is not accepted; login: cannot connect",
         )
 
     def test_the_list_of_no_host_read_says_so_once(self):
@@ -306,15 +313,15 @@ class Reasons(unittest.TestCase):
         errors = {h: remote.failure(255, DENIED) for h in [f"gpu{i}" for i in range(1, 9)] + ["master"]}
         (text, blocks), _ = bans.bans_blocks.ban_list([], errors, read=False)
         shown = str(blocks)
-        self.assertEqual(text, "차단 목록을 읽지 못했습니다")
-        self.assertNotIn("없음", shown)
-        self.assertNotIn("0개", shown)
+        self.assertEqual(text, "Banned addresses: unread")
+        self.assertNotIn("none", shown)
+        self.assertNotIn(": 0", rich.read(blocks))
         self.assertNotIn("Permission denied", shown)
         self.assertEqual(shown.count("gpu[1-8],master"), 1)
         self.assertIn("cluster-bot.yml", shown)
         (text, blocks), _ = bans.bans_blocks.ban_list([], {})
-        self.assertEqual(text, "현재 차단된 주소가 없습니다")
-        self.assertEqual([b["type"] for b in blocks], ["rich_text", "context"], "said once, in the header")
+        self.assertEqual(text, "Banned addresses: none")
+        self.assertEqual([b["type"] for b in blocks], ["header", "context"], "said once, in the header")
 
 
 if __name__ == "__main__":

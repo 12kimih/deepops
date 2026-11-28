@@ -246,11 +246,11 @@ class MonitoringImages(unittest.TestCase):
 
         cases = {
             "firing": ("firing", [alert(h, "firing") for h in ("n1", "n2", "n3")],
-                       ":red_circle: Critical: HostDown (3) || *n1 is down*\n*n2 is down*\n*n3 is down*\nNo scrape for 5 minutes."),
+                       ":small_red_triangle: Critical: HostDown (3) || *n1 is down*\n*n2 is down*\n*n3 is down*\nNo scrape for 5 minutes."),
             "mixed": ("firing", [alert("n1", "firing"), alert("n2", "resolved"), alert("n3", "resolved")],
-                      ":red_circle: Critical: HostDown on n1 || *n1 is down*\nNo scrape for 5 minutes.\n_2 resolved since_"),
+                      ":small_red_triangle: Critical: HostDown on n1 || *n1 is down*\nNo scrape for 5 minutes.\n_2 resolved since_"),
             "resolved": ("resolved", [alert(h, "resolved") for h in ("n1", "n2", "n3")],
-                         ":white_check_mark: Resolved: HostDown (3) || ~n1 is down~\n~n2 is down~\n~n3 is down~"),
+                         ":heavy_check_mark: Resolved: HostDown (3) || ~n1 is down~\n~n2 is down~\n~n3 is down~"),
         }  # fmt: skip
         for name, (status, alerts, expected) in cases.items():
             (data / f"{name}.json").write_text(json.dumps({

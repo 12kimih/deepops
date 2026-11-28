@@ -1,8 +1,9 @@
 """cluster_bot.remove: the message shortcut by which an administrator deletes one of the
 bot's messages. Only a member of the administrators' user group (read live), only what
 Slack lets the bot delete (its own, the rule tidy decides by), never what a feature keeps
-up to date (it would come back), every delete logged; through the fake Slack, which
-refuses another's message as Slack does."""
+up to date (it would come back), every delete logged like the DMs (one day message in
+the administrators' channel, each delete whole in its thread, naming who as text, never
+mentioning); through the fake Slack, which refuses another's message as Slack does."""
 
 import sys
 import unittest
@@ -13,7 +14,8 @@ sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "tests/lib"))
 from cluster_bot import commands, remove  # noqa: E402
-from cluster_tools.slack import marked  # noqa: E402
+from cluster_tools import rich  # noqa: E402
+from cluster_tools.slack import KEPT, marked  # noqa: E402
 from fake_slack import FakeChannel  # noqa: E402
 
 GROUP, ADMIN, OTHER = "S0ADMINS", "U0ADMIN", "U0OTHER"
@@ -32,8 +34,11 @@ class Shortcut(unittest.TestCase):
         )
 
     def run_on(self, ts, user=ADMIN, group=GROUP, thread_ts=None):
-        return remove.run(self.slack, user=user, channel="CNEWS", ts=ts, thread_ts=thread_ts, group_id=group,
-                          known=KNOWN, log_channel="CADMIN")  # fmt: skip
+        return remove.run(self.slack, user=user, name="admin1", channel="CNEWS", ts=ts, thread_ts=thread_ts,
+                          group_id=group, known=KNOWN, deletes=remove.log("CADMIN"))  # fmt: skip
+
+    def day_messages(self):
+        return [m for m in self.slack.posts("CADMIN") if (m.get("metadata") or {}).get("event_type") == KEPT]
 
     def kept(self):
         return {m["ts"] for m in self.slack.messages}
@@ -43,10 +48,21 @@ class Shortcut(unittest.TestCase):
         self.assertNotIn(self.mine, self.kept())
         self.assertNotIn(self.reply, self.kept())
         self.assertIn(self.person_reply, self.kept(), "a person's reply stays")
-        [log] = [m for m in self.slack.posts("CADMIN")]
-        self.assertIn(f"<@{ADMIN}>", log["text"])
-        self.assertIn("<#CNEWS>", log["text"])
-        self.assertIn("이번 주 사용량", log["text"])
+        [day] = self.day_messages()
+        self.assertTrue(day["text"].startswith("Deleted bot messages "), day["text"])
+        [entry] = self.slack.thread(day["ts"])
+        shown = rich.read(entry["blocks"])
+        self.assertIn("admin1 deleted a bot message in <#CNEWS>", shown)
+        self.assertIn("이번 주 사용량", shown, "the message as it was")
+        self.assertNotIn("<@", entry["text"] + shown + day["text"], "a log mentions no one")
+
+    def test_deletes_of_one_day_share_one_message_and_its_count(self):
+        other = self.slack.add("공지", "#news")
+        self.run_on(self.mine)
+        self.run_on(other)
+        [day] = self.day_messages()
+        self.assertEqual(len(self.slack.thread(day["ts"])), 2)
+        self.assertIn(": 2 ", day["text"])
 
     def test_one_reply_of_the_bot_goes_alone(self):
         self.assertEqual(self.run_on(self.reply, thread_ts=self.mine), remove.DONE)

@@ -2,7 +2,8 @@
 bot's alike, so a disk report, the hourly GPU status, a rule's DM and the bot's Home tab
 read the same way (owner, 2026-11-27: "structured, eye-catching, easy to read").
 
-    title(name, when)          -> a header block: the message's noun and its time
+    title(name, when, report)  -> a header block: the message's noun and its time (REPORT:
+                                  a usage report, emoji.REPORT first)
     part(label, body, state)   -> rich text: a short bold label (its state's mark first), the body
     facts(pairs)               -> a section of up to ten (label, value, state) side by side
     gauges(header, rows)       -> a fixed-width table (slack.table) for a gauge column (slack.bar)
@@ -11,24 +12,32 @@ read the same way (owner, 2026-11-27: "structured, eye-catching, easy to read").
     notice(rule_id, text)      -> (text, blocks) of a DM about a rule, titled with the rule's name
 
 Every text goes through cluster_tools.rich; a state is one of cluster_tools.rules.STATES
-and shows as rules.STATE_MARK, as the usage command's rows and the Home tab show it.
+and shows its mark from cluster_tools.emoji, the one place every emoji is chosen, as the
+usage command's rows and the Home tab show it.
 Python 3.9 or newer, standard library only.
 """
 
-from . import rich, rules
+from . import emoji, rich, rules
 from .slack import table
 
 MAX_FACTS = 10  # fields of one section (Slack)
+# The language the cluster writes in each channel role (slack_channels) and in a DM
+# (owner, 2026-11-28): the administrators' channel all English, so it reads as one; every
+# place people read, Korean. A text copied into a log (a DM, a deleted message) stays as
+# it was sent. The tests hold every message to its place's language.
+LANGUAGE = {"admin": "en", "status": "ko", "help": "ko", "announce": "ko", "dm": "ko"}
 
 
 def mark(state):
     """STATE's mark ("" for none), the one the CLI's rows and the Home tab show."""
-    return f"{rules.STATE_MARK[state]} " if state else ""
+    return emoji.mark(state)
 
 
-def title(name, when=""):
-    """The message's header: NAME, a noun, then WHEN (its date or time) if given."""
-    return rich.header(f"{name}  {when}" if when else name)
+def title(name, when="", report=False):
+    """The message's header: NAME, a noun, then WHEN (its date or time) if given; a usage
+    REPORT's (the GPU and disk reports) with emoji.REPORT first."""
+    text = f"{name}  {when}" if when else name
+    return rich.header(f"{emoji.REPORT} {text}" if report else text)
 
 
 def part(label, body="", state=""):
@@ -58,7 +67,7 @@ def note(text):
 def step(text):
     """The last line: what the reader can do, with the command (a rule's check, from
     cluster_tools.rules, never typed here)."""
-    return rich.blocks(f":point_right: {text}")
+    return rich.blocks(text)
 
 
 def notice(rule_id, text):

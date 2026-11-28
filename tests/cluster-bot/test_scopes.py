@@ -72,7 +72,7 @@ class Scopes(unittest.TestCase):
         slack = FakeSlack(set(commands.SCOPES))
         self.run_with(slack)
         self.assertEqual(len(slack.posts), 1)
-        self.assertIn("모두 있습니다", slack.posts[0][1])
+        self.assertIn("every scope it needs again", slack.posts[0][1])
 
     def test_slack_not_answering_fails_the_run_and_keeps_the_last_answer(self):
         self.run_with(FakeSlack(set(commands.SCOPES)))

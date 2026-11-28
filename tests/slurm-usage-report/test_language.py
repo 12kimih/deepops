@@ -110,9 +110,9 @@ class Language(unittest.TestCase):
 
     def test_the_weekly_summary(self):
         rows = [{"user": "alice", "held": 120, "idle": 90}, {"user": "bob", "held": 10, "idle": 0}]
-        self.assertKorean("weekly", strings(report.render_week(rows, who, 5)))
-        self.assertShown("weekly", report.render_week(rows, who, 5))
-        self.assertKorean("weekly, none", strings(report.render_week([], who, 5)))
+        self.assertKorean("weekly", strings(report.render_week(rows, 5)))
+        self.assertShown("weekly", report.render_week(rows, 5))
+        self.assertKorean("weekly, none", strings(report.render_week([], 5)))
 
     def test_the_disk_report_and_its_thread(self):
         data = disk_report.collect(disk_fixture.site(), disk_fixture.NOW)

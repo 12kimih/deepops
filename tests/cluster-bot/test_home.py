@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
 from cluster_bot import commands, home_blocks, projects_blocks  # noqa: E402
-from cluster_tools import rich, rules  # noqa: E402
+from cluster_tools import emoji, rich, rules  # noqa: E402
 
 # Slack's limits (Block Kit reference: views, blocks): a Home tab of at most 100 blocks, a
 # section's text of 3000 characters and 10 fields, a header's text of 150.
@@ -65,16 +65,16 @@ class Home(unittest.TestCase):
                  for e in s.get("elements", []) if e.get("type") == "emoji"]  # fmt: skip
         self.assertEqual(
             marks[: len(rules.RULES)],
-            [rules.STATE_MARK[s].strip(":") for s in (rules.STATES * 2)[: len(rules.RULES)]],
+            [emoji.STATE[s].strip(":") for s in (rules.STATES * 2)[: len(rules.RULES)] if emoji.STATE[s]],
         )
 
     def test_an_empty_figure_is_left_out(self):
         bot = rules.row("login-limits", "", "", "?", "로그인 노드에서만 잴 수 있습니다")
-        self.assertEqual(rules.lines([bot]), [":grey_question: 알 수 없음 **로그인 노드 한도**: 로그인 노드에서만 잴 수 있습니다 "
+        self.assertEqual(rules.lines([bot]), ["알 수 없음 **로그인 노드 한도**: 로그인 노드에서만 잴 수 있습니다 "
                                              "`usage login-node`"])  # fmt: skip
         self.assertEqual(
             rules.lines([rules.row("disk", "", "5 TB", "ok")]),
-            [":large_green_circle: 괜찮음 **디스크 한도**: 한도: 5 TB"],
+            ["괜찮음 **디스크 한도**: 한도: 5 TB"],
         )
         self.assertNotIn(": -", "\n".join(rules.lines([rules.row("disk", "", "", "off")])))
 

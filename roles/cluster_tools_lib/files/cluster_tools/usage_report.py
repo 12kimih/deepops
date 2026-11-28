@@ -48,7 +48,7 @@ from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
-from .slack import MEMBER, DmCounts, DmLog, Slack, bar, escape, mentioning, pages, sections, table
+from .slack import MEMBER, DailyLog, DmCounts, DmLog, Slack, bar, escape, mentioning, pages, table
 from .slack import member as slack_member
 from .slurm import (
     Error,
@@ -78,7 +78,8 @@ DM_FIELDS = {"jobs": "- `1234_5` (GPU 8장, 1:00:00 실행 중)", "count": 1, "h
 # go this much early, so it never slips to the next run.
 RUN_LEEWAY = 300
 WEEK_DAYS = 7
-WEEK_TOP = 5  # the idlest people mentioned in the weekly summary
+WEEK_TOP = 5  # the people in each of the weekly summary's top lists
+WEEK_TITLE = "주간 GPU 사용"
 WEEKS_KEPT = 8  # weeks of each person's numbers the weekly summary remembers
 
 
@@ -199,30 +200,40 @@ def collect_week(prom, threshold, days=WEEK_DAYS):
     )
 
 
-def render_week(rows, who, threshold, days=WEEK_DAYS, top=WEEK_TOP, now=None):
-    """(text, blocks): totals, then everyone who held GPUs, idlest first; the TOP idlest
-    with idle hours are mentioned. THRESHOLD is collect_week's, in percent; NOW dates the
-    header (default: now)."""
+def render_week(rows, threshold, days=WEEK_DAYS, top=WEEK_TOP, now=None):
+    """(text, blocks): the totals, then the TOP people by GPU-hours allocated and by GPU
+    idle hours, as plain names: the weekly summary mentions no one (owner, 2026-11-28).
+    THRESHOLD is collect_week's, in percent; NOW ends the period in the header (default:
+    now)."""
     held = sum(r["held"] for r in rows)
     idle = sum(r["idle"] for r in rows)
     share = idle / held if held else 0
-    head = f"지난 {days}일 GPU 사용: {held:,.0f} GPU시간 중 GPU 유휴 시간 {idle:,.0f} ({share:.0%})"
-    lines = []
-    for n, r in enumerate(rows):
-        name = who(r["user"], n < top and r["idle"] >= 1)
-        part = r["idle"] / r["held"] if r["held"] else 0
-        lines.append(f"- {name}: {r['held']:,.0f} GPU시간 중 유휴 {r['idle']:,.0f} ({part:.0%})")
-    stamp = datetime.fromtimestamp(time.time() if now is None else now).strftime("%Y-%m-%d")
+    end = time.time() if now is None else now
+    period = f"{datetime.fromtimestamp(end - days * 86400):%m-%d} ~ {datetime.fromtimestamp(end):%m-%d}"
+    head = f"{WEEK_TITLE} {period}: {held:,.0f} GPU시간 중 GPU 유휴 시간 {idle:,.0f} ({share:.0%})"
+
+    def part(r):
+        return f"{r['idle'] / r['held']:.0%}" if r["held"] else "0%"
+
+    by_held = sorted((r for r in rows if r["held"] >= 1), key=lambda r: (-r["held"], r["user"]))[:top]
+    by_idle = sorted((r for r in rows if r["idle"] >= 1), key=lambda r: (-r["idle"], r["user"]))[:top]
+    held_lines = [f"- {escape(r['user'])}: {r['held']:,.0f} GPU시간 (유휴 {part(r)})" for r in by_held]
+    idle_lines = [f"- {escape(r['user'])}: {r['idle']:,.0f} GPU시간 (할당 시간의 {part(r)})" for r in by_idle]
     note = (
         f"GPU 유휴 시간: 잡이 할당받은 GPU의 사용률이 {util_at_most(threshold)}였던 시간입니다 (1분 단위로 셉니다). "
-        f"GPU 유휴 시간이 가장 긴 {top}명(1시간 이상)을 멘션합니다."
+        f"상위 {top}명까지, 1 GPU시간 이상인 분만 보입니다."
     )
     return head, [
-        cards.title(f"지난 {days}일 GPU 사용", stamp),
+        cards.title(WEEK_TITLE, period, report=True),
         cards.facts(
-            [("할당된 GPU시간", f"{held:,.0f}", ""), ("GPU 유휴 시간", f"{idle:,.0f} ({share:.0%})", "")]
+            [
+                ("GPU 할당 시간", f"{held:,.0f} GPU시간", ""),
+                ("GPU 유휴 시간", f"{idle:,.0f} GPU시간 ({share:.0%})", ""),
+                ("GPU 잡 사용자", f"{sum(1 for r in rows if r['held'] >= 1)}명", ""),
+            ]
         ),
-        *cards.part("사람별", "\n".join(lines) or "GPU 잡이 없었습니다."),
+        *cards.part("GPU시간 상위", "\n".join(held_lines) or "GPU 잡이 없었습니다."),
+        *cards.part("GPU 유휴 시간 상위", "\n".join(idle_lines) or "GPU 유휴 시간이 없었습니다."),
         cards.note(note),
         *cards.step(f"쓰지 않는 GPU는 `scancel <JOBID>`로 반납해 주세요. {rules.check_note('gpu-idle')}"),
     ]
@@ -332,7 +343,7 @@ def summary_card(report):
         f"평균 사용률 {avg}, {IDLE_JOB} {len(idle)}개"
     )
     facts = [
-        ("할당된 GPU", f"{alloc} / {total}장 ({100 * alloc / total:.0f}%)", ""),
+        ("GPU 할당", f"{alloc} / {total}장 ({100 * alloc / total:.0f}%)", ""),
         ("평균 사용률", avg, ""),
         (IDLE_JOB, f"{len(idle)}개", "warn" if idle else "ok"),
         ("대기 중인 잡", f"{pend_jobs}개, GPU {pend_gpus}장", ""),
@@ -342,7 +353,7 @@ def summary_card(report):
     if report.get("dashboard_url"):
         more += f" <{report['dashboard_url']}|Grafana>"
     return text, [
-        cards.title("GPU 사용 현황", stamp),
+        cards.title("GPU 사용 현황", stamp, report=True),
         cards.facts(facts),
         cards.note(more),
         *cards.step(f"내 잡의 GPU 사용은 `{rules.BY_ID['gpu-idle'].check}`로 봅니다."),
@@ -692,38 +703,44 @@ def repeaters(weeks, cfg):
 
 
 def render_repeaters(users, weeks, jobs, cfg):
-    """(text, blocks) for the administrators: who, each week's numbers, their jobs now,
-    and the steps to take."""
-    head = f"Heavy idle GPU use {cfg['repeat_weeks']} weeks running: {', '.join(users)}"
-    parts = []
+    """(text, blocks) for the administrators, in English: who, each week's numbers and
+    their jobs now as bullets, then the steps to take."""
+    title = f"Idle GPU use {cfg['repeat_weeks']} weeks running"
+    head = f"{title}: {', '.join(users)}"
+    lines = []
     for u in users:
-        hist = ", ".join(f"{w['idle']:,.0f} of {w['held']:,.0f} h" for w in weeks[u][-cfg["repeat_weeks"] :])
-        running = ", ".join(f"`{j['label']}` ({len(j['gpus'])} GPU)" for j in jobs if j["user"] == u)
-        parts.append(f"**{u}**: idle GPU-hours by week {hist}. Now: {running or 'no jobs'}.")
-    steps = (
-        "What to do: 1) message them with these numbers and ask what the jobs wait on; "
-        "2) check their jobs (`sq`, the Grafana job panels) for GPUs held while the work runs on CPU or "
-        "waits for input, and suggest splitting CPU and GPU stages (--dependency) or fewer GPUs; "
-        "3) if it goes on, agree a limit with them (their QoS) or cancel jobs that hold GPUs idle. "
+        lines.append(f"- **{escape(u)}**")
+        lines += [f"  - week {n}: {w['idle']:,.0f} idle of {w['held']:,.0f} GPU-hours"
+                  for n, w in enumerate(weeks[u][-cfg["repeat_weeks"] :], 1)]  # fmt: skip
+        running = [f"`{escape(j['label'])}` ({len(j['gpus'])} GPU)" for j in jobs if j["user"] == u]
+        lines.append(f"  - running now: {len(running)} jobs" if running else "  - running now: no jobs")
+        lines += [f"    - {r}" for r in running]
+    steps = [
+        "- Message them with these numbers and ask what the jobs wait on.",
+        "- Check their jobs (`sq`, the Grafana job panels) for GPUs held while the work runs on CPU or "
+        "waits for input; suggest splitting CPU and GPU stages (--dependency) or fewer GPUs.",
+        "- If it goes on, agree a limit with them (their QoS) or cancel the jobs that hold GPUs idle.",
+    ]
+    note = (
         f"Thresholds: {cfg['repeat_idle_gpu_hours']:g} idle GPU-hours and {cfg['repeat_idle_share']:.0%} "
         "of the hours held, each week."
     )
-    blocks = sections("\n".join(parts)) + [rich.context(steps)]
+    blocks = [cards.title(title), *cards.part("People", "\n".join(lines)),
+              *cards.part("What to do", "\n".join(steps)), cards.note(note)]  # fmt: skip
     return head, blocks
 
 
 def weekly(cfg, args):
     """The weekly summary, and the administrators' notice of heavy idlers. Touches no
-    job; a preview posts both to --to and records nothing. Its own state file (the weeks
-    and member lookups), so it never races the hourly report's."""
+    job; a preview posts both to --to and records nothing. Its own state file (the weeks),
+    so it never races the hourly report's."""
     slack = client(cfg, args)
     now = time.time()
     rows = collect_week(Prometheus(cfg["prometheus_url"]), cfg["idle_util_threshold"])
     path, state = side_state(cfg, "weekly.json")
-    weeks, cache = state.get("weeks", {}), state.get("users", {})
-    who = namer(cfg, slack, cache)
+    weeks = state.get("weeks", {})
     preview = args.dry_run or bool(args.to)
-    text, blocks = render_week(rows, who, cfg["idle_util_threshold"])
+    text, blocks = render_week(rows, cfg["idle_util_threshold"])
     to_channel(slack, args.to, cfg["channel"], text, blocks)
     remember_week(weeks, rows, now)
     heavy = repeaters(weeks, cfg)
@@ -733,7 +750,7 @@ def weekly(cfg, args):
         )
         to_channel(slack, args.to, cfg["admin_channel"], text, blocks)
     if not preview:
-        write_atomic(path, json.dumps({"weeks": weeks, "users": cache}), mode=0o600)
+        write_atomic(path, json.dumps({"weeks": weeks}), mode=0o600)
 
 
 def side_state(cfg, name):
@@ -827,10 +844,10 @@ def disk(cfg, args):
 
 def io(cfg, args):
     """The I/O notices. For each node whose NFS traffic to a measured export stayed hot
-    (cluster_tools.io_report), the users of its top jobs are sent a DM and the
-    administrators one line per node, each when due (cluster_tools.notices: at once,
-    then every io_repeat_hours while it lasts); a root job is named to the
-    administrators only. A preview prints to --to and records nothing; one failed DM does
+    (cluster_tools.io_report), the users of its top jobs are sent a DM and the nodes go in
+    the administrators' day log (io_report.LOG, no channel line), each when due
+    (cluster_tools.notices: at once, then every io_repeat_hours while it lasts); a root
+    job is named to the administrators only. A preview prints to --to and records nothing; one failed DM does
     not stop the others, and the run fails at the end naming them."""
     now = time.time()
     if not cfg["io_mounts"]:
@@ -866,7 +883,10 @@ def io(cfg, args):
     due = [item for item in hot if io_report.admin_key(item) in keys]
     if due and cfg["admin_channel"] and not preview:
         try:
-            slack.post(cfg["admin_channel"], io_report.admin_text(due))
+            text = io_report.admin_text(due)
+            DailyLog(cfg["admin_channel"], io_report.LOG, io_report.log_title, io_report.LOGGED).record(
+                slack, pages(rich.plain(text.split("\n")[0]), rich.blocks(text))
+            )
             for item in due:
                 told[io_report.admin_key(item)] = int(now)
         except (RuntimeError, OSError) as e:
@@ -875,9 +895,6 @@ def io(cfg, args):
         write_atomic(path, json.dumps({"users": cache, "told": told}), mode=0o600)
     if failures:
         raise RuntimeError("; ".join(failures))
-
-
-SSH_BLOCK_REPEAT = 10 * 365 * 86400  # a block is told once: its key names its start
 
 
 def ssh_text(login, host, n, warn, refuse, window, until=None):
@@ -895,9 +912,11 @@ def ssh_text(login, host, n, warn, refuse, window, until=None):
 
 def ssh(cfg, args):
     """The SSH rate notices (cluster_tools.ssh_rate's metrics, from every login node): at
-    the warning level a DM, again every ssh_repeat_hours while it lasts; a refusal, a DM
-    and one line to the administrators, once each. A preview prints to --to and records
-    nothing; one failed DM does not stop the others, and the run fails naming them."""
+    the warning level a DM, again every ssh_repeat_hours while it lasts; a refusal, a DM,
+    again at most every ssh_repeat_hours however often the blocks come back (someone
+    cycling through blocks all day was told each one). Nothing goes to the administrators'
+    channel: each DM is in their DM log. A preview prints to --to and records nothing; one
+    failed DM does not stop the others, and the run fails naming them."""
     if not cfg["ssh_rate"]:
         return
     from .disk_report import series
@@ -917,11 +936,11 @@ def ssh(cfg, args):
     path, state = side_state(cfg, "ssh.json")
     cache, told = state.get("users", {}), state.get("told", {})
     warn_keys = [f"ssh warn {h} {u}" for h, u, _ in over]
-    block_keys = [f"ssh block {h} {u} {s}" for h, u, s in blocked]
+    block_keys = [f"ssh block {h} {u}" for h, u, _ in blocked]
     due = set(notices.due(warn_keys, {k: v for k, v in told.items() if k.startswith("ssh warn")}, now,
                           cfg["ssh_repeat_hours"] * 3600, leeway=RUN_LEEWAY))  # fmt: skip
     due |= set(notices.due(block_keys, {k: v for k, v in told.items() if k.startswith("ssh block")}, now,
-                           SSH_BLOCK_REPEAT))  # fmt: skip
+                           cfg["ssh_repeat_hours"] * 3600, leeway=RUN_LEEWAY))  # fmt: skip
     told = {k: v for k, v in told.items() if k in set(warn_keys) | set(block_keys)}
     texts = []
     for (host, user, n), k in zip(over, warn_keys):
@@ -948,13 +967,6 @@ def ssh(cfg, args):
             told[k] = int(now)
         except (RuntimeError, OSError) as e:
             failures.append(f"notifying {user}: {e}")
-    new_blocks = [(h, u) for (h, u, _), k in zip(blocked, block_keys) if k in due]
-    if new_blocks and cfg["admin_channel"] and not preview:
-        try:
-            slack.post(cfg["admin_channel"], "새 SSH 접속이 막힌 사람: "
-                       + ", ".join(f"{u} ({h})" for h, u in new_blocks))  # fmt: skip
-        except (RuntimeError, OSError) as e:
-            failures.append(f"telling the administrators: {e}")
     if not preview:
         write_atomic(path, json.dumps({"users": cache, "told": told}), mode=0o600)
     if failures:
@@ -997,10 +1009,8 @@ def purge_notices(cfg, slack, cache, state, now, preview):
 
 def cancelled_note(cancelled, cfg, who):
     """The report thread's (text, blocks) on the jobs CANCELLED for leaving their GPUs idle."""
-    lines = [
-        f"{cards.mark('act')}{who(user, bool(cfg['notify']))}  "
-        + ", ".join(f"`{j['label']}`" for j in jobs)
-        + f": 할당받은 GPU를 {cfg['cancel_after_hours']:g}시간 동안 쓰지 않아 취소했습니다"
+    lines = [f"할당받은 GPU를 {cfg['cancel_after_hours']:g}시간 동안 쓰지 않아 취소했습니다."] + [
+        f"- {who(user, bool(cfg['notify']))}  " + ", ".join(f"`{escape(j['label'])}`" for j in jobs)
         for user, jobs in by_owner(cancelled).items()
     ]
     return f"{IDLE_JOB}을 취소했습니다", cards.part(f"{IDLE_JOB} 취소", "\n".join(lines), "act")

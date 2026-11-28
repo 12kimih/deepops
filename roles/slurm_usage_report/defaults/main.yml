@@ -69,8 +69,9 @@ slurm_usage_report_cancel_warn_text: |-
 # The I/O notices (systemd OnCalendar, every 5 minutes): a node whose NFS traffic to a
 # measured export (io_fairness_models, roles/io_defaults) stayed above io_share of what
 # the disk serves for io_minutes; the users of its io_top_jobs jobs by I/O are sent a
-# DM ending in io_advice and the administrators one line per node (admin_channel), at
-# once and every io_repeat_hours while it lasts. No models, no notices.
+# DM ending in io_advice and the node goes in the administrators' day log (admin_channel:
+# one message a day, the reports in its thread), at once and every io_repeat_hours
+# while it lasts. No models, no notices.
 slurm_usage_report_io_schedule: "*:0/5"
 slurm_usage_report_io_repeat_hours: 6
 slurm_usage_report_io_advice: >-
@@ -80,7 +81,8 @@ slurm_usage_report_io_advice: >-
 # The SSH rate notices (systemd OnCalendar, every 5 minutes; roles/ssh_rate, while
 # slurm_enable_ssh_rate is on): a person whose new SSH sessions on a login node reach the
 # warning level is sent a DM, again every ssh_repeat_hours while it lasts; one whose new
-# logins are refused, a DM and the administrators one line, once per refusal.
+# logins are refused, a DM, again at most every ssh_repeat_hours however often the blocks
+# recur. The administrators read them in the DM log, no channel line.
 slurm_usage_report_ssh_schedule: "*:0/5"
 slurm_usage_report_ssh_repeat_hours: 24
 

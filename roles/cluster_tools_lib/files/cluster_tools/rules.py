@@ -28,7 +28,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 
-from . import slurm
+from . import emoji, slurm
 from .config import require
 from .exits import AT_RISK, OK, UNKNOWN
 
@@ -457,11 +457,6 @@ def as_dict(rows):
 
 
 STATE_KO = {"ok": "괜찮음", "warn": "주의", "act": "조치 대상", "off": "해당 없음", "?": "알 수 없음"}
-# Each state's mark in Slack, first on its row, so a row reads at a glance: green, yellow
-# and red for ok, warn and act, white for a rule that does not apply, a question mark for
-# a source that did not answer.
-STATE_MARK = {"ok": ":large_green_circle:", "warn": ":large_yellow_circle:", "act": ":red_circle:",
-              "off": ":white_circle:", "?": ":grey_question:"}  # fmt: skip
 
 
 def lines(rows):
@@ -476,7 +471,7 @@ def lines(rows):
             rest.append(f"한도: {r.limit}")
         if r.when:
             rest.append(r.when)
-        text = f"{STATE_MARK[r.state]} {STATE_KO[r.state]} **{r.title}**" + (
+        text = f"{emoji.mark(r.state)}{STATE_KO[r.state]} **{r.title}**" + (
             ": " + ", ".join(rest) if rest else ""
         )
         if r.state not in ("ok", "off"):

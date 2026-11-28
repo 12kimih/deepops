@@ -4,7 +4,7 @@ person always looks), and the ban is lifted on every host that holds it.
 
     feature = UnbanFeature({host: Remote(..., SERVICE)})
     feature.where(ip) -> {host: [ban, ...]} where IP is banned now
-    watch(feature, slack, channel, mention, seen)   one round of the administrators' ban watch
+    watch(feature, slack, channel, seen)   one round of the administrators' ban watch
 
 Each host runs cluster_tools.bans for SERVICE: list, unban IP.
 req: user, ip (as address() writes it), reason.
@@ -13,7 +13,7 @@ req: user, ip (as address() writes it), reason.
 import ipaddress
 import sys
 
-from cluster_tools.slack import Error, keep, mentioning  # the cluster's library (PYTHONPATH)
+from cluster_tools.slack import DailyLog, Error, keep  # the cluster's library (PYTHONPATH)
 
 from . import bans_blocks
 from .requests import Failed, Feature, Refused
@@ -22,6 +22,13 @@ from .requests import Failed, Feature, Refused
 SERVICE = "bans"
 # The ban list's key among the messages the bot keeps (cluster_tools.slack.keep).
 LIST = "bans"
+# The new bans' day log (cluster_tools.slack.DailyLog): its key and its replies' event_type.
+LOG, LOGGED = "ban-log", "cluster_ban_logged"
+
+
+def log_title(day, count):
+    """The new bans' day message (English: the administrators' channel)."""
+    return f"Ban log {day}: {count} rounds with new bans (each in the thread)"
 
 
 def address(text):
@@ -51,7 +58,7 @@ class UnbanFeature(Feature):
         """The hosts that ban IP now, with their bans; Failed when none could be asked."""
         found, errors = self.survey()
         if errors and not found:
-            raise Failed(f"차단 목록을 읽지 못했습니다 ({bans_blocks.by_reason(errors)})")
+            raise Failed(f"could not read the bans ({bans_blocks.by_reason(errors)})")
         return {h: hits for h, bans in found.items() if (hits := [b for b in bans if b["ip"] == ip])}
 
     def decide(self, req):
@@ -76,12 +83,19 @@ class UnbanFeature(Feature):
             except Failed as e:
                 errors[name] = e
         if errors:
-            raise Failed(f"{req['ip']} 차단을 다 풀지 못했습니다 ({bans_blocks.by_reason(errors)})")
+            raise Failed(f"could not lift every ban of {req['ip']} ({bans_blocks.by_reason(errors)})")
         where = f" ({bans_blocks.hostlist(lifted)})" if lifted else ""
         return f"{req['ip']} 차단을 풀었습니다{where}. 다시 접속해 보세요.", {"hosts": lifted}
 
     def describe(self, req):
         return f"IP {req['ip']} 차단 해제 ({req.get('reason') or '사유 없음'})"
+
+    def describe_en(self, req):
+        return (
+            f"unban IP {req['ip']} ("
+            + (f"reason: {req['reason']}" if req.get("reason") else "no reason given")
+            + ")"
+        )
 
 
 def _old_list(message):
@@ -90,11 +104,12 @@ def _old_list(message):
     return text.startswith("현재 차단된 주소") or text == "차단 목록을 읽지 못했습니다"
 
 
-def watch(feature, slack, channel, mention, seen, log=None):
+def watch(feature, slack, channel, seen, log=None):
     """One round of the ban watch in CHANNEL through SLACK (cluster_tools.slack.Slack).
-    Each ban new since the last round is told in one notice that starts with MENTION,
-    every one of them in its thread. The bans now are one message kept up to date
-    (cluster_tools.slack.keep: found in the channel, never posted twice, pinned): a
+    The bans new since the last round go in the day's ban log (a DailyLog: one message a
+    day, each round's new bans in its thread, mentioning no one: a ban needs nobody to
+    act, an unban comes as a request to approve). The bans now are one message kept up to
+    date (cluster_tools.slack.keep: found in the channel, never posted twice, pinned): a
     summary, and every ban in its thread. SEEN ({"bans": {key: ban}, "list": the kept
     record, "read": the hosts read once}, the caller keeps it) is updated. A host's first
     read only learns what it bans already: nothing of it is new then, whether that is the
@@ -111,10 +126,12 @@ def watch(feature, slack, channel, mention, seen, log=None):
     new = sorted((k for k in set(now) - set(before) if now[k]["host"] in read), key=lambda k: now[k]["since"])
     seen["read"] = sorted(read | set(found))
     if new:
-        (text, blocks), thread = bans_blocks.new_bans([now[k] for k in new])
-        ts = slack.post(channel, *mentioning(mention, text, blocks))
-        for reply in thread:
-            slack.post(channel, *reply, thread_ts=ts)
+        try:
+            DailyLog(channel, LOG, log_title, LOGGED).record(
+                slack, bans_blocks.new_bans([now[k] for k in new])
+            )
+        except Error as e:  # the bans are seen all the same: the list below holds them
+            log(f"the new bans were not logged: {e}")
     seen["bans"] = now
     card, thread = bans_blocks.ban_list(
         list(now.values()), errors, getattr(feature, "command", "/cluster"), read=bool(found)

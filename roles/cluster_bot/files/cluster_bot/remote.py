@@ -8,7 +8,9 @@ there (cluster_tools.bot_serve) runs only the services roles offer on that host.
 The request is the service's name and its words, quoted as a shell would quote them; the
 host splits them back without running a shell. The client is fully given here, no
 ssh_config read: a site's (host-based authentication, connection sharing) is for people
-and Ansible, and its failures buried the bot's own reason.
+and Ansible, and its failures buried the bot's own reason. A Failed is the system's,
+told to the administrators and the deploy's terminal, so in English (a person asking is
+told in Korean that the system could not do it, cluster_bot.requests).
 
     python3 -m cluster_bot.remote CONFIG ADDRESS   the services ADDRESS offers, as JSON
                                                    ({"offers": [...]} or {"failed": why})
@@ -25,15 +27,15 @@ TIMEOUT = 120
 # The dispatcher's own request (cluster_tools.bot_serve.OFFERS).
 OFFERS = "offers"
 # What the deploy does about each way the bot is kept out: its check names what is missing.
-DEPLOY = "`playbooks/generic/cluster-bot.yml`을 실행하면 무엇을 배포할지 알려 줍니다"
+DEPLOY = "run `playbooks/generic/cluster-bot.yml`: it names what to deploy"
 # ssh's own failures (exit 255), by the words of its message: (reason, what to do).
 SSH_FAILURES = (
-    (("Permission denied",), "봇의 키가 허용되지 않았습니다", DEPLOY),
+    (("Permission denied",), "the bot's key is not accepted", DEPLOY),
     (("Host key verification failed", "REMOTE HOST IDENTIFICATION HAS CHANGED"),
-     "호스트 키가 봇이 아는 것과 다릅니다", "`playbooks/generic/cluster-bot.yml`을 다시 실행해 호스트 키를 고정해 주세요"),
+     "the host key differs from the one the bot knows", "run `playbooks/generic/cluster-bot.yml` again to pin the host key"),
     (("Connection timed out", "Connection refused", "No route to host", "Network is unreachable",
       "Could not resolve", "Connection closed", "Connection reset"),
-     "접속되지 않습니다", "호스트가 켜져 있고 sshd가 응답하는지 확인해 주세요"),
+     "cannot connect", "check that the host is up and sshd answers"),
 )  # fmt: skip
 
 
@@ -48,13 +50,13 @@ def failure(returncode, stderr, stdout=""):
         for needles, reason, fix in SSH_FAILURES:
             if any(n in stderr for n in needles):
                 return Failed(reason, fix)
-        return Failed(f"SSH 접속이 실패했습니다: {_last_line(stderr)[:120]}")
+        return Failed(f"SSH failed: {_last_line(stderr)[:120]}")
     line = _last_line(stderr) or _last_line(stdout)
     if "offers no" in line:  # the dispatcher: the host offers no such service
-        return Failed("호스트가 이 서비스를 제공하지 않습니다", DEPLOY)
+        return Failed("the host does not offer this service", DEPLOY)
     # The service's own refusal, without its program's name ("cluster-bans: ...").
     return Failed(
-        line.split(": ", 1)[-1][:200] if line else f"호스트가 요청을 거절했습니다 (종료 코드 {returncode})"
+        line.split(": ", 1)[-1][:200] if line else f"the host refused the request (exit {returncode})"
     )
 
 
@@ -87,7 +89,7 @@ class Remote:
             )
         except subprocess.TimeoutExpired:
             raise Failed(
-                f"호스트가 {TIMEOUT}초 안에 답하지 않았습니다", "호스트가 느리거나 멈췄는지 확인해 주세요"
+                f"the host did not answer within {TIMEOUT} s", "check whether the host is slow or hung"
             ) from None
         if done.returncode != 0:
             raise failure(done.returncode, done.stderr, done.stdout)
@@ -97,7 +99,7 @@ class Remote:
             # A reply that is not the service's JSON is the host's failure, reported as
             # such, never an exception past the caller's report.
             raise Failed(
-                f"호스트가 알아볼 수 없는 답을 보냈습니다: {_last_line(done.stdout)[:80]!r}"
+                f"the host sent an answer that is not the service's: {_last_line(done.stdout)[:80]!r}"
             ) from None
 
     def __call__(self, *words):

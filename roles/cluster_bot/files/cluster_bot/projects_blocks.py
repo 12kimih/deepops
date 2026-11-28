@@ -82,7 +82,7 @@ def new_form(places):
         field("purpose", "폴더 설명", {"type": "plain_text_input"}, optional=True),
         field("place", "위치", {"type": "radio_buttons", "initial_option": _option(names["home"], "home"),
                                         "options": [_option(names[p], p) for p in names]}),
-        field("owners", "함께 맡을 사람 (소유자)", people, optional=True),
+        field("owners", "공동 소유자", people, optional=True),
         field("members", "멤버 (읽고 쓰기)", people, optional=True),
         field("viewers", "열람자 (읽기만)", people, optional=True),
         rich.context("신청한 사람이 소유자가 됩니다. 관리자가 승인하면 폴더가 만들어집니다."),

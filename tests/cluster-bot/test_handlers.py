@@ -264,7 +264,10 @@ class Handlers(unittest.TestCase):
         with mock.patch.object(app.remove, "run", return_value="no") as run:
             self.call("shortcut", app.remove.SHORTCUT, shortcut=payload)
         self.assertEqual(run.call_args.kwargs["user"], "UALICE")
-        self.assertEqual(run.call_args.kwargs["log_channel"], "#admin")
+        self.assertEqual(
+            run.call_args.kwargs["deletes"].channel, "#admin", "the day log in the admin channel"
+        )
+        self.assertEqual(run.call_args.kwargs["name"], "alice", "named by login, as text")
         self.client.chat_postEphemeral.assert_called_once()
         self.assertEqual(self.client.chat_postEphemeral.call_args.kwargs["user"], "UALICE")
         self.client.chat_postMessage.assert_not_called()

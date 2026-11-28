@@ -102,18 +102,29 @@ def dm_text(item, rank, advice):
     )
 
 
+# The administrators' day log of the hot nodes (cluster_tools.slack.DailyLog): its key and
+# its replies' event_type. A log, not a channel line: the people told are in the DM log.
+LOG, LOGGED = "io-log", "cluster_io_logged"
+
+
+def log_title(day, count):
+    """The I/O log's day message (English: the administrators' channel)."""
+    return f"I/O log {day}: {count} reports of hot nodes (each in the thread)"
+
+
 def admin_text(items):
-    """One line per hot node, for the administrators' channel."""
-    lines = []
+    """The administrators' message on the hot nodes, in English: a bullet per node, its
+    top jobs under it."""
+    lines = [f"**Shared storage under heavy I/O** ({len(items)} nodes)"]
     for item in items:
         _, _, _, verb, prep = DIRECTIONS[item["direction"]]
+        lines.append(
+            f"- `{item['host']}` {verb} {prep} `{item['mount']}` at {rate(item['rate'])} "
+            f"({share_of(item)}% of the disk) for {item['minutes']} min"
+        )
         # No job ranked on a hot node means the per-job count is broken there, not that
         # nobody did it: no one could be told, so the line says what to look at.
-        jobs = ", ".join(f"{job} ({user}, {rate(r)})" for job, user, r in item["jobs"]) or (
-            "none counted, so nobody was told: io-usage counts no job there (alert IoUsageJobsMissing)"
-        )
-        lines.append(
-            f"I/O: `{item['host']}` {verb} {prep} `{item['mount']}` at {rate(item['rate'])} "
-            f"({share_of(item)}% of the disk) for {item['minutes']} min; top jobs: {jobs}"
-        )
+        lines += [f"  - job {job} ({user}): {rate(r)}" for job, user, r in item["jobs"]] or [
+            "  - no job counted, so nobody was told: io-usage counts no job there (alert IoUsageJobsMissing)"
+        ]
     return "\n".join(lines)

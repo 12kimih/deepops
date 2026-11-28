@@ -243,6 +243,12 @@ terms:
     title_not:
       - 구성원 기간
     why: What acts on a person is the end of their membership, not the period itself.
+  # The reports' titles (owner, 2026-11-28): fixed nouns the docs name too.
+  - title: 주간 GPU 사용
+    title_not:
+      - 지난 \{?\w*\}?일 GPU 사용
+    why: The weekly summary's card, one fixed name in Slack and the docs; its period goes
+      in the header's date.
   # Title idioms (owner, 2026-11-27): a verb phrase that names a thing has a noun for
   # it in a title; refused in titles only, sentences keep them.
   - title: 역할

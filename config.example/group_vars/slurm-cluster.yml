@@ -127,7 +127,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_usage_report_disk_repeat_days: 7
 # The I/O notices: a node whose NFS traffic to a measured export (io_fairness_models)
 # stays above io_share of the disk's throughput for io_minutes; the users of its top
-# jobs by I/O get a DM ending in io_advice, the administrators one line per node.
+# jobs by I/O get a DM ending in io_advice; the node goes in the administrators' day log.
 #slurm_usage_report_io_share: 0.4
 #slurm_usage_report_io_minutes: 15
 #slurm_usage_report_io_repeat_hours: 6

@@ -25,7 +25,8 @@ class Refused(Exception):
 
 class Failed(Exception):
     """The system the request acts on refused or could not be reached: str() says why in
-    one short line; FIX, when known, what an administrator does about it."""
+    one short line; FIX, when known, what an administrator does about it. Both in English:
+    they are for the administrators (Refused, said to the person asking, is Korean)."""
 
     def __init__(self, reason, fix=""):
         super().__init__(reason)
@@ -65,11 +66,14 @@ class Engine:
     def describe(self, req):
         return self.features[req["kind"]].describe(req)
 
+    def describe_en(self, req):
+        return self.features[req["kind"]].describe_en(req)
+
     def _apply(self, req):
         try:
             text, data = self.features[req["kind"]].apply(req)
         except (Failed, Refused) as e:
-            return Outcome("refused", f"처리하지 못했습니다: {e}", request=req)
+            return Outcome("refused", f"처리하지 못했습니다: {e}", {"error": str(e)}, request=req)
         return Outcome("done", text, data, req)
 
     def submit(self, req):
@@ -88,6 +92,9 @@ class Engine:
         approvers = list(verdict[1]) if isinstance(verdict, tuple) and verdict[0] == "people" else []
         key = secrets.token_hex(4)
         with state.locked(self.pending_path, {}) as pending:
+            # The same request asked again while held is that one: no second approval post.
+            if any(all(p.get(k) == v for k, v in req.items()) for p in pending.values()):
+                return Outcome("refused", "같은 요청이 이미 승인을 기다리고 있습니다.", request=req)
             pending[key] = {**req, "why": why, "asked": int(time.time()), "approvers": approvers}
         whom = f"{', '.join(approvers)} 중 한 명의" if approvers else "관리자"
         return Outcome(

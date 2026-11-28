@@ -44,23 +44,24 @@ def recipient_login(recipient, email_domain):
 
 
 def line(env):
-    """One line for a notice, from the job's environment."""
+    """One job's line of a notice, from the job's environment: its ID and name, then its
+    state, run time and a failing exit code."""
     state = env.get("SLURM_JOB_STATE", "") or env.get("SLURM_JOB_MAIL_TYPE", "")
     head = f"`{escape(env.get('SLURM_JOB_ID', '?'))}` {escape(env.get('SLURM_JOB_NAME', ''))}".rstrip()
-    parts = [head, state, env.get("SLURM_JOB_RUN_TIME", "")]
+    parts = [state, env.get("SLURM_JOB_RUN_TIME", "")]
     code = env.get("SLURM_JOB_EXIT_CODE_MAX")
     if code not in (None, "", "0"):
         parts.append(f"exit {code}")
-    return ", ".join(p for p in parts if p)
+    rest = ", ".join(p for p in parts if p)
+    return f"{head}: {rest}" if rest else head
 
 
 def render(lines):
-    """The message for one or more notices."""
-    if len(lines) == 1:
-        return f"Slurm 잡 알림: {lines[0]}"
-    shown = "\n".join(lines[-SHOWN:])
+    """The message for one or more notices: a bold title, a bullet per job."""
+    shown = "\n".join(f"- {ln}" for ln in lines[-SHOWN:])
     more = f"\n(앞의 {len(lines) - SHOWN}개 생략)" if len(lines) > SHOWN else ""
-    return f"Slurm 잡 알림 {len(lines)}건\n{shown}{more}"
+    count = f" {len(lines)}건" if len(lines) > 1 else ""
+    return f"**Slurm 잡 알림**{count}\n{shown}{more}"
 
 
 @contextmanager

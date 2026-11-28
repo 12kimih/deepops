@@ -1,6 +1,7 @@
-"""Block Kit pieces every feature shares: buttons, form fields, and the administrators'
-message for a held request (cluster_bot.requests), approved or denied with
-request.approve and request.deny whatever the feature."""
+"""Block Kit pieces every feature shares: buttons, form fields, and the message for a
+held request (cluster_bot.requests), approved or denied with request.approve and
+request.deny whatever the feature: in Korean to the people it is held for (a project's
+owners, by DM), in English in the administrators' channel (held_admin, decided_admin)."""
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 
@@ -26,7 +27,7 @@ def field(block_id, label, element, optional=False):
 
 
 def held(user_mention, text, key):
-    """The administrators' message for a request held for them (any feature)."""
+    """The message to a person a request is held for (a project's owner, by DM)."""
     return [
         rich.section(f"{user_mention}: {text}"),
         {"type": "actions", "elements": [
@@ -34,3 +35,27 @@ def held(user_mention, text, key):
             button("거절", "request.deny", key, style="danger"),
         ]},
     ]  # fmt: skip
+
+
+def held_admin(who, what, key):
+    """(text, blocks) of a request held for the administrators, in their channel: WHO
+    asked (a login, as text), WHAT (the feature's describe_en)."""
+    text = f"Approval needed: {what} (asked by {who})"
+    return text, [
+        rich.section(f"**Approval needed**: {what}\nAsked by {who}"),
+        {"type": "actions", "elements": [
+            button("Approve", "request.approve", key, style="primary"),
+            button("Deny", "request.deny", key, style="danger"),
+        ]},
+    ]  # fmt: skip
+
+
+def decided_admin(outcome, approved, by, what):
+    """The administrators' held message once decided: approved or denied BY (a login, as
+    text), WHAT was asked, and how it went (OUTCOME, cluster_bot.requests)."""
+    if not outcome.request:
+        return "Already decided."
+    if not approved:
+        return f"Denied by {by}: {what}"
+    error = outcome.data.get("error")
+    return f"Approved by {by}: {what}. " + (f"Failed: {error}" if error else "Done.")

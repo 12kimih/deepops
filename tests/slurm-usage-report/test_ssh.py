@@ -32,9 +32,9 @@ class Prom:
                 for (n, labels), v in self.values.items() if n == name]  # fmt: skip
 
 
-def counts(sessions, blocked=()):
+def counts(sessions, blocked=(), start=NOW - 5):
     """The metrics of a login node where each of SESSIONS ({login: n}) opened n new
-    sessions and each of BLOCKED is refused."""
+    sessions and each of BLOCKED is refused, from START."""
     with tempfile.TemporaryDirectory() as d:
         cfg = {"mode": "refuse", "window_minutes": 10, "warn_sessions": 90, "refuse_sessions": 100,
                "block_minutes": 10, "block_max_minutes": 60, "exempt_users": [], "state_dir": d,
@@ -42,7 +42,7 @@ def counts(sessions, blocked=()):
         for login, n in sessions.items():
             state = {"sessions": [NOW - 60 + i * 0.1 for i in range(n)]}
             if login in blocked:
-                state.update(blocked_until=NOW + 600, block_start=NOW - 5)
+                state.update(blocked_until=start + 605, block_start=start)
             Path(d, login).write_text(json.dumps(state))
         ssh_rate.metrics(cfg, NOW)
         return Path(cfg["textfile"]).read_text()
@@ -78,22 +78,23 @@ class Run(unittest.TestCase):
             report.ssh(cfg, mock.Mock(dry_run=False, to=None))
         return posted
 
-    def test_a_warning_daily_and_a_refusal_once_with_the_admins_told(self):
+    def test_a_warning_daily_and_a_refusal_daily_and_no_channel_line(self):
         text = counts({"kim": 95, "lee": 120, "park": 12}, blocked=("lee",))
         with tempfile.TemporaryDirectory() as d:
             posted = self.run_ssh(text, d)
             to = sorted(p[0] for p in posted)
-            self.assertEqual(to, ["#admins", "UKIM", "ULEE"], "park is below the warning")
+            self.assertEqual(to, ["UKIM", "ULEE"], "park is below the warning; the DM log has them, no line")
             lee = next(t for m, t in posted if m == "ULEE")
             self.assertIn("막혔습니다", lee)
             self.assertIn("ControlMaster", lee)
             self.assertIn("`usage login-node`", lee, "every warning ends with its check")
-            self.assertIn("lee (m)", next(t for m, t in posted if m == "#admins"))
             self.assertEqual(self.run_ssh(text, d, NOW + 300), [], "told already: nothing again")
-            again = self.run_ssh(text, d, NOW + 25 * 3600)
+            later = counts({"kim": 95, "lee": 120, "park": 12}, blocked=("lee",), start=NOW + 3600)
             self.assertEqual(
-                sorted(p[0] for p in again), ["UKIM"], "the warning again a day on; the block once"
+                self.run_ssh(later, d, NOW + 3600), [], "a new block within the day is not told again"
             )
+            again = self.run_ssh(later, d, NOW + 25 * 3600)
+            self.assertEqual(sorted(p[0] for p in again), ["UKIM", "ULEE"], "both again a day on")
 
     def test_off_tells_no_one(self):
         text = counts({"kim": 95})

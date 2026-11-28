@@ -13,11 +13,12 @@ slack_members: "{{ people | people_attr('slack') }}"
 # looked up); a notice sent to an address in it names that login.
 slack_email_domain: ""
 
-# The channels by what they are for:
-#   status    what everyone may look at: the hourly and weekly GPU usage, storage
-#   admin     what an administrator has to act on
-#   help      where people ask for help and make requests (accounts, unbans, shared data)
-#   announce  notices and release notes
+# The channels by what they are for, and the language the cluster writes there
+# (cluster_tools.cards.LANGUAGE; a DM to a person is Korean):
+#   status    what everyone may look at: the hourly and weekly GPU usage, storage (Korean)
+#   admin     what an administrator has to act on, and the day logs (English)
+#   help      where people ask for help and make requests (accounts, unbans, shared data) (Korean)
+#   announce  notices and release notes (Korean)
 slack_channels:
   status: "#gpu-usage"
   admin: "#alerts"
@@ -35,8 +36,8 @@ slack_dm_log_channel: "{{ slack_channels.admin }}"
 # how a notice an administrator has to act on mentions the group in
 # slack_channels.admin, so Slack notifies its members: critical alerts
 # (roles/alertmanager), the usage report's notices to administrators
-# (roles/slurm_usage_report), the cluster bot's held requests and new bans
-# (roles/cluster_bot); reports and the lists the bot keeps up to date do not. Empty ID
+# (roles/slurm_usage_report), the cluster bot's held requests (roles/cluster_bot);
+# reports, the day logs and the lists the bot keeps up to date do not. Empty ID
 # with a handle and the bot token: each run looks the ID up by the handle (this role's
 # tasks, usergroups.list) and says it, to pin here. No ID found: those notices mention
 # no one.

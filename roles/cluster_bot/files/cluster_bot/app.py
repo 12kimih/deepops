@@ -131,12 +131,13 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             # otherwise the administrators, in their channel.
             places = [s for s in map(slack_of, approvers) if s] or [channels["admin"]]
             for place in places:
-                text, blocks = outcome.text, shared.held(f"<@{slack_id}>", outcome.text, outcome.key)
                 if place == channels["admin"]:
-                    text, blocks = mentioning(cfg["admin_mention"], text, blocks)
+                    text, blocks = mentioning(cfg["admin_mention"], *shared.held_admin(
+                        user_of(slack_id) or f"<@{slack_id}>", engine.describe_en(req), outcome.key))  # fmt: skip
                     client.chat_postMessage(channel=place, **rich.message(text, blocks))
                 else:
-                    dm(place, text, blocks, kind="approval", log=True)
+                    blocks = shared.held(f"<@{slack_id}>", outcome.text, outcome.key)
+                    dm(place, outcome.text, blocks, kind="approval", log=True)
             engine.note(outcome.key, slack_id=slack_id, thread_ts=first["ts"])
             dm(slack_id, outcome.text, kind="request", log=False)
         else:
@@ -430,13 +431,15 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
 
     # One of the bot's messages deleted by an administrator (cluster_bot.remove): only they
     # see the answer.
+    deletes = remove.log(channels.get("admin", ""))
+
     @app.shortcut(remove.SHORTCUT)
     def delete_message(ack, shortcut, client):
         ack()
         user, channel, message = shortcut["user"]["id"], shortcut["channel"]["id"], shortcut["message"]
-        text = remove.run(dms, user=user, channel=channel, ts=message["ts"], thread_ts=message.get("thread_ts"),
-                          group_id=cfg.get("admin_group_id", ""), known=(cfg.get("tidy") or {}).get("known") or {},
-                          log_channel=channels.get("admin", ""))  # fmt: skip
+        text = remove.run(dms, user=user, name=user_of(user) or user, channel=channel, ts=message["ts"],
+                          thread_ts=message.get("thread_ts"), group_id=cfg.get("admin_group_id", ""),
+                          known=(cfg.get("tidy") or {}).get("known") or {}, deletes=deletes)  # fmt: skip
         client.chat_postEphemeral(channel=channel, user=user, **rich.message(text))
 
     @app.action("request.approve")
@@ -448,13 +451,17 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
         if admin not in admins and user_of(admin) not in engine.approvers(action["value"]):
             dm(admin, "이 요청을 승인할 수 있는 사람이 아닙니다.", kind="request", log=False)
             return
-        if action["action_id"] == "request.approve":
+        approved = action["action_id"] == "request.approve"
+        if approved:
             outcome = engine.approve(action["value"], f"<@{admin}>")
         else:
             outcome = engine.deny(action["value"], f"<@{admin}>")
-        client.chat_update(
-            channel=body["channel"]["id"], ts=body["message"]["ts"], **rich.message(outcome.text)
-        )
+        text = outcome.text
+        # Held for the administrators in their channel (English, no mention); for an owner, in a DM (D...).
+        if not body["channel"]["id"].startswith("D"):
+            what = engine.describe_en(outcome.request) if outcome.request else ""
+            text = shared.decided_admin(outcome, approved, user_of(admin) or admin, what)
+        client.chat_update(channel=body["channel"]["id"], ts=body["message"]["ts"], **rich.message(text))
         if outcome.request.get("slack_id"):
             tell(client, outcome.request["slack_id"], outcome, log=True)
 
@@ -607,7 +614,7 @@ def main(argv=None):
 
         def watch_round():
             with state.locked(cfg["bans"]["seen"], {}) as seen:
-                watch(unban, dms, channels["admin"], cfg["admin_mention"], seen)
+                watch(unban, dms, channels["admin"], seen)
 
         every(BAN_WATCH_EVERY, "ban watch", watch_round)
     if data is not None:

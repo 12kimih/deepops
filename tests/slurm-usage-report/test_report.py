@@ -508,22 +508,33 @@ class WeeklyTests(unittest.TestCase):
             values = {"alice": 40 if idle else 100, "bob": 90 if idle else 120, "carol": 0 if idle else 30}
             return [{"metric": {"user": u}, "value": [0, str(v)]} for u, v in values.items()]
 
-    def test_collect_and_render_idlest_first(self):
+    def test_the_summary_lists_the_top_by_gpu_hours_and_by_idle_hours_mentioning_no_one(self):
+        """Owner, 2026-11-28: the weekly summary mentions no one; it names the top people
+        by GPU-hours and by idle hours, as plain names."""
         rows = report.collect_week(self.Prom(), 0)
         self.assertEqual([r["user"] for r in rows], ["bob", "alice", "carol"])
-        text, blocks = report.render_week(rows, lambda u, m: f"@{u}" if m else u, 5, top=1)
+        text, blocks = report.render_week(rows, 5, top=2, now=7 * 86400)
         self.assertIn("250 GPU시간 중 GPU 유휴 시간 130 (52%)", text)
+        self.assertEqual(blocks[0]["text"]["text"], ":bar_chart: 주간 GPU 사용  01-01 ~ 01-08")
         body = rich.read([b for b in blocks if b["type"] not in ("header", "context")])
-        self.assertIn("@bob: 120 GPU시간 중 유휴 90 (75%)", body)
-        self.assertIn("alice: 100 GPU시간 중 유휴 40", body)
+        top = body[body.index("GPU시간 상위") : body.index("GPU 유휴 시간 상위")]
+        self.assertEqual(
+            top.splitlines()[1:], ["- bob: 120 GPU시간 (유휴 75%)", "- alice: 100 GPU시간 (유휴 40%)"]
+        )
+        idle = body[body.index("GPU 유휴 시간 상위") :]
+        self.assertEqual(
+            idle.splitlines()[1:3],
+            ["- bob: 90 GPU시간 (할당 시간의 75%)", "- alice: 40 GPU시간 (할당 시간의 40%)"],
+        )
+        self.assertNotIn("carol", idle, "no idle hours, not on the idle list")
+        self.assertNotIn("<@", str(blocks) + text, "no mention")
         note = rich.read([b for b in blocks if b["type"] == "context"])
         self.assertIn("5% 이하", note, "the threshold the hours were counted at, not a fixed 0%")
-        self.assertIn("가장 긴 1명(1시간 이상)을 멘션합니다", note, "why one is mentioned and another not")
+        self.assertNotIn("멘션", note)
         self.assertEqual(report.util_at_most(0), "0%", "nothing is under 0%")
         self.assertEqual(report.util_at_most(5), "5% 이하")
-        _, zero = report.render_week(rows, lambda u, m: u, 0)
+        _, zero = report.render_week(rows, 0)
         self.assertNotIn("0% 이하", rich.read(zero))
-        self.assertNotIn("@alice", body)
 
     def test_a_streak_of_heavy_weeks_is_reported_and_a_rerun_replaces_its_week(self):
         weeks = {}
@@ -538,9 +549,10 @@ class WeeklyTests(unittest.TestCase):
         self.assertEqual(report.repeaters(weeks, self.CFG), [])
         text, blocks = report.render_repeaters(["bob"], {"bob": weeks["bob"][:2]}, [], self.CFG)
         self.assertIn("bob", text)
-        context = rich.read(blocks[-1:])
-        self.assertIn("What to do", context)
-        self.assertIn("50 idle GPU-hours and 50%", context)
+        shown = rich.read(blocks)
+        self.assertIn("What to do", shown)
+        self.assertIn("- week 1: 90 idle of 120 GPU-hours", shown)
+        self.assertIn("50 idle GPU-hours and 50%", rich.read(blocks[-1:]))
 
 
 if __name__ == "__main__":

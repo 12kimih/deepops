@@ -156,9 +156,9 @@ class RenderTests(unittest.TestCase):
         self.assertIn("경고 수준을 넘은 사용량 2건", text)
         body = text_of(card)
         self.assertIn("login:/    ████████░░  75%  400G   100G  +10G", body)
-        self.assertIn(":red_circle: @bob login:/에서: 21G, 한도(20G)에 닿았습니다", body)
+        self.assertIn(":small_red_triangle: @bob login:/에서: 21G, 한도(20G)에 닿았습니다", body)
         self.assertIn(
-            ":large_yellow_circle: @alice login:/에서: 18G, 경고 수준(15G)을 넘었습니다 (한도 20G)", body
+            ":small_orange_diamond: @alice login:/에서: 18G, 경고 수준(15G)을 넘었습니다 (한도 20G)", body
         )
         self.assertNotIn("@carol", body)
         self.assertIn("nfs (마지막", body, "a host not reported lately is named")
@@ -182,7 +182,7 @@ class RenderTests(unittest.TestCase):
         (_, card), _ = disk_report.render(
             data, who, fill=fill, fill_mention={disk_report.fill_key(("login", "/"))}
         )
-        self.assertIn(":large_yellow_circle: login:/ 75% 사용 중: @bob 21G, @alice 18G", text_of(card))
+        self.assertIn(":small_orange_diamond: login:/ 75% 사용 중: @bob 21G, @alice 18G", text_of(card))
         (_, card), _ = disk_report.render(data, who, fill=fill, fill_mention=set())
         self.assertIn("75% 사용 중: bob 21G, alice 18G", text_of(card), "named every day, mentioned when due")
 
@@ -200,7 +200,7 @@ class RenderTests(unittest.TestCase):
         body = text_of(card)
         self.assertIn("경고 수준을 넘은 프로젝트", body)
         self.assertIn(
-            ":large_yellow_circle: shared-data nfs:/home에서: 19G, 경고 수준(18G)을 넘었습니다 (한도 20G)",
+            ":small_orange_diamond: shared-data nfs:/home에서: 19G, 경고 수준(18G)을 넘었습니다 (한도 20G)",
             body,
         )
         self.assertNotIn("/home/shared/datasets*", body, "7G of a 10G limit is past nothing")
@@ -330,7 +330,7 @@ class RunTests(unittest.TestCase):
             self.assertIn("<@UBOB> (bob)", posted[0][2])
             self.assertNotIn("<@UALICE>", posted[0][2])
             self.assertIn(
-                ":large_yellow_circle: alice login:/에서", posted[0][2], "still listed, not mentioned"
+                ":small_orange_diamond: alice login:/에서", posted[0][2], "still listed, not mentioned"
             )
 
     def test_a_filling_filesystem_mentions_its_people_at_most_weekly(self):

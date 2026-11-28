@@ -1,6 +1,7 @@
-"""The Slack form of unban requests (cluster_bot.bans)."""
+"""The Slack form of unban requests (cluster_bot.bans): the request form in Korean (a
+person asks), the ban list and the new bans in English (the administrators' channel)."""
 
-from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+from cluster_tools import cards, rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 from cluster_tools.slack import escape, pages  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 from cluster_tools.slurm import hostlist  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 
@@ -24,37 +25,44 @@ def unban_form():
 
 
 def _line(b):
-    return f"`{escape(b['ip'])}` {escape(b['host'])} ({escape(b['jail'])}), {escape(b['since'])}부터"
+    return f"`{escape(b['ip'])}` on {escape(b['host'])} ({escape(b['jail'])}) since {escape(b['since'])}"
 
 
 def _summary(bans):
-    """The lines that sum BANS up: how many on each host, and the newest."""
+    """The Markdown that sums BANS up: how many on each host, one bullet each, and the
+    newest."""
     hosts = {}
     for b in bans:
         hosts[b["host"]] = hosts.get(b["host"], 0) + 1
     newest = max(bans, key=lambda b: b["since"])
-    return [
-        "호스트별: " + ", ".join(f"{escape(h)} {n}개" for h, n in sorted(hosts.items())),
-        f"가장 최근: {_line(newest)}",
-    ]
+    return "\n".join(
+        [
+            "**By host**",
+            *(f"- {escape(h)}: {n}" for h, n in sorted(hosts.items())),
+            f"**Newest**: {_line(newest)}",
+        ]
+    )
 
 
 def _listing(title, bans):
-    """TITLE and BANS as a card (text, blocks: the count, each host's count, the newest)
-    and the thread [(text, blocks)] with every ban, newest first, in as many replies as
-    Slack's limits need (cluster_tools.slack.pages); none when the card shows them all."""
+    """TITLE and BANS as a card (text, blocks: each host's count, the newest) and the
+    thread [(text, blocks)] with every ban, newest first, one bullet each, in as many
+    replies as Slack's limits need (cluster_tools.slack.pages); none when the card shows
+    them all. The administrators' channel: English."""
     bans = sorted(bans, key=lambda b: b["since"], reverse=True)
-    blocks = [rich.section(f"**{title}**"), *rich.blocks("\n".join(_summary(bans)))]
+    blocks = [cards.title(title), *rich.blocks(_summary(bans))]
     if len(bans) < 2:
         return (title, blocks), []
-    lines = rich.blocks("\n".join(_line(b) for b in bans))
-    return (title, blocks), pages(f"{title}: 전체 목록", lines)
+    lines = rich.blocks("\n".join(f"- {_line(b)}" for b in bans))
+    return (title, blocks), pages(f"{title}: every ban", lines)
 
 
 def new_bans(bans):
-    """The administrators' notice of the bans made since the last look: the card (text,
-    blocks) and its thread [(text, blocks)], every ban in it."""
-    return _listing(f"새로 차단된 주소 {len(bans)}개", bans)
+    """The day log's entry ([(text, blocks)]) of the bans made since the last look
+    (cluster_bot.bans.watch): how many, and every one."""
+    title = f"New bans: {len(bans)}"
+    lines = "\n".join(f"- {_line(b)}" for b in sorted(bans, key=lambda b: b["since"]))
+    return pages(title, rich.blocks(f"**{title}**\n{lines}"))
 
 
 def unread(errors):
@@ -77,22 +85,22 @@ def ban_list(bans, errors, command="/cluster", read=True):
     """The bans now as the one message kept up to date: the card (text, blocks) sums them
     up, the thread [(text, blocks)] lists every one, newest first. ERRORS ({host: Failed})
     are the hosts not read this time, by reason with what to do; their bans stay as last
-    seen. READ: any host was read. COMMAND is the bot's."""
+    seen. READ: any host was read. COMMAND is the bot's. The administrators' channel:
+    English."""
     if bans:
-        (text, blocks), thread = _listing(f"현재 차단된 주소 {len(bans)}개", bans)
+        (text, blocks), thread = _listing(f"Banned addresses: {len(bans)}", bans)
     else:
-        text = "현재 차단된 주소가 없습니다" if read else "차단 목록을 읽지 못했습니다"
-        blocks, thread = [rich.section(f"**{text}**")], []
+        text = "Banned addresses: none" if read else "Banned addresses: unread"
+        blocks, thread = [cards.title(text)], []
     if errors:
         shown = [
-            f"- {escape(hosts)}: {reason}." + (f" {fix}." if fix else "")
+            f"- {escape(hosts)}: {reason}" + (f" (to fix: {fix})" if fix else "")
             for hosts, reason, fix in unread(errors)
         ]
-        blocks += rich.blocks(
-            "\n".join(["**읽지 못한 호스트** (그 호스트의 차단은 마지막으로 읽은 대로입니다)", *shown])
-        )
-    note = f"해제는 `{command} unban` 신청을 받아 승인합니다."
+        blocks += cards.part("Hosts not read", "\n".join(shown))
+        blocks.append(cards.note("Their bans are as last read."))
+    note = f"An unban is asked with `{command} unban` and approved here."
     if thread:
-        note = f"전체 목록은 이 메시지의 스레드에 있습니다. {note}"
-    blocks.append(rich.context(note))
+        note = f"Every ban is in this message's thread. {note}"
+    blocks.append(cards.note(note))
     return (text, blocks), thread

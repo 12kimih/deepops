@@ -1,13 +1,13 @@
 {{/* Written by roles/alertmanager; edits are overwritten. One message per kind of alert
 (group_by alertname): the title says whether anything still fires and where, a firing
 message lists only what fires (a description they share, once), and a resolved one is one
-struck-through line per alert. */}}
+struck-through line per alert. Its marks are cluster_tools.emoji.ALERT's. */}}
 {{ define "slack.color" -}}
 {{ if eq .Status "resolved" }}good{{ else if eq .CommonLabels.severity "critical" }}danger{{ else }}warning{{ end }}
 {{- end }}
 
 {{ define "slack.title" -}}
-{{ if eq .Status "resolved" }}:white_check_mark: Resolved{{ else if eq .CommonLabels.severity "critical" }}:red_circle: Critical{{ else }}:large_orange_circle: Warning{{ end -}}
+{{ if eq .Status "resolved" }}:heavy_check_mark: Resolved{{ else if eq .CommonLabels.severity "critical" }}:small_red_triangle: Critical{{ else }}:small_orange_diamond: Warning{{ end -}}
 : {{ .CommonLabels.alertname }}
 {{- $shown := .Alerts.Firing }}{{ if eq .Status "resolved" }}{{ $shown = .Alerts.Resolved }}{{ end }}
 {{- if eq (len $shown) 1 }}{{ with (index $shown 0).Labels.host }} on {{ . }}{{ end }}{{ else if gt (len $shown) 1 }} ({{ len $shown }}){{ end }}

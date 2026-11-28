@@ -32,7 +32,7 @@ def leave_form(login, may_choose, today):
     ]  # fmt: skip
     if may_choose:
         blocks.append(
-            field("login", "정리할 계정의 아이디", {"type": "plain_text_input", "initial_value": login})
+            field("login", "정리 대상 계정 아이디", {"type": "plain_text_input", "initial_value": login})
         )
     return {
         "type": "modal", "callback_id": "leave.submit", "private_metadata": login,

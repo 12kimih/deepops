@@ -89,8 +89,9 @@ class Collect(unittest.TestCase):
         self.assertIn("2번째로 많이 쓴 잡이 `11`", io_report.dm_text(item, 1, ""))
         self.assertEqual(
             io_report.admin_text([item]),
-            "I/O: `n1` writing to `/home` at 400M/s (50% of the disk) for 15 min; "
-            "top jobs: 10 (alice, 300M/s), 11 (bob, 50M/s), 12 (root, 1M/s)",
+            "**Shared storage under heavy I/O** (1 nodes)\n"
+            "- `n1` writing to `/home` at 400M/s (50% of the disk) for 15 min\n"
+            "  - job 10 (alice): 300M/s\n  - job 11 (bob): 50M/s\n  - job 12 (root): 1M/s",
         )
 
 
@@ -114,10 +115,20 @@ class Run(unittest.TestCase):
                 posted.append((channel, text))
                 return "ts"
 
+        class Log:
+            """The administrators' day log (cluster_tools.slack.DailyLog): its entries."""
+
+            def __init__(self, channel, key, title, logged):
+                self.channel = channel
+
+            def record(self, slack, entry):
+                posted.append((f"log {self.channel}", entry[0][0]))
+
         cfg = dict(self.CFG, state_file=f"{state}/state.json")
         args = mock.Mock(dry_run=False, to=to)
         with (
             mock.patch.object(report, "Prometheus", lambda url: prom),
+            mock.patch.object(report, "DailyLog", Log),
             mock.patch.object(report, "Slack", Slack),
             mock.patch.object(report.time, "time", lambda: now),
         ):
@@ -134,8 +145,9 @@ class Run(unittest.TestCase):
             posted, error, saved = self.run_io(Prom(), d)
             self.assertIsNone(error)
             self.assertEqual(
-                sorted(p[0] for p in posted), ["#admins", "UALICE", "UBOB"], "root's job: admins only"
+                sorted(p[0] for p in posted), ["UALICE", "UBOB", "log #admins"], "root's job: admins only"
             )
+            self.assertNotIn("#admins", dict(posted), "the day log, never a channel line")
             self.assertIn("가장 많이 쓴 잡", dict(posted)["UALICE"])
             self.assertEqual(len(saved["told"]), 3)
             again, _, _ = self.run_io(Prom(), d, now=NOW + 3600)
@@ -155,7 +167,7 @@ class Run(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             posted, error, saved = self.run_io(Prom(), d, fail={"UBOB"})
             self.assertIn("notifying bob", error)
-            self.assertEqual(sorted(p[0] for p in posted), ["#admins", "UALICE"])
+            self.assertEqual(sorted(p[0] for p in posted), ["UALICE", "log #admins"])
             self.assertNotIn(io_report.user_key({"host": "n1", "mount": "/home", "direction": "write"}, "bob"),
                              saved["told"])  # fmt: skip
 

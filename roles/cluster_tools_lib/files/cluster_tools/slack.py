@@ -18,6 +18,8 @@
     keep(slack, channel, key, card, thread, record) -> one message kept up to date, with
                                                its replies (below); the record to keep
     find(slack, channel, key, legacy) -> the bot's own messages marked KEY, newest first
+    DailyLog(channel, key, title, logged).record(slack, entry) -> ENTRY's replies under
+                                               the day's one message (DmLog: the DMs')
 
 A message the bot keeps up to date (a list edited in place, a day's log) is marked with
 Slack's message metadata (event_type KEPT, payload {"key", "part"}) and found in the
@@ -90,20 +92,23 @@ class Error(RuntimeError):
     """Slack refused or could not be reached; str() says which method and why."""
 
 
-class DmLog:
-    """The administrators' record of the DMs: in CHANNEL, one message a day, its count
-    kept up to date, and under it each DM as the person got it (dm_log_entry). Slack
-    holds it all: the day's message is the bot's one marked "dm-log DAY" (find()), the
-    count is the replies marked DM_LOGGED, so any number of senders, in any process on any
-    host, share them. Two senders that start a day at once each post a day message, see
-    both, and keep the older; a count one of them wrote over is read again and set right
-    (DM_LOG_RECOUNT). Needs the history scopes (cluster_bot.scopes reports them)."""
+class DailyLog:
+    """A record the administrators open only when they want it: in CHANNEL, one message
+    a day titled TITLE(day, count), its count kept up to date, and under it each entry
+    (a list of replies). Slack holds it all: the day's message is the bot's one marked
+    "KEY DAY" (find()), the count is the replies marked LOGGED (event_type), so any number
+    of senders, in any process on any host, share them. Two senders that start a day at
+    once each post a day message, see both, and keep the older; a count one of them wrote
+    over is read again and set right (DM_LOG_RECOUNT). No entry mentions anyone, so the
+    channel's alerts stay on top. Needs the history scopes (cluster_bot.scopes reports
+    them). The DMs' log is one (DmLog), the bot's deletes another (cluster_bot.remove)."""
 
-    def __init__(self, channel):
-        self.channel, self._cid = channel, None
+    def __init__(self, channel, key, title, logged):
+        self.channel, self.key, self.title, self.logged = channel, key, title, logged
+        self._cid = None
 
     def record(self, slack, entry, now=None):
-        """ENTRY (dm_log_entry: [(text, blocks)]) under today's message, in order."""
+        """ENTRY ([(text, blocks)]) under today's message, in order."""
         now = time.time() if now is None else now
         day = time.strftime("%Y-%m-%d", time.localtime(now))
         if self._cid is None:
@@ -111,18 +116,19 @@ class DmLog:
         cid, start = self._cid, _day_start(now)
         ts = self._day_message(slack, cid, day, start)
         for part, (text, blocks) in enumerate(entry):
-            slack.post(cid, text, blocks, thread_ts=ts, metadata=_logged(part))
+            meta = {"event_type": self.logged, "event_payload": {"part": part}}
+            slack.post(cid, text, blocks, thread_ts=ts, metadata=meta)
         self._count(slack, cid, ts, day)
 
     def _day_message(self, slack, cid, day, start):
         """The ts of DAY's message: the bot's oldest marked for it, posted by this call
         when there is none. A second one posted meanwhile by another sender gives way to
         the older, deleted before any reply is under it."""
-        key = f"dm-log {day}"
+        key = f"{self.key} {day}"
         found = find(slack, cid, key, oldest=start)
         if found:
             return min(found, key=float)
-        mine = slack.call("chat.postMessage", channel=cid, text=dm_log_title(day, 0),
+        mine = slack.call("chat.postMessage", channel=cid, text=self.title(day, 0),
                           metadata=json.dumps(marked(key)))["ts"]  # fmt: skip
         oldest = min(find(slack, cid, key, oldest=start) + [mine], key=float)
         if oldest != mine:
@@ -130,33 +136,36 @@ class DmLog:
         return oldest
 
     def _count(self, slack, cid, ts, day):
-        """Set the day message's count to the DMs logged under it, read from Slack, and
-        read it again after: a sender that counted earlier and wrote later is outdone."""
+        """Set the day message's count to the entries logged under it, read from Slack,
+        and read it again after: a sender that counted earlier and wrote later is outdone."""
         written = None
         for _ in range(DM_LOG_RECOUNT):
-            n = sum(1 for r in replies(slack, cid, ts) if _logged_part(r) == 0)
+            n = sum(1 for r in replies(slack, cid, ts) if self._part(r) == 0)
             if n == written:
                 return
-            slack.update(cid, ts, dm_log_title(day, n))
+            slack.update(cid, ts, self.title(day, n))
             written = n
+
+    def _part(self, message):
+        """The part of a logged entry MESSAGE is (0 its first reply), else None."""
+        meta = message.get("metadata") or {}
+        if meta.get("event_type") != self.logged:
+            return None
+        return (meta.get("event_payload") or {}).get("part", 0)
+
+
+class DmLog(DailyLog):
+    """The administrators' record of the DMs: each DM as the person got it
+    (dm_log_entry), under the day's message "dm-log DAY"."""
+
+    def __init__(self, channel):
+        super().__init__(channel, "dm-log", dm_log_title, DM_LOGGED)
 
 
 def _day_start(now):
     """The Unix time of the local midnight that starts NOW's day."""
     t = time.localtime(now)
     return time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1))
-
-
-def _logged(part):
-    return {"event_type": DM_LOGGED, "event_payload": {"part": part}}
-
-
-def _logged_part(message):
-    """The part of a logged DM MESSAGE is (0 its first reply), else None."""
-    meta = message.get("metadata") or {}
-    if meta.get("event_type") != DM_LOGGED:
-        return None
-    return (meta.get("event_payload") or {}).get("part", 0)
 
 
 class DmCounts:
@@ -314,7 +323,7 @@ class Slack:
 
 def dm_log_title(day, count):
     """The day's message the DM lines are threaded under."""
-    return f":envelope: Notices sent to people by DM on {day}: {count} (each in the thread)"
+    return f"DM log {day}: {count} sent to people (each in the thread)"
 
 
 def dm_log_line(kind, login, link=""):

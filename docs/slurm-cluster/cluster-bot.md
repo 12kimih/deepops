@@ -89,9 +89,10 @@ lifted on every such host (`fail2ban-client unban`, which also drops it from fai
 database). The form refuses what is not an IP address before anything is asked.
 
 The administrators see the bans in their channel without asking: every five minutes the
-bot reads each such host's list, tells the bans made since its last look in one message
-(a wave of bans is one message, every ban in its thread), and keeps one pinned message
-of the bans now: the count, each host's count and the newest ban, with every ban,
+bot reads each such host's list, records the bans made since its last look in the day's
+ban log (one message a day, each round's new bans in its thread, mentioning no one: a
+ban needs no one to act, and a person locked out asks with `/cluster unban`), and keeps
+one pinned message of the bans now: the count, each host's count and the newest ban, with every ban,
 newest first, in its thread, as many replies as Slack's limits need, edited in place.
 Nothing is cut. Its first look only learns the bans made before it; a host it cannot
 read keeps its bans on the list as last seen and is named there.
@@ -168,7 +169,9 @@ Slack lets a member delete only their own messages, and an app's only a workspac
 or admin. So the bot has a message shortcut, "클러스터 봇 글 지우기" (a message's "..." menu,
 `cluster_bot.remove`): a member of the administrators' user group (`slack_admin_group_id`,
 read from Slack each time) deletes one of the bot's own messages with it, with the bot's
-replies under it, and the delete is logged in `slack_channels.admin`. It refuses what
+replies under it, and the delete is logged in `slack_channels.admin` like the DMs: one
+message a day, each delete in its thread with who (as text, no mention), where, and the
+message as it was. It refuses what
 Slack would not let the bot delete (an integration's or a person's message, naming who
 posted it) and what a feature keeps up to date (the ban list, the DM log's day message),
 which would come back. A notice post may go: the notices round keeps it as announced.

@@ -284,10 +284,11 @@ after its owner was told of it in an earlier report and warned
 the setting must exceed `slurm_usage_report_idle_hours` and needs
 `slurm_usage_report_notify`; the deploy checks the config and stops on a mistake.
 
-Every Monday (`slurm_usage_report_weekly_schedule`) it also posts the week: for each
-person, the GPU-hours their jobs held and how many sat idle (at or under the idle
-threshold for the minute), idlest first, the five idlest mentioned. It touches no job;
-seeing the numbers is the point. Someone over both `slurm_usage_report_repeat_idle_gpu_hours`
+Every Monday (`slurm_usage_report_weekly_schedule`) it also posts the week ("주간 GPU
+사용"): the GPU-hours jobs held and how many sat idle (at or under the idle threshold
+for the minute), then the five people with the most GPU-hours and the five with the
+most idle hours, as plain names: it mentions no one. It touches no job; seeing the
+numbers is the point. Someone over both `slurm_usage_report_repeat_idle_gpu_hours`
 and `slurm_usage_report_repeat_idle_share` in each of `slurm_usage_report_repeat_weeks`
 weeks running is reported to the administrators' channel (`slack_channels.admin`) with each
 week's numbers, their jobs now and the steps to take. The weekly run is its own timer and
