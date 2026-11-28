@@ -25,10 +25,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
+import yaml_load  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "tests/cluster-tools/slurm-names.json"
@@ -42,7 +42,7 @@ def fetch(url):
 
 
 def pinned_version():
-    return str(yaml.safe_load((ROOT / "roles/slurm/defaults/main.yml").read_text())["slurm_version"])
+    return str(yaml_load.load((ROOT / "roles/slurm/defaults/main.yml").read_text())["slurm_version"])
 
 
 def newest_parser(tag):

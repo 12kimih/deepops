@@ -36,6 +36,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
+import yaml_load  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 KUBESPRAY = "submodules/kubespray"
@@ -141,7 +142,7 @@ class Vault:
         return "<vault>"
 
 
-class _Loader(yaml.SafeLoader):
+class _Loader(yaml_load.Loader):
     pass
 
 

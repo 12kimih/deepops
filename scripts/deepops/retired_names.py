@@ -14,12 +14,14 @@ Python 3.9 or newer; PyYAML.
 """
 
 import re
+import sys
 from pathlib import Path
 
-import yaml
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import yaml_load  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-RETIRED = yaml.safe_load((ROOT / "roles/cluster_tools_defaults/defaults/main.yml").read_text())[
+RETIRED = yaml_load.load((ROOT / "roles/cluster_tools_defaults/defaults/main.yml").read_text())[
     "cluster_tools_retired_builtin"
 ]
 

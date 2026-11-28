@@ -27,6 +27,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import yaml_load  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 # Keys that are a task's own settings, never its module.
@@ -84,7 +85,7 @@ def role_var_files():
 
 def load(path):
     try:
-        return yaml.safe_load(path.read_text(encoding="utf-8"))
+        return yaml_load.load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError:
         return None
 

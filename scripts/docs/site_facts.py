@@ -85,6 +85,8 @@ over the settings already known, until nothing more resolves); one that needs wh
 a host knows (groups, facts, an Ansible filter) is left out.
 """
 
+import copy
+import functools
 import importlib
 import importlib.util
 import json
@@ -106,6 +108,7 @@ import cli  # noqa: E402
 import terms  # noqa: E402
 from cluster_tools import ssh_rate, submit_holds  # noqa: E402
 from repo_files import tracked  # noqa: E402
+import yaml_load  # noqa: E402
 
 
 def _filter(name):
@@ -222,7 +225,7 @@ POLICY = {
 _SIZE_GIB = {"K": 1 / 1024**2, "M": 1 / 1024, "G": 1, "T": 1024}
 
 
-class _Loader(yaml.SafeLoader):
+class _Loader(yaml_load.Loader):
     """YAML with Ansible's tags: a vaulted value reads as None (never decrypted here)."""
 
 
@@ -232,9 +235,16 @@ _Loader.add_constructor("!unsafe", lambda loader, node: loader.construct_scalar(
 
 def _yaml(path):
     try:
-        return yaml.load(Path(path).read_text(), Loader=_Loader) or {}
+        text = Path(path).read_text()
     except FileNotFoundError:
         return {}
+    return copy.deepcopy(_parsed(text))  # a copy: a caller may change what it gets
+
+
+@functools.cache
+def _parsed(text):
+    """TEXT's YAML, parsed once: every settings() reads all the role defaults again."""
+    return yaml.load(text, Loader=_Loader) or {}
 
 
 def _literal(value):
@@ -276,10 +286,16 @@ def settings(config, group=None):
 _JINJA = jinja2.nativetypes.NativeEnvironment(undefined=jinja2.StrictUndefined, autoescape=False)  # noqa: S701
 
 
+@functools.cache
+def _template(text):
+    """TEXT compiled once: settings() renders the same defaults on every call."""
+    return _JINJA.from_string(text)
+
+
 def _render(text, values):
     """TEXT rendered over VALUES, or None when it needs anything they lack."""
     try:
-        out = _JINJA.from_string(text).render(values)
+        out = _template(text).render(values)
         # A lone undefined name renders as itself natively instead of raising.
         return None if isinstance(out, jinja2.Undefined) else out
     except (jinja2.TemplateError, TypeError, ValueError, AttributeError):

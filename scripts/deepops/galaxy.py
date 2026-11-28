@@ -29,10 +29,10 @@ import sys
 import time
 from pathlib import Path
 
-import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
+import yaml_load  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 COLLECTIONS = ROOT / "collections"
@@ -115,7 +115,7 @@ def install_locked():
     for new in staged.values():
         remove(new)
     for req in (r for r in REQUIREMENTS if r.exists()):
-        data = yaml.safe_load(req.read_text()) or {}
+        data = yaml_load.load(req.read_text()) or {}
         if data.get("collections"):
             galaxy("collection", req, staged[COLLECTIONS])
         if data.get("roles"):
@@ -155,7 +155,7 @@ def installed_collections(where=COLLECTIONS):
 
 def installed_role(name, where=ROLES):
     info = where / name / "meta" / ".galaxy_install_info"
-    return (yaml.safe_load(info.read_text()) or {}).get("version") if info.exists() else None
+    return (yaml_load.load(info.read_text()) or {}).get("version") if info.exists() else None
 
 
 def problems(collections=COLLECTIONS, roles=ROLES):
@@ -163,7 +163,7 @@ def problems(collections=COLLECTIONS, roles=ROLES):
     if not REQUIREMENTS[0].exists():  # the site's list is optional, ours is not
         found.append(f"{REQUIREMENTS[0].relative_to(ROOT)} is missing")
     for req in (r for r in REQUIREMENTS if r.exists()):
-        data = yaml.safe_load(req.read_text()) or {}
+        data = yaml_load.load(req.read_text()) or {}
         for c in data.get("collections") or []:
             want = str(c.get("version", have.get(c["name"], "any")))
             if c["name"] not in have or have[c["name"]] != want:

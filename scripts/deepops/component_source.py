@@ -28,6 +28,7 @@ tree with uncommitted changes hashes what is on disk.
 """
 
 import ast
+import functools
 import hashlib
 import json
 import os
@@ -42,6 +43,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
 import settings  # noqa: E402
+import yaml_load  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 RECORD = "component_record"
@@ -78,9 +80,12 @@ INERT_MODULES = {
 CACHE = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "deepops" / "component-sources"
 
 
+@functools.cache
 def _load(text):
+    """TEXT's YAML (None when it is not), parsed once: the records, the closure and the
+    play's end read the same files again. Callers never change what they get."""
     try:
-        return yaml.safe_load(text or "")
+        return yaml_load.load(text or "")
     except yaml.YAMLError:
         return None
 

@@ -77,6 +77,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 import cli  # noqa: E402
 import settings  # noqa: E402
 from repo_files import tracked  # noqa: E402
+import yaml_load  # noqa: E402
 
 NAME = r"(?P<name>[\w:./@-]+)"
 BLOCK = re.compile(
@@ -107,13 +108,13 @@ def literal(value):
 
 def defaults(role):
     path = ROOT / "roles" / role / "defaults" / "main.yml"
-    return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.exists() else {}
+    return (yaml_load.load(path.read_text(encoding="utf-8")) or {}) if path.exists() else {}
 
 
 def example_values():
     found = {}
     for path in sorted(tracked("config.example/group_vars/*.yml")):
-        for name, value in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items():
+        for name, value in (yaml_load.load(path.read_text(encoding="utf-8")) or {}).items():
             if literal(value):
                 found[name] = str(value)
     return found
@@ -221,7 +222,7 @@ SWITCH_NAME = re.compile(r"\b([a-z][a-z0-9]*_[a-z0-9_]+)\b")
 
 def gen_components(_arg, _page=None):
     path = ROOT / "roles" / "deploy_defaults" / "vars" / "main.yml"
-    registry = yaml.safe_load(path.read_text(encoding="utf-8"))["deepops_component_registry"]
+    registry = yaml_load.load(path.read_text(encoding="utf-8"))["deepops_component_registry"]
     rows = ["| Component | Role | Switches | Hosts | Needs | Removal |", "|---|---|---|---|---|---|"]
     for name, entry in registry.items():
         rules = entry.get("rules") or []
@@ -254,7 +255,7 @@ def gen_bot_subcommands(_arg, _page=None):
 
 def registry():
     path = ROOT / "roles" / "deploy_defaults" / "vars" / "main.yml"
-    return yaml.safe_load(path.read_text(encoding="utf-8"))["deepops_component_registry"]
+    return yaml_load.load(path.read_text(encoding="utf-8"))["deepops_component_registry"]
 
 
 def setting(template):
@@ -294,7 +295,7 @@ def dashboard_set_roles():
     """{dashboard set: the role that installs it}, from each role's own setting of it."""
     found = {}
     for path in tracked("roles/*/vars/main.yml") + tracked("roles/*/defaults/main.yml"):
-        for name, value in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items():
+        for name, value in (yaml_load.load(path.read_text(encoding="utf-8")) or {}).items():
             if re.search(r"dashboard_set(_own)?$", name) and isinstance(value, str) and "{{" not in value:
                 found[value] = path.parts[-3]
     return found
@@ -547,7 +548,7 @@ def gen_partitions(_arg, page=None):
 
 def gen_os_matrix(_arg, _page=None):
     def keys(path, name):
-        return ", ".join(yaml.safe_load((ROOT / path).read_text(encoding="utf-8"))[name]) or "-"
+        return ", ".join(yaml_load.load((ROOT / path).read_text(encoding="utf-8"))[name]) or "-"
 
     rows = [
         ("Slurm cluster (the packages are built per release, `slurm_deb_build_images`)",

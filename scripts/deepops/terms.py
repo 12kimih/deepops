@@ -31,7 +31,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 GLOSSARY = Path(__file__).with_name("terms_ko.yml")
@@ -39,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
 import retired_names  # noqa: E402
 from repo_files import tracked  # noqa: E402
+import yaml_load  # noqa: E402
 
 # The files that must quote the variants: the glossary, its reader, its doc and its tests.
 QUOTING = {
@@ -62,7 +62,7 @@ def load(path=GLOSSARY):
     compiled once (`patterns`, and `title_patterns` for title_not: refused in a title
     only), and the title rules; an entry needs a word (use or title), something it
     refuses or a title form beside its word, and a reason."""
-    data = yaml.safe_load(Path(path).read_text()) or {}
+    data = yaml_load.load(Path(path).read_text()) or {}
     entries = Glossary(data.get("terms") or [])
     for e in entries:
         word = e.get("use") or e.get("title")

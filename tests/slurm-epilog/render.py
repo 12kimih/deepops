@@ -10,7 +10,6 @@ the result.
 import sys
 from pathlib import Path
 
-import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +17,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_files import tracked  # noqa: E402
 import in_tree  # noqa: E402
+import yaml_load  # noqa: E402
 
 # The repository's filters the templates use, loaded from their file: plugins/filter on
 # sys.path would shadow the standard library with its secrets.py.
@@ -29,7 +29,7 @@ def role_defaults(*names):
     other), so the tests render with the deployed values, never a copy of them."""
     found = {}
     for path in [*tracked("roles/*/defaults/main.yml"), *tracked("roles/*/vars/main.yml")]:
-        found.update(yaml.safe_load(path.read_text()) or {})
+        found.update(yaml_load.load(path.read_text()) or {})
     env = Environment(undefined=StrictUndefined, autoescape=False)  # noqa: S701 (not HTML)
 
     def resolve(value):

@@ -6,12 +6,12 @@ check behaviour, so they load files through here and compare names with
 `same_name`, which keeps them valid for both spellings.
 """
 
+import sys
 from pathlib import Path
 
-import yaml
-
-
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import yaml_load  # noqa: E402
 
 
 def canonical(value):
@@ -28,7 +28,7 @@ def canonical(value):
 
 def load(path):
     """Parse a repo file (path relative to the repo root) and canonicalize it."""
-    return canonical(yaml.safe_load((ROOT / path).read_text(encoding="utf-8")))
+    return canonical(yaml_load.load((ROOT / path).read_text(encoding="utf-8")))
 
 
 def role_defaults(role):
@@ -41,13 +41,13 @@ def role_defaults(role):
         found.update(role_defaults(dep))
     own = ROOT / "roles" / role / "defaults" / "main.yml"
     if own.is_file():
-        found.update(yaml.safe_load(own.read_text(encoding="utf-8")) or {})
+        found.update(yaml_load.load(own.read_text(encoding="utf-8")) or {})
     return found
 
 
 def _dependencies(role):
     meta = ROOT / "roles" / role / "meta" / "main.yml"
-    deps = ((yaml.safe_load(meta.read_text()) or {}).get("dependencies") or []) if meta.is_file() else []
+    deps = ((yaml_load.load(meta.read_text()) or {}).get("dependencies") or []) if meta.is_file() else []
     return [d["role"] if isinstance(d, dict) else d for d in deps]
 
 
@@ -59,7 +59,7 @@ def role_vars(role):
         found.update(role_vars(dep))
     own = ROOT / "roles" / role / "vars" / "main.yml"
     if own.is_file():
-        found.update(yaml.safe_load(own.read_text(encoding="utf-8")) or {})
+        found.update(yaml_load.load(own.read_text(encoding="utf-8")) or {})
     return found
 
 

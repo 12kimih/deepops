@@ -25,10 +25,10 @@ import os
 import sys
 from pathlib import Path
 
-import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
+import yaml_load  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
@@ -39,7 +39,7 @@ spec.loader.exec_module(people)
 
 def system_ids():
     """The UIDs and GIDs roles/system_accounts reserves."""
-    data = yaml.safe_load((ROOT / "roles" / "system_accounts" / "defaults" / "main.yml").read_text())
+    data = yaml_load.load((ROOT / "roles" / "system_accounts" / "defaults" / "main.yml").read_text())
     accounts = data.get("system_accounts") or {}
     return {a["uid"] for a in accounts.values()} | {a.get("gid", a["uid"]) for a in accounts.values()}
 
@@ -66,7 +66,7 @@ def accounting_file(config):
     for name in ("all.yml", "slurm-cluster.yml"):
         path = config / "group_vars" / name
         if path.is_file():
-            value = (yaml.safe_load(path.read_text()) or {}).get("slurm_accounting_file", value)
+            value = (yaml_load.load(path.read_text()) or {}).get("slurm_accounting_file", value)
     if not value:
         return None
     rendered = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(value)  # noqa: S701
@@ -77,7 +77,7 @@ def add(path, login, account, name=None, slack=None):
     accounting = accounting_file(path.parent)
     declared = None
     if accounting is not None and accounting.is_file():
-        declared = (yaml.safe_load(accounting.read_text()) or {}).get("accounts") or {}
+        declared = (yaml_load.load(accounting.read_text()) or {}).get("accounts") or {}
     done = edit(path, lambda t: people.roster_add(t, login, account, name, slack, system_ids(), declared))
     if done is None:
         return 1
@@ -121,7 +121,7 @@ def main(argv):
         return 1
     failed = False
     for path in files:
-        problems = people.check(yaml.safe_load(path.read_text()))
+        problems = people.check(yaml_load.load(path.read_text()))
         for problem in problems:
             print(f"{path}: {problem}", file=sys.stderr)
         failed |= bool(problems)

@@ -16,11 +16,11 @@ import re
 import sys
 from pathlib import Path
 
-import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
 import repo_files  # noqa: E402
+import yaml_load  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 PATH = "roles/prometheus/files/rules/components.yml"
@@ -29,7 +29,7 @@ APPLIES = re.compile(r"deepops_components\.(\w+)\s*\|\s*component_phase\b")
 
 
 def registry(root=ROOT):
-    return yaml.safe_load((root / "roles/deploy_defaults/vars/main.yml").read_text())[
+    return yaml_load.load((root / "roles/deploy_defaults/vars/main.yml").read_text())[
         "deepops_component_registry"
     ]
 
@@ -62,7 +62,7 @@ def playbooks(root=ROOT):
 def managed(root=ROOT):
     """deepops_managed_roles: {role: {kind, playbook}} (roles/deploy_defaults/vars/main.yml)."""
     return (
-        yaml.safe_load((root / "roles/deploy_defaults/vars/main.yml").read_text()).get(
+        yaml_load.load((root / "roles/deploy_defaults/vars/main.yml").read_text()).get(
             "deepops_managed_roles"
         )
         or {}
