@@ -175,11 +175,16 @@
 
 # The Slack app manifest from the subcommand table (cluster_bot.commands), with the
 # app's name and every scope the cluster's Slack features need: what the owner imports
-# into the app, so its command, scopes and events always match this bot.
+# into the app, so its command, scopes and events always match this bot. Run on the
+# controller as the bot runs on its host: its package (here) and the cluster's library
+# (cluster_tools_lib_source, roles/cluster_tools_lib) on the path, with the controller's
+# own interpreter, as the library's release tool runs.
 - name: Generate the Slack app manifest
   ansible.builtin.command:
-    argv: "{{ ['python3', '-m', 'cluster_bot.commands', 'manifest', cluster_bot_command, cluster_bot_app_name] + cluster_bot_extra_scopes }}"
+    argv: "{{ [ansible_playbook_python, '-m', 'cluster_bot.commands', 'manifest', cluster_bot_command, cluster_bot_app_name] + cluster_bot_extra_scopes }}"
     chdir: "{{ role_path }}/files"
+  environment:
+    PYTHONPATH: "{{ cluster_tools_lib_source }}"
   delegate_to: localhost
   become: false
   run_once: true

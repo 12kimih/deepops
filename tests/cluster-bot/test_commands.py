@@ -3,7 +3,10 @@ dispatcher, the help, the Home tab, the manifest and the docs all read; the mani
 scopes cover every Slack method the repository calls; no name Slack uses itself."""
 
 import ast
+import json
+import os
 import re
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -166,6 +169,25 @@ class Commands(unittest.TestCase):
         self.assertTrue(m["settings"]["socket_mode_enabled"])
         self.assertEqual(m["settings"]["event_subscriptions"]["bot_events"], ["app_home_opened"])
         self.assertLessEqual(len(m["features"]["slash_commands"][0]["description"]), 100)
+
+    def test_the_deploy_generates_the_manifest_with_the_path_it_gives(self):
+        """The deploy runs the manifest on the controller (roles/cluster_bot present.yml):
+        in a process of its own, with only the path the task gives, so a package import
+        the task does not provide fails here, not in the deploy (2026-11-28: the
+        library import the bot's package gained broke the deploy's manifest step)."""
+        import yaml
+
+        tasks = yaml.safe_load((ROOT / "roles/cluster_bot/tasks/present.yml").read_text())
+        task = next(t for t in tasks if t.get("name") == "Generate the Slack app manifest")
+        self.assertEqual(task["environment"], {"PYTHONPATH": "{{ cluster_tools_lib_source }}"})
+        self.assertIn("ansible_playbook_python", task["ansible.builtin.command"]["argv"])
+        env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT / "roles/cluster_tools_lib/files")}
+        out = subprocess.run(
+            [sys.executable, "-m", "cluster_bot.commands", "manifest", "/cluster", "cluster-bot"],
+            cwd=ROOT / "roles/cluster_bot/files", env=env, capture_output=True, text=True, check=False,
+        )  # fmt: skip
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(json.loads(out.stdout)["display_information"]["name"], "cluster-bot")
 
 
 if __name__ == "__main__":
