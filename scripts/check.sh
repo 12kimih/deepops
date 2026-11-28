@@ -92,6 +92,12 @@ step "no secrets or site data in tracked files" "${python}" scripts/deepops/sens
 # GIT_CONFIG_KEY_n carry `git -c` settings into every git the tests run.
 isolated=(env)
 while IFS= read -r name; do isolated+=(-u "${name}"); done < <(compgen -e | grep '^GIT_' || true)
+# Each step's time in the last run in this clone (any worktree), kept in its shared git
+# directory: what orders the steps, and which test files run as their methods
+# (scripts/deepops/check_times.py). Outside a git checkout there are none.
+git_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+times="${git_dir:+${git_dir}/deepops-check-times}"
+
 # The tracked tests/<suite>/test_*.py, like every other check, one check per file so a
 # slow suite's files run side by side; each runs from its suite directory, as discover
 # would run it.
@@ -102,10 +108,12 @@ for test_file in "${test_files[@]}"; do
     suite="$(dirname "${test_file}")"
     if "${fast}" && [ -e "${suite}/.slow" ]; then continue; fi
     module="$(basename "${test_file}" .py)"
-    # A slow suite runs each test method as its own check, side by side
-    # (scripts/deepops/test_units.py); a file it cannot split runs whole.
+    # A slow suite, or a file that took SPLIT_SECONDS or more last time, runs each test
+    # method as its own check, side by side (scripts/deepops/test_units.py,
+    # check_times.py split); a file it cannot split runs whole.
     unit_names=()
-    if [ -e "${suite}/.slow" ]; then
+    if [ -e "${suite}/.slow" ] || { [ -n "${times}" ] &&
+        "${python}" scripts/deepops/check_times.py split "${times}" "unit tests (${suite}/${module})"; }; then
         mapfile -t unit_names < <("${python}" scripts/deepops/test_units.py "${test_file}")
     fi
     if [ "${#unit_names[@]}" -gt 1 ]; then
@@ -117,6 +125,12 @@ for test_file in "${test_files[@]}"; do
     fi
 done
 
+# ansible-lint is the run's longest step and parallel only in parts: given more than the
+# one CPU every other step gets (PYTHON_CPU_COUNT below), it runs in about half the
+# time (2026-11-28: 370s on one CPU, 197s on four, 173s on eight), so it takes up to
+# four. It starts first, beside the others.
+lint_cpus="$("${python}" roles/cluster_tools_lib/files/cluster_tools/cpus.py)"
+lint_cpus=$((lint_cpus < 4 ? lint_cpus : 4))
 # ansible-lint renders every template, which nothing else in --fast does; on all of
 # the repository it takes minutes, so --fast lints the Ansible files this branch
 # changes (against main, and what is staged), the full check all of them.
@@ -128,7 +142,7 @@ if "${fast}"; then
             | grep -E '[.]ya?ml$' | grep -v '/files/' | sort -u
     )
     if [ "${#changed_ansible[@]}" -gt 0 ]; then
-        step "ansible-lint (the changed Ansible files)" ansible-lint -q "${changed_ansible[@]}"
+        step "ansible-lint (the changed Ansible files)" env PYTHON_CPU_COUNT="${lint_cpus}" ansible-lint -q "${changed_ansible[@]}"
     fi
 fi
 
@@ -143,7 +157,7 @@ if ! "${fast}"; then
     for test_file in "${validation_tests[@]}"; do
         step "unit tests (${test_file%.py})" "${isolated[@]}" "${python}" "${strict}" discover -s scripts/validation/tests -p "$(basename "${test_file}")" -q
     done
-    step "ansible-lint" ansible-lint -q
+    step "ansible-lint" env PYTHON_CPU_COUNT="${lint_cpus}" ansible-lint -q
     for playbook in playbooks/slurm-cluster.yml playbooks/k8s-cluster.yml; do
         step "syntax-check ${playbook}" ansible-playbook -i config.example/inventory --syntax-check "${playbook}"
     done
@@ -219,8 +233,6 @@ run_one() {
 # Longest first, from each step's time in the last run in this clone (any worktree):
 # the run then ends about when its work per CPU does (scripts/deepops/check_times.py).
 # Outside a git checkout there are no times, and the order is the declared one.
-git_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-times="${git_dir:+${git_dir}/deepops-check-times}"
 mapfile -t order < <(printf '%s\n' "${names[@]}" | "${python}" scripts/deepops/check_times.py order "${times}")
 echo "Running ${#names[@]} checks, ${jobs_max} at a time (${usable} usable CPUs, ${running} run(s) of this person)"
 started=${SECONDS}

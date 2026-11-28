@@ -1,5 +1,6 @@
 """scripts/deepops/check_times.py: scripts/check.sh starts its steps longest first, from
-each step's time in the last run, and a step never met before first of all."""
+each step's time in the last run, and a step never met before first of all; a test file
+that took SPLIT_SECONDS or more, whole or split, runs as its methods."""
 
 import subprocess
 import sys
@@ -28,6 +29,35 @@ class Order(unittest.TestCase):
 
     def test_without_times_the_declared_order(self):
         self.assertEqual(ct.order(["a", "b", "c"], {}), [0, 1, 2])
+
+
+class Split(unittest.TestCase):
+    NAME = "unit tests (tests/component-state/test_component_record)"
+
+    def test_a_slow_file_splits_and_stays_split_while_its_methods_are_slow(self):
+        slow = ct.SPLIT_SECONDS
+        self.assertTrue(ct.slow(self.NAME, {self.NAME: slow}))
+        self.assertFalse(ct.slow(self.NAME, {self.NAME: slow - 1}))
+        self.assertFalse(ct.slow(self.NAME, {}), "never run: whole, the order puts it first")
+        methods = {f"{self.NAME[:-1]}.Run.test_{i})": 20 for i in range(3)}
+        self.assertTrue(ct.slow(self.NAME, methods), "split last time, 60s together")
+        self.assertFalse(ct.slow(self.NAME, {k: 1 for k in methods}), "fast again: whole")
+        other = {"unit tests (tests/component-state/test_component_record_more)": 600}
+        self.assertFalse(ct.slow(self.NAME, other), "another file's name is not its methods'")
+
+    def test_the_command_answers_by_its_exit_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "times"
+            path.write_text(f"{ct.SPLIT_SECONDS}\t{self.NAME}\n")
+            split = [sys.executable, str(SCRIPT), "split", str(path)]
+            self.assertEqual(subprocess.run([*split, self.NAME], check=False).returncode, 0)
+            self.assertEqual(
+                subprocess.run([*split, "unit tests (tests/x/test_y)"], check=False).returncode, 1
+            )
+
+    def test_check_sh_splits_by_it(self):
+        text = (ROOT / "scripts/check.sh").read_text()
+        self.assertIn('check_times.py split "${times}" "unit tests (${suite}/${module})"', text)
 
 
 class Record(unittest.TestCase):
