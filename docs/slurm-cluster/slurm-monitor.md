@@ -130,8 +130,10 @@ recording rule `host_device:slurm_gpu_allocated:max` keys them like DCGM series,
 alert `GpuBusyWithoutJob` fires when one of those stays busy for 15 minutes (a process
 outside Slurm, or one a finished job left behind), and `GpuStuck` (critical) when it is
 fully busy with almost no memory in use for 10 minutes: a hung GPU, which needs a reset or
-a reboot. `SlurmGpuMetricsStale` warns when the file stops updating, which also pauses
-both alerts.
+a reboot. Busy is `host_device:dcgm_busy_ratio:max`: the graphics engine's active share
+from DCGM's profiling, NVML's utilisation only on a GPU without it, since NVML's can stay at
+100% after a job ends with no context left. `SlurmGpuMetricsStale` warns when the file
+stops updating, which also pauses both alerts.
 
 Per-job GPU usage comes from the same join: `job_device:dcgm_gpu_util_ratio:max` and
 `job_device:dcgm_fb_used_bytes:max` carry each held GPU's utilisation and memory, and

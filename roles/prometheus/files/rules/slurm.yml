@@ -33,6 +33,16 @@ groups:
         expr: |
           max by (host, gpu) (DCGM_FI_DEV_GPU_UTIL_RATIO)
           * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
+      # Whether a GPU is busy now, for the alerts on GPUs outside Slurm: the graphics
+      # engine's active share (DCGM's profiling, averaged over its sample), NVML's
+      # utilisation only where a GPU has no profiling. NVML's is a sample that can stay at
+      # 100% after a job ends with no context left (2026-11-28: 20 minutes at 1.0 with
+      # engine and SM activity 0 and idle power, which paged as a hung GPU).
+      - record: host_device:dcgm_busy_ratio:max
+        expr: |
+          (max by (host, gpu) (DCGM_FI_PROF_GR_ENGINE_UTIL_RATIO)
+           or max by (host, gpu) (DCGM_FI_DEV_GPU_UTIL_RATIO))
+          * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
       - record: host_device:dcgm_fb_used_bytes:max
         expr: |
           max by (host, gpu) (DCGM_FI_DEV_FB_USED_BYTES)
@@ -92,7 +102,7 @@ groups:
           and on () (time() - max(slurm_metrics_updated_timestamp_seconds) < 300)
       - alert: GpuBusyWithoutJob
         expr: |
-          host_device:dcgm_gpu_util_ratio:max > 0
+          host_device:dcgm_busy_ratio:max > 0
           and on (host, device) host_device:slurm_gpu_unheld:info
         for: 15m
         labels: {severity: warning}
@@ -106,7 +116,7 @@ groups:
       # drains a node on the XIDs NVIDIA lists, but this one may log none.
       - alert: GpuStuck
         expr: |
-          host_device:dcgm_gpu_util_ratio:max >= 0.95
+          host_device:dcgm_busy_ratio:max >= 0.95
           and on (host, device) host_device:dcgm_fb_used_fraction:max < 0.03
           and on (host, device) host_device:slurm_gpu_unheld:info
         for: 10m

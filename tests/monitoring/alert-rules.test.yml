@@ -733,6 +733,56 @@ tests:
                 reason="gpu hung"`), then reset the GPU or reboot once its jobs end, and run
                 playbooks/utilities/gpu-diag.yml before resuming it.
 
+  # NVML's utilisation can stay at 100% after a job ends, with no context left: the
+  # graphics engine's activity says whether the GPU works. Where DCGM has it, it decides:
+  # NVML 1 with the engine idle is neither busy nor hung; the engine busy with no memory is.
+  - name: a GPU whose engine is idle is not busy or hung however NVML reads
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '0x30'
+      - series: 'DCGM_FI_PROF_GR_ENGINE_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '0x30'
+      - series: 'DCGM_FI_PROF_GR_ENGINE_UTIL_RATIO{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_FB_USED_BYTES{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '0x30'
+      - series: 'DCGM_FI_DEV_FB_USED_BYTES{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '0x30'
+      - series: 'DCGM_FI_DEV_FB_CAPACITY_BYTES{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '48000x30'
+      - series: 'DCGM_FI_DEV_FB_CAPACITY_BYTES{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '48000x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '0x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '1x30'
+      - series: 'slurm_metrics_updated_timestamp_seconds{host="m", instance="m:9100"}'
+        values: '0+60x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: GpuStuck
+        exp_alerts:
+          - exp_labels: {severity: critical, host: n1, gpu: "1", device: nvidia1}
+            exp_annotations:
+              summary: "GPU nvidia1 on n1 is busy with no job and no memory in use: hung"
+              description: >-
+                Drain the node (`scontrol update nodename=n1 state=drain
+                reason="gpu hung"`), then reset the GPU or reboot once its jobs end, and run
+                playbooks/utilities/gpu-diag.yml before resuming it.
+      - eval_time: 20m
+        alertname: GpuBusyWithoutJob
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, gpu: "1", device: nvidia1}
+            exp_annotations:
+              summary: "GPU nvidia1 on n1 is 100% busy with no Slurm job holding it"
+              description: >-
+                A process outside Slurm, or one left behind by a finished job. As root on
+                the host, `fuser -v /dev/nvidia*` finds it; a GPU reset or reboot clears a
+                hung one.
+
   # A job's SM activity and power are those of the GPU its allocation names (NVML 0 is
   # Slurm's nvidia1, held by job 7).
   - name: a job's SM activity and power are the GPU its allocation names
