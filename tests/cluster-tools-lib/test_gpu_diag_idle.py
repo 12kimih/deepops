@@ -15,7 +15,7 @@ from cluster_tools import gpu_diag_idle as gd  # noqa: E402
 from cluster_tools import slurm  # noqa: E402
 
 NOW = 1_800_000_000
-CFG = {"level": 2, "timeouts": {"1": 600, "2": 1200}, "period_days": 6, "budget_seconds": 36000,
+CFG = {"level": 2, "timeouts": {"1": 600, "2": 1200}, "period_days": 7, "budget_seconds": 36000,
        "drain_on_failure": True, "reservation_prefix": "gpu-diag"}  # fmt: skip
 
 
@@ -50,6 +50,15 @@ class Choosing(unittest.TestCase):
         ]  # fmt: skip
         state = {"fresh": {"diagnosed": NOW - 2 * gd.DAY}, "old": {"diagnosed": NOW - 9 * gd.DAY}}
         self.assertEqual([n["name"] for n in gd.candidates(nodes, state, CFG, NOW)], ["never", "old"])
+
+    def test_a_node_diagnosed_late_in_last_weeks_pass_is_due_this_week(self):
+        # A pass started a week ago and took up to its budget: a node diagnosed within it is
+        # due now; one diagnosed after that window waits.
+        nodes = [node("in-last-pass"), node("after-it")]
+        week, budget = 7 * gd.DAY, CFG["budget_seconds"]
+        state = {"in-last-pass": {"diagnosed": NOW - week + budget - 60},
+                 "after-it": {"diagnosed": NOW - week + budget + 60}}  # fmt: skip
+        self.assertEqual([n["name"] for n in gd.candidates(nodes, state, CFG, NOW)], ["in-last-pass"])
 
 
 class Verdict(unittest.TestCase):

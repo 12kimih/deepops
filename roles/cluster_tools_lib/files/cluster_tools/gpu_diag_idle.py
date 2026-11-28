@@ -94,8 +94,9 @@ def idle(node):
 
 def candidates(nodes, state, cfg, now):
     """The GPU nodes a pass diagnoses, oldest diagnosis first: idle, and not diagnosed
-    within period_days."""
-    due = now - cfg["period_days"] * DAY
+    within period_days, less one pass's budget (a node diagnosed late in the last pass
+    is due when the next starts, one period after the last one started)."""
+    due = now - cfg["period_days"] * DAY + cfg["budget_seconds"]
     found = [
         n for n in nodes if node_gres(n) and idle(n) and state.get(n["name"], {}).get("diagnosed", 0) <= due
     ]

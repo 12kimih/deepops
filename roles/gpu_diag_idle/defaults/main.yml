@@ -19,8 +19,10 @@ gpu_diag_idle_schedule: "Sun *-*-* 04:00:00"
 # dcgmi diag -r: 2, the medium run (about two minutes); its time limit is the shared
 # dcgm_diag_timeout (roles/slurm_paths).
 gpu_diag_idle_level: 2
-# A node diagnosed less than this many days ago waits for a later pass.
-gpu_diag_idle_period_days: 6
+# A node is diagnosed once in this many days: one weekly pass. A node diagnosed late in
+# the last pass (within its budget, gpu_diag_idle_budget_seconds) is due again at the
+# start of the next, so a week never slips to two.
+gpu_diag_idle_period_days: 7
 # The longest a pass may run (seconds): no node is started that its two runs could not
 # finish within it; the rest wait for the next pass.
 gpu_diag_idle_budget_seconds: 10800
