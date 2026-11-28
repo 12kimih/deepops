@@ -345,7 +345,7 @@ class RunTests(unittest.TestCase):
                    "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
                    "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
                    "disk_notify": ["mention"], "disk_repeat_days": 7,
-                   "people": [], "holds_on": False, "holds_from": 0, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
+                   "people": [], "holds_on": False, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
             "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
             "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
             Path(f"{d}/config.json").write_text(json.dumps(cfg))
@@ -388,7 +388,7 @@ class ConfigTests(unittest.TestCase):
             "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
             "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
             "disk_notify": ["mention", "dm"], "disk_repeat_days": 7,
-            "people": ["alice"], "holds_on": False, "holds_from": 0, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
+            "people": ["alice"], "holds_on": False, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
             "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
             "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
 

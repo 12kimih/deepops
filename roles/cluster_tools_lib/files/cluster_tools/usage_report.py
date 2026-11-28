@@ -487,7 +487,7 @@ CONFIG_KEYS = {
     "repeat_idle_share": (int, float), "repeat_weeks": int,
     "cancel_warn_hours": (int, float), "cancel_warn_text": str,
     "disk_notify": list, "disk_repeat_days": (int, float), "people": list,
-    "holds_on": bool, "holds_from": (int, float),
+    "holds_on": bool,
     "disk_fill": (int, float), "disk_fill_mentions": int, "stale_days": int,
 }  # fmt: skip
 # Keys added after configs were written: optional, with these defaults, so the package
@@ -495,14 +495,15 @@ CONFIG_KEYS = {
 # No io_mounts, no I/O notices.
 # No dm_log_channel: the DMs are not logged for the administrators (cluster_tools.slack).
 # No dm_metrics: they are not counted.
-# disk_top is retired (the disk report lists every person): accepted, read by nothing,
+# disk_top is retired (the disk report lists every person), and holds_from (each limit
+# has its own day, disk_quota_limit_from_timestamp_seconds): accepted, read by nothing,
 # until every config is rewritten by its role.
 CONFIG_DEFAULTS = {"io_mounts": {}, "io_share": 0.4, "io_minutes": 15, "io_top_jobs": 3, "io_repeat_hours": 6,
                    "io_advice": "", "dm_log_channel": "", "dm_metrics": "", "ssh_rate": False,
                    "ssh_repeat_hours": 24}  # fmt: skip
 CONFIG_OPTIONAL = {"io_mounts": dict, "io_share": (int, float), "io_minutes": int, "io_top_jobs": int,
                    "io_repeat_hours": (int, float), "io_advice": str, "dm_log_channel": str, "dm_metrics": str,
-                   "disk_top": int, "ssh_rate": bool, "ssh_repeat_hours": (int, float)}  # fmt: skip
+                   "disk_top": int, "holds_from": (int, float), "ssh_rate": bool, "ssh_repeat_hours": (int, float)}  # fmt: skip
 
 
 def _positive(value):
@@ -808,9 +809,8 @@ def disk(cfg, args):
     due = [r for r in rows if disk_report.row_key(r) in keys]
     fill_due = {disk_report.fill_key(k) for k, _, _ in fill} & keys
     who = namer(cfg, slack, cache)
-    hold = cfg["holds_from"] if cfg["holds_on"] else None
     card, thread = disk_report.render(
-        data, who, people=set(cfg["people"]), mention=keys if "mention" in notify else set(), hold=hold,
+        data, who, people=set(cfg["people"]), mention=keys if "mention" in notify else set(), holds=cfg["holds_on"],
         fill=fill, fill_mention=fill_due, stale_days=cfg["stale_days"],
     )  # fmt: skip
     if not preview:
@@ -824,7 +824,7 @@ def disk(cfg, args):
             try:
                 member = slack_id(row[2], cfg, slack, cache)
                 if member:
-                    text = disk_report.dm_text(row, disk_report.hold_note(hold, now))
+                    text = disk_report.dm_text(row, disk_report.hold_note(cfg["holds_on"], row[3]))
                     slack.dm(member, *cards.notice("disk", text), kind="disk", login=row[2])
                     delivered = True
             except (RuntimeError, OSError) as e:

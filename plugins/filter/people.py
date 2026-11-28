@@ -64,6 +64,10 @@ import days  # noqa: E402  (plugins/filter/days.py: the one reading of a day)
 STATUSES = ("active", "left")
 KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status", "disk_quota", "ends"}
 QUOTA_KEYS = ("block_hard", "inode_hard")  # warn levels: cluster_user_warn_fraction of them
+# A limit's keys: its hard limits, and the day the kernel enforces them from ("from",
+# plugins/filter/days.py; none: at once). Before it the limit is announced: shown and
+# warned about, never set (roles/disk_quota).
+LIMIT_KEYS = QUOTA_KEYS + ("from",)
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 UID_MIN = 1000
 TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "reserved_logins", "projects", "people"}
@@ -369,13 +373,13 @@ def check(roster, uid_min=UID_MIN):
             isinstance(quota, dict)
             and all(
                 isinstance(mount, str) and mount.startswith("/")
-                and isinstance(lim, dict) and not set(lim) - set(QUOTA_KEYS)
+                and isinstance(lim, dict) and not set(lim) - set(LIMIT_KEYS) and _day_ok(lim.get("from"))
                 for mount, lim in quota.items()
             )
         ):  # fmt: skip
             problems.append(
-                f"{where}.disk_quota: filesystem -> a mapping of {', '.join(QUOTA_KEYS)}"
-                " (/home: {block_hard: 20T})"
+                f"{where}.disk_quota: filesystem -> a mapping of {', '.join(LIMIT_KEYS)}"
+                " (/home: {block_hard: 20T}; from a day, YYYY-MM-DD)"
             )
         accounts = p.get("accounts") or {}
         if not isinstance(accounts, dict):
@@ -667,9 +671,19 @@ def roster_project_close(text, name, uid_min=UID_MIN):
 
 def people_disk_quotas(people, filesystems):
     """{filesystem: {login: limits}} for every active person: on each of FILESYSTEMS
-    ({filesystem: the site's limits there, a mapping of QUOTA_KEYS}) their own
-    disk_quota for it over the site's. Someone with neither there is left out of it:
-    not limited there."""
+    ({filesystem: the site's limits there, a mapping of LIMIT_KEYS}) their own
+    disk_quota for it over the site's, its from as Unix time. Someone with neither
+    there is left out of it: not limited there."""
+    out = _disk_limits(people, filesystems)
+    for mount, limits in out.items():
+        for lim in limits.values():
+            if "from" in lim:  # the day as Unix time, the tool's reading
+                lim["from"] = days.day_start(lim["from"]) if _day_ok(lim["from"]) else _bad_day(mount)
+    return out
+
+
+def _disk_limits(people, filesystems):
+    """people_disk_quotas without reading the days: who is limited where."""
     if not isinstance(filesystems, dict):
         from ansible.errors import AnsibleFilterError  # only under Ansible, as above
 
@@ -686,11 +700,27 @@ def people_disk_quotas(people, filesystems):
     return out
 
 
+def _day_ok(value):
+    try:
+        days.parse(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _bad_day(mount):
+    from ansible.errors import AnsibleFilterError
+
+    raise AnsibleFilterError(f"disk_quota_filesystems {mount}: from is a day, YYYY-MM-DD")
+
+
 def people_disk_limited(people, filesystems_each):
     """Whether anyone active is limited on any filesystem of FILESYSTEMS_EACH (one
     disk_quota_filesystems per host, as people_disk_quotas reads it): what the disk
-    rule needs before it warns or holds anyone (cluster_tools usage, the docs' rules)."""
-    return any(any(people_disk_quotas(people, fs or {}).values()) for fs in filesystems_each)
+    rule needs before it warns or holds anyone (cluster_tools usage, the docs' rules).
+    Announced or enforced alike, and the days unread: the docs' data reads host_vars
+    as written, a day there still a template (from: "{{ a_day }}")."""
+    return any(any(_disk_limits(people, fs or {}).values()) for fs in filesystems_each)
 
 
 def people_check(roster, uid_min=UID_MIN):

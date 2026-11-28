@@ -158,6 +158,8 @@ class Derive(unittest.TestCase):
         nobody = {k: v for k, v in self.p.items() if k != "alice"}
         self.assertFalse(people.people_disk_limited(nobody, [{"/": {}}, {}]), "counted only")
         self.assertTrue(people.people_disk_limited(nobody, [{}, {"/data": {"block_hard": "2T"}}]))
+        templated = {"/data": {"block_hard": "2T", "from": "{{ disk_limits_from }}"}}
+        self.assertTrue(people.people_disk_limited(nobody, [templated]), "a day not rendered yet is not read")
 
 
 class Check(unittest.TestCase):
@@ -171,17 +173,26 @@ class Check(unittest.TestCase):
 
     def test_disk_quota_takes_only_its_limits(self):
         self.assertIn(
-            "people.bob.disk_quota: filesystem -> a mapping of block_hard, inode_hard (/home: {block_hard: 20T})",
+            "people.bob.disk_quota: filesystem -> a mapping of block_hard, inode_hard, from (/home: {block_hard: 20T}; from a day, YYYY-MM-DD)",
             self.problems(lambda r: r["people"]["bob"].update(disk_quota={"/": {"size": "1G"}})),
         )
         self.assertIn(
-            "people.bob.disk_quota: filesystem -> a mapping of block_hard, inode_hard (/home: {block_hard: 20T})",
+            "people.bob.disk_quota: filesystem -> a mapping of block_hard, inode_hard, from (/home: {block_hard: 20T}; from a day, YYYY-MM-DD)",
             self.problems(lambda r: r["people"]["bob"].update(disk_quota="20G")),
         )
         self.assertIn(
-            "people.bob.disk_quota: filesystem -> a mapping of block_hard, inode_hard (/home: {block_hard: 20T})",
+            "people.bob.disk_quota: filesystem -> a mapping of block_hard, inode_hard, from (/home: {block_hard: 20T}; from a day, YYYY-MM-DD)",
             self.problems(lambda r: r["people"]["bob"].update(disk_quota={"block_hard": "20G"})),
         )
+
+    def test_disk_quota_may_name_the_day_it_is_enforced_from(self):
+        def with_day(day):
+            return lambda r: r["people"]["bob"].update(
+                disk_quota={"/home": {"block_hard": "20T", "from": day}}
+            )
+
+        self.assertEqual(self.problems(with_day("2027-01-04")), [])
+        self.assertTrue(any("disk_quota" in x for x in self.problems(with_day("soon"))))
 
     def test_duplicate_uid(self):
         self.assertIn(

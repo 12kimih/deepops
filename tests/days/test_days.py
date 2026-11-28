@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import in_tree  # noqa: E402
-from ansible_yaml import render, role_vars  # noqa: E402
+from ansible_yaml import render  # noqa: E402
 
 days = in_tree.load("plugins/filter/days.py")
 MIDNIGHT = int(time.mktime(datetime.date(2026, 12, 9).timetuple()))
@@ -42,12 +42,15 @@ class Days(unittest.TestCase):
 
 
 class Readers(unittest.TestCase):
-    def test_the_holds_start_reads_through_day_start(self):
-        expr = role_vars("deploy_defaults")["submit_holds_from_time"]
-        self.assertIn("day_start", expr)
+    def test_a_disk_limits_day_reads_through_day_start(self):
+        """Each limit's from (disk_quota_filesystems, a person's disk_quota) is when the
+        kernel enforces it and the holds start (it replaced submit_holds_from)."""
+        people = in_tree.load("plugins/filter/people.py")
+        roster = {"kim": {"uid": 5000, "status": "active"}}
         for value, want in ((datetime.date(2026, 12, 9), MIDNIGHT), ("2026-12-09", MIDNIGHT), ("", 0)):
             with self.subTest(value=value):
-                self.assertEqual(int(render(expr, {"submit_holds_from": value})), want)
+                limits = people.people_disk_quotas(roster, {"/home": {"block_hard": "10T", "from": value}})
+                self.assertEqual(limits["/home"]["kim"]["from"], want)
 
     def test_no_role_parses_a_day_in_jinja(self):
         """The one reading: to_datetime on a setting is the parser this replaced."""

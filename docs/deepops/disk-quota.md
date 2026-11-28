@@ -49,6 +49,28 @@ people:
 
 Someone who leaves the roster loses their limits; their files stay.
 
+## Announced first, enforced from a day
+
+A limit may name the day it is enforced from, `from` (YYYY-MM-DD), beside its hard
+limits, in `disk_quota_filesystems` or in a person's own `disk_quota`:
+
+```yaml
+disk_quota_filesystems:
+  /home: {block_hard: 10T, from: 2026-12-09}
+```
+
+Until that day the limit is announced: its levels are exported with the day
+(`disk_quota_limit_from_timestamp_seconds`), so the daily disk report and its mentions,
+the DMs, `usage disk`, the bot's Home tab and the alerts tell people at once where they
+stand, each saying when the limit starts; nothing is refused and no job is held. On the
+day the metrics run (every `disk_quota_metrics_interval`) sets the limit in the kernel
+itself, with no deploy, on a filesystem whose quotas are on (it never turns quotas on or
+counts afresh: a filesystem not ready, its mount options missing, is left to
+`playbooks/generic/disk-quota.yml`). Then the day's series goes, and the limit is
+enforced like any other, the submit holds included. The day is the notice a site gave
+everyone already past the new limit; it replaced the holds' own grace date, so the hold, the
+report and the kernel always agree.
+
 ## Project quotas
 
 `disk_quota_projects` gives a directory tree one limit, whoever writes in it:
@@ -81,7 +103,8 @@ every `disk_quota_metrics_interval`:
 | Metric | Labels |
 |---|---|
 | `disk_quota_used_bytes`, `disk_quota_used_inodes` | `filesystem`, `user` |
-| `disk_quota_limit_bytes`, `disk_quota_limit_inodes` | `filesystem`, `user`, `kind` (warn, hard) |
+| `disk_quota_limit_bytes`, `disk_quota_limit_inodes` | `filesystem`, `user`, `kind` (warn, hard); announced or enforced |
+| `disk_quota_limit_from_timestamp_seconds` | `filesystem`, `user`: while a limit is announced and not in the kernel yet, its day |
 | `disk_quota_project_used_bytes` | `filesystem`, `project`, `project_id` |
 | `disk_quota_project_limit_bytes` | `filesystem`, `project`, `project_id`, `kind` |
 | `disk_quota_last_success_timestamp_seconds` | |
@@ -123,7 +146,8 @@ being reported, and who or which project has been past its warn level for an hou
 ## No new Slurm jobs at a hard limit
 
 With `slurm_enable_submit_holds` (off by default; `roles/submit_holds`, on the controllers)
-and `submit_holds_disk`, someone at a hard limit, of space or of files, on any counted
+and `submit_holds_disk`, someone at an enforced hard limit (an announced one holds no
+one before its `from` day), of space or of files, on any counted
 filesystem cannot submit
 Slurm jobs until they free space there. `sbatch`, `srun` and `salloc` refuse the job
 with the reason (where, how much, `usage disk` to look; `usage submit` says every
@@ -133,7 +157,6 @@ hold); their running jobs go on.
 |---|---|
 | `slurm_enable_submit_holds` | Turns the holds on: a person past their roster `ends` is held from the next day (docs/deepops/accounts.md) |
 | `submit_holds_disk` | Holds a person at a hard limit too (and the disk report says what a hard limit means for Slurm). Off by default |
-| `submit_holds_from` | `YYYY-MM-DD`: no one is held before this date, the grace for everyone already at a limit when the holds are turned on; the disk report and its DMs say from when. `""` holds at once |
 | `submit_holds_interval` | How often the holds are worked out again |
 | `submit_holds_max_age` | How long, in seconds, `job_submit.lua` trusts the holds file after it was written; `SubmitHoldsStale` warns at half of it |
 

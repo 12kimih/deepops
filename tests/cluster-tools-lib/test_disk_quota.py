@@ -90,12 +90,15 @@ class FakeHost:
         return ""
 
 
-def plan(host, cfg, action="apply"):
-    return [text for text, _ in dq.steps_for(host, cfg, action)]
+NOW = 1_800_000_000
+
+
+def plan(host, cfg, action="apply", now=NOW):
+    return [text for text, _ in dq.steps_for(host, cfg, action, now)]
 
 
 def run(host, cfg, action="apply"):
-    for _, act in dq.steps_for(host, cfg, action):
+    for _, act in dq.steps_for(host, cfg, action, NOW):
         act()
 
 
@@ -371,6 +374,51 @@ class Metrics(unittest.TestCase):
             get("disk_quota_project_limit_bytes", kind="warn", **labels), str(int(20 * TB * 0.9) * 1024)
         )
         self.assertEqual(get("disk_quota_last_success_timestamp_seconds"), "1700000000")
+
+
+class Announced(unittest.TestCase):
+    """A limit with "from" is told before it is enforced (owner 2026-11-28): its levels and
+    its date are exported at once, the kernel gets it only from then, and the metrics run
+    sets it on the day by itself."""
+
+    LATER = {"filesystems": {"/": {"alice": {**ALICE, "from": NOW + 86400}}}, "release": ["alice"], **LEVELS}
+    CSV = "alice,ok,ok,2048,0,0,,5,0,0,\n"
+
+    def values(self, host, now=NOW):
+        return prom.parse(dq.metrics(host, self.LATER, now))
+
+    def test_before_its_day_it_is_shown_with_the_day_and_never_set(self):
+        host = FakeHost(quota_file=True, on=True, csv=self.CSV)
+        self.assertEqual(plan(host, self.LATER), [], "a deploy sets nothing yet")
+        self.assertEqual(dq.due_steps(host, self.LATER, NOW), [])
+        values = self.values(host)
+        labels = {"filesystem": "/", "user": "alice"}
+        self.assertEqual(
+            values[prom.key("disk_quota_limit_bytes", kind="hard", **labels)], str(20 * GB * 1024)
+        )
+        self.assertEqual(values[prom.key("disk_quota_limit_bytes", kind="warn", **labels)],
+                         str(int(20 * GB * 0.9) * 1024))  # fmt: skip
+        self.assertEqual(
+            values[prom.key("disk_quota_limit_from_timestamp_seconds", **labels)], str(NOW + 86400)
+        )
+
+    def test_on_its_day_the_metrics_run_sets_it_and_the_date_goes(self):
+        host = FakeHost(quota_file=True, on=True, csv=self.CSV)
+        later = NOW + 86400
+        self.assertEqual([t for t, _ in dq.due_steps(host, self.LATER, later)],
+                         [f"setquota -u alice 0 {20 * GB} 0 500000 /"])  # fmt: skip
+        self.assertEqual(plan(host, self.LATER, now=later), [f"setquota -u alice 0 {20 * GB} 0 500000 /"])
+        set_ = FakeHost(quota_file=True, on=True, csv=f"alice,ok,ok,2048,0,{20 * GB},,5,0,500000,\n")
+        self.assertNotIn(prom.key("disk_quota_limit_from_timestamp_seconds", filesystem="/", user="alice"),
+                         self.values(set_, later), "enforced: no date left")  # fmt: skip
+
+    def test_the_metrics_run_never_turns_quotas_on(self):
+        for host in (FakeHost(on=False), FakeHost(live="rw,noatime", on=False)):
+            with self.subTest(host=host.files["/proc/self/mounts"]):
+                self.assertEqual(dq.due_steps(host, self.LATER, NOW + 86400), [])
+
+    def test_a_from_is_not_a_level(self):
+        self.assertEqual(dq.levels("x", {"block_hard": "1T", "from": 5}, LEVELS)[1], TB)
 
 
 class Cli(unittest.TestCase):

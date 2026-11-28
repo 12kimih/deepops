@@ -9,7 +9,7 @@ Each step is printed as it is taken (or would be, with --check), one line each. 
 "-" is read from standard input (a preview of a configuration not written yet):
 
     {"filesystems": {"/": {},
-                     "/home": {"alice": {"block_hard": "10T"}}},
+                     "/home": {"alice": {"block_hard": "10T", "from": 1796742000}}},
      "release": ["alice", "bob"],
      "warn_fraction": 0.9, "inodes_per_tib": 3000000,
      "projects": {"/home/shared/datasets": {"filesystem": "/home", "id": 101,
@@ -31,6 +31,12 @@ only one the kernel enforces: a write past it fails at once. Each has its warn l
 warn_fraction of it, never sent to the kernel (its soft limit stays 0, so there is no
 grace period that turns into a refusal later); it is exported with the usage, for the
 alerts and the people's notices.
+
+A limit with "from" (Unix time) is announced until then: exported with its levels and
+its date (disk_quota_limit_from_timestamp_seconds), so the notices, `usage disk` and the
+alerts tell people now, and set in the kernel only from that time. The metrics run
+(every few minutes) sets each limit that has come due itself, on a filesystem whose
+quotas are on; no deploy is needed on the day.
 
 User quotas are on ext4 and XFS. An ext4 filesystem with its quota feature (tune2fs -O
 quota) needs usrquota in its mount options; one without it keeps journaled quota files
@@ -102,6 +108,8 @@ def inodes(count):
 
 
 LIMIT_KEYS = ("block_hard", "inode_hard")
+# Not a level: the time the kernel enforces a limit from (none: at once).
+FROM = "from"
 TIB_KIB = 1024**3
 
 
@@ -109,7 +117,7 @@ def levels(name, lim, cfg):
     """(block_warn, block_hard, inode_warn, inode_hard) of LIM in KiB and inodes: the
     hard limits, the inodes from the blocks where LIM names none (cfg's inodes_per_tib),
     each warn level cfg's warn_fraction of its hard limit."""
-    unknown = sorted(set(lim) - set(LIMIT_KEYS))
+    unknown = sorted(set(lim) - set(LIMIT_KEYS) - {FROM})
     if unknown:
         raise Error(
             f"{name}: {', '.join(unknown)}: a limit is {' and '.join(LIMIT_KEYS)};"
@@ -124,8 +132,18 @@ def levels(name, lim, cfg):
 
 
 def wanted(limits, cfg):
-    """{user: (block_warn, block_hard, inode_warn, inode_hard)}."""
+    """{user: (block_warn, block_hard, inode_warn, inode_hard)}, announced or enforced."""
     return {user: levels(user, lim, cfg) for user, lim in (limits or {}).items()}
+
+
+def starts(lim):
+    """When LIM's kernel limits start (Unix time; 0 at once)."""
+    return int(lim.get(FROM) or 0)
+
+
+def due(limits, now):
+    """Of LIMITS ({user: limit}), those the kernel holds at NOW."""
+    return {user: lim for user, lim in (limits or {}).items() if starts(lim) <= now}
 
 
 def kernel(values):
@@ -285,9 +303,10 @@ def filesystem_steps(host, mount, cfg):
     return steps
 
 
-def limit_steps(host, mount, cfg, fresh=False):
-    """[(description, action)] that set every user's hard limits on MOUNT (soft 0)."""
-    want = wanted(cfg["filesystems"][mount], cfg)
+def limit_steps(host, mount, cfg, now, fresh=False):
+    """[(description, action)] that set every user's hard limits due at NOW on MOUNT
+    (soft 0); an announced one not yet due is none in the kernel."""
+    want = wanted(due(cfg["filesystems"][mount], now), cfg)
     have = {} if fresh else user_report(host, mount)
     steps = []
     for user, values in sorted(want.items()):
@@ -457,16 +476,20 @@ def remove_project_steps(host, cfg):
 
 
 def metrics(host, cfg, now):
-    """Usage and limits, as textfile metrics: the hard limit as the kernel holds it, the
-    warn level from the configuration (the kernel never has it)."""
+    """Usage and limits, as textfile metrics: each configured limit's levels (announced
+    or enforced) and, while the kernel does not hold it yet, the time it starts; a hard
+    limit the configuration does not name, as the kernel holds it."""
     values = {}
     for mount, limits in (cfg.get("filesystems") or {}).items():
         want = wanted(limits, cfg)
-        for user, (bu, _, bh, iu, _, ih) in user_report(host, mount).items():
+        for user, (bu, _, kbh, iu, _, kih) in user_report(host, mount).items():
             labels = {"filesystem": mount, "user": user}
             values[key("disk_quota_used_bytes", **labels)] = bu * 1024
             values[key("disk_quota_used_inodes", **labels)] = iu
-            bw, _, iw, _ = want.get(user, (0, 0, 0, 0))
+            bw, bh, iw, ih = want.get(user, (0, kbh, 0, kih))
+            if user in want and (kbh, kih) != (bh, ih):
+                # Announced, or due and not set yet: when the kernel holds it.
+                values[key("disk_quota_limit_from_timestamp_seconds", **labels)] = starts(limits[user])
             for kind, b, i in (("warn", bw, iw), ("hard", bh, ih)):
                 if b:
                     values[key("disk_quota_limit_bytes", kind=kind, **labels)] = b * 1024
@@ -507,7 +530,22 @@ def scan(host, cfg, now):
     return values
 
 
-def steps_for(host, cfg, action):
+def due_steps(host, cfg, now):
+    """[(description, action)] that set the limits come due at NOW, on each filesystem
+    whose quotas are on (the metrics run's): never a quotacheck or a quotaon, which are
+    a deploy's; a filesystem not ready is left to it."""
+    out = []
+    for mount in cfg.get("filesystems") or {}:
+        try:
+            if filesystem_steps(host, mount, cfg):
+                continue
+        except Error:
+            continue
+        out += limit_steps(host, mount, cfg, now)
+    return out
+
+
+def steps_for(host, cfg, action, now):
     out = []
     if action == "remove":
         out += remove_project_steps(host, cfg)
@@ -519,7 +557,7 @@ def steps_for(host, cfg, action):
         out += fs
         # Quotas not on yet (they are turned on above): nothing can be read, and every
         # limit is set.
-        out += limit_steps(host, mount, cfg, fresh=any(t.startswith("quotaon ") for t, _ in fs))
+        out += limit_steps(host, mount, cfg, now, fresh=any(t.startswith("quotaon ") for t, _ in fs))
     return out + project_steps(host, cfg)
 
 
@@ -570,6 +608,12 @@ def main(argv=None):
         cfg = load_config(args[0])
         host = Host()
         if args[1] == "metrics":
+            for text, action in due_steps(host, cfg, time.time()):
+                print(text)
+                try:
+                    action()
+                except Exception as e:  # noqa: BLE001 - the usage is still written
+                    print(f"disk-quota: {text}: {e}", file=sys.stderr)
             if cfg.get("textfile"):
                 write_atomic(cfg["textfile"], metrics(host, cfg, time.time()))
             return OK
@@ -581,7 +625,7 @@ def main(argv=None):
                     cfg.get("scan_textfile_kept", ""),
                 )
             return OK
-        for text, action in steps_for(host, cfg, args[1]):
+        for text, action in steps_for(host, cfg, args[1], time.time()):
             print(text)
             if not check:
                 action()

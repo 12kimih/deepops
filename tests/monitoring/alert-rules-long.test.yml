@@ -514,7 +514,7 @@ tests:
           - exp_labels: {severity: info, host: login, instance: "login:9100", filesystem: /, user: alice}
             exp_annotations:
               summary: "alice is past their disk warn level on login:/"
-              description: "Nothing is refused yet: only the hard limit stops writes. `quota -s alice` on the host shows it; the person frees space, or gets a larger disk_quota in people.yml."
+              description: "Nothing is refused yet: only the hard limit stops writes (a limit announced for a later day, disk_quota_limit_from_timestamp_seconds, from that day). `quota -s alice` on the host shows it; the person frees space, or gets a larger disk_quota in people.yml."
       - eval_time: 2h
         alertname: DiskQuotaProjectOverWarnLevel
         exp_alerts:

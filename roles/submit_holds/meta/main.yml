@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: deploy_defaults  # submit_holds_from, submit_holds_disk
+  - role: deploy_defaults  # submit_holds_disk
   - role: people_defaults  # people_leave_grace_days
   - role: cluster_tools_lib  # cluster_tools.submit_holds
   - role: prometheus_paths  # prometheus_url, node_exporter_prom_dir

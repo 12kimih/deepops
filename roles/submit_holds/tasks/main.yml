@@ -1,12 +1,10 @@
 ---
-- name: Check the component state and the grace date
+- name: Check the component state
   ansible.builtin.assert:
     that:
       - submit_holds_state in ['present', 'absent', 'kept']
-      - submit_holds_from | string is match('^([0-9]{4}-[0-9]{2}-[0-9]{2})?$')
     fail_msg: >-
-      submit_holds_state must be present, absent or kept (not {{ submit_holds_state }}), and
-      submit_holds_from a date, YYYY-MM-DD, or "" (not {{ submit_holds_from }}).
+      submit_holds_state must be present, absent or kept (not {{ submit_holds_state }}).
     quiet: true
 
 - name: "Make the submission holds {{ submit_holds_state }}"

@@ -1,5 +1,5 @@
 """cluster_tools.submit_holds: who may not submit for now. Someone at a disk hard limit,
-with the reason they are shown, from disk_from on; the file job_submit.lua reads, and a
+with the reason they are shown, once the limit is enforced; the file job_submit.lua reads, and a
 failed Prometheus read that leaves the last file in place."""
 
 import json
@@ -18,7 +18,7 @@ from cluster_tools.prometheus import Error as PrometheusError  # noqa: E402
 from test_disk import NOW, site  # noqa: E402
 
 UIDS = {"alice": 1001, "bob": 1002, "carol": 1003}
-DISK = {"disk": True, "disk_from": 0, "ends": {}}
+DISK = {"disk": True, "ends": {}}
 DAY = 86400
 
 
@@ -34,8 +34,11 @@ class HoldTests(unittest.TestCase):
         # The command that shows one's own use anywhere, not quota on a host they cannot log in to.
         self.assertIn("(`usage disk` shows it)", held[1002])
 
-    def test_no_one_before_the_grace_ends_nor_without_an_account(self):
-        self.assertEqual(submit_holds.holds(self.data(), {**DISK, "disk_from": NOW + 1}, NOW, UIDS.get), {})
+    def test_no_one_before_the_limit_is_enforced_nor_without_an_account(self):
+        announced = self.data()
+        for entry in announced["users"].values():
+            entry["from"] = NOW + DAY  # disk_quota_limit_from_timestamp_seconds
+        self.assertEqual(submit_holds.holds(announced, DISK, NOW, UIDS.get), {})
         with mock.patch("sys.stderr"):
             self.assertEqual(submit_holds.holds(self.data(), DISK, NOW, {}.get), {})
         self.assertEqual(submit_holds.holds(None, DISK, NOW, UIDS.get), {})
@@ -56,6 +59,14 @@ class HoldTests(unittest.TestCase):
         rules = (ROOT / "roles/prometheus/files/rules/submit-holds.yml").read_text()
         self.assertIn("> submit_holds_max_age_seconds / 2", rules)
         self.assertNotIn("max_age_seconds", submit_holds.metrics({}, DISK, NOW))
+
+    def test_a_config_written_with_the_retired_disk_from_still_loads(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Path(d, "c.json")
+            cfg.write_text(
+                json.dumps({**DISK, "disk_from": 0, "prometheus_url": "x", "file": "/f", "textfile": "/t"})
+            )
+            self.assertEqual(submit_holds.load_config(str(cfg))["disk_from"], 0)
 
     def test_a_config_written_before_max_age_still_loads(self):
         with tempfile.TemporaryDirectory() as d:

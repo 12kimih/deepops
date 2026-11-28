@@ -6,7 +6,7 @@ All from Prometheus (prometheus_url in the site file), the series the cluster al
 keeps; nothing is measured here:
   space    roles/disk_quota's metrics: the bytes and files each person holds on each
            counted filesystem, the warn level (a notice) and the hard limit (the kernel
-           refuses the write that would pass it)
+           refuses the write that would pass it; an announced one from its day)
   folders  the folders worth cleaning (cluster_tools.cleanup: unused past the stale
            period), the largest and longest unused first
 and the scratch cleanup's list of your files (cluster_tools.scratch_space), each looked
@@ -39,6 +39,8 @@ SPACE = (
     ("file_warn", "disk_quota_limit_inodes", "warn"),
     ("file_hard", "disk_quota_limit_inodes", "hard"),
 )
+# A limit announced and not enforced yet: the time the kernel holds it from (not drawn).
+STARTS = "disk_quota_limit_from_timestamp_seconds"
 FOLDERS = (("bytes", "disk_cleanup_candidate_bytes"), ("unused_days", "disk_cleanup_candidate_unused_days"))
 # When each filesystem's folders were last weighed (cluster_tools.cleanup): the folders
 # are as of then, and each filesystem is scanned on its own schedule.
@@ -62,7 +64,8 @@ def folders(selector):
 NOTES = [
     "Sources, all read from Prometheus (nothing is measured here):\n"
     "  space    the disk quota metrics: bytes and files on each counted filesystem, the warn\n"
-    "           level (a notice) and the limit (the kernel refuses the write past it).\n"
+    "           level (a notice) and the limit (the kernel refuses the write past it; a\n"
+    "           limit announced and not enforced yet, from the day shown with it).\n"
     "           The host itself answers `quota -s` with the live figures.\n"
     "  folders  the folders worth cleaning: unused past the stale period, the largest and\n"
     "           longest unused first, from each filesystem's last scan (its time shown; the\n"
@@ -109,7 +112,12 @@ def collect(api, user, top):
     for figure, expr in space(selector).items():
         for k, v in _series(api, expr, ("filesystem",)).items():
             figures.setdefault(k, dict.fromkeys(f for f, _, _ in SPACE))[figure] = v
-    rows = [{"where": where(*k), **f} for k, f in sorted(figures.items()) if f["used"] is not None]
+    starts = _series(api, f"max by (host, filesystem) ({STARTS}{{{selector}}})", ("filesystem",))
+    rows = [
+        {"where": where(*k), **f, **({"from": int(starts[k])} if starts.get(k) else {})}
+        for k, f in sorted(figures.items())
+        if f["used"] is not None
+    ]
     found = {}
     for figure, expr in folders(selector).items():
         for k, v in _series(api, expr, ("filesystem", "path")).items():
@@ -164,15 +172,16 @@ def render(data, theme):
                 align=["l", "r", "r", "r", "r", "r", "r"],
                 groups=[("SPACE", 1, 3), ("FILES", 4, 6)])  # fmt: skip
     for r in data["space"]:
+        start = f" from {time.strftime('%Y-%m-%d', time.localtime(r['from']))}" if r.get("from") else ""
         grid.row(
             [
                 (r["where"], "text"),
                 (size(r["used"]), _level(r["used"], r["warn"], r["hard"])),
                 (_bytes(r["warn"]), "muted"),
-                (_bytes(r["hard"]), "muted"),
+                (_bytes(r["hard"]) + start, "muted"),
                 (_count(r["files"]), _level(r["files"] or 0, r["file_warn"], r["file_hard"])),
                 (_count(r["file_warn"]), "muted"),
-                (_count(r["file_hard"]), "muted"),
+                (_count(r["file_hard"]) + (start if r["file_hard"] else ""), "muted"),
             ]
         )
     title = f"disk usage of {who}"

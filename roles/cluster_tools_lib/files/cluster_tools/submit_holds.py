@@ -7,10 +7,10 @@ Held, their new jobs refused with the reason while running jobs go on:
 - a person past their membership's end (`ends`: login -> {ends, login_expires}, the
   roster's people_leaving): from the day after `ends`, local time, with no deploy; their
   login lasts until login_expires to move their files. Needs no Prometheus.
-- with `disk`, a person at a disk hard limit (cluster_tools.disk_report: the disk quota
-  metrics, as the daily disk report reads them), until they free space there. Before
-  `disk_from` (Unix time, 0: at once) no one is held for it: the grace a site gives
-  everyone already at a limit when it turns disk holds on.
+- with `disk`, a person at a disk hard limit the kernel enforces (cluster_tools.disk_report:
+  the disk quota metrics, as the daily disk report reads them), until they free space
+  there. A limit announced and not enforced yet (its "from" day, roles/disk_quota) holds
+  no one: the grace a site gives everyone already past it.
 
 The file is a line "generated <unix time>", then "<uid> <reason>" per person held; the
 rendered job_submit.lua reads it at most once a minute and trusts it for `max_age`
@@ -19,8 +19,9 @@ the metrics carry `max_age` for the alert that says so first (SubmitHoldsStale).
 keeps the last file's disk holds, exits 3 and leaves the metrics (so the alert fires).
 A login the host cannot resolve is skipped, said on standard error.
 
-CONFIG: prometheus_url, file (the holds), disk, disk_from, ends, textfile
-(node_exporter's), max_age (optional: a config written before it gives no such metric).
+CONFIG: prometheus_url, file (the holds), disk, ends, textfile (node_exporter's), max_age
+(optional: a config written before it gives no such metric); disk_from, retired (each
+limit has its own day), is accepted and read by nothing until the role rewrites it.
 Python 3.9 or newer, standard library only.
 """
 
@@ -37,9 +38,9 @@ from .prometheus import Error as PrometheusError
 from .prometheus import Prometheus
 
 CONFIG_KEYS = {
-    "prometheus_url": str, "file": str, "disk": bool, "disk_from": (int, float), "ends": dict, "textfile": str,
+    "prometheus_url": str, "file": str, "disk": bool, "ends": dict, "textfile": str,
 }  # fmt: skip
-CONFIG_OPTIONAL = {"max_age": int}
+CONFIG_OPTIONAL = {"max_age": int, "disk_from": (int, float)}
 # How an ends hold's reason begins: what a run that could not read the disk metrics
 # tells apart from the disk holds it keeps.
 ENDED = "Your membership ended on"
@@ -68,7 +69,7 @@ def disk_holds(data):
         # notices' own (disk_report.amounts).
         place, what, used, level, kind, _ = disk_report.amounts(row)
         figure = disk_report.size if what == "space" else (lambda n: f"{n:,.0f} files")
-        if kind == "hard" and row[2] not in out:
+        if kind == "hard" and disk_report.enforced(row[3]) and row[2] not in out:
             out[row[2]] = (
                 f"{DISK_HELD} {place} is {figure(used)}, at the hard limit {figure(level)}: writes"
                 f" there fail now. New jobs are held until you free space there"
@@ -91,11 +92,11 @@ def ends_holds(ends, now):
 
 
 def holds(data, cfg, now, uid=None):
-    """{uid: reason} of everyone held NOW: past their end, or (with disk, from disk_from
-    on, when DATA was read) at a disk hard limit. An end goes first: it is the lasting one."""
+    """{uid: reason} of everyone held NOW: past their end, or (with disk, when DATA was
+    read) at an enforced disk hard limit. An end goes first: it is the lasting one."""
     uid = uid or uid_of
     reasons = {}
-    if cfg["disk"] and data is not None and now >= cfg["disk_from"]:
+    if cfg["disk"] and data is not None:
         reasons.update(disk_holds(data))
     reasons.update(ends_holds(cfg["ends"], now))
     out = {}
@@ -133,7 +134,6 @@ def text(held, now):
 def metrics(held, cfg, now):
     values = {
         key("submit_holds_people"): len(held),
-        key("submit_holds_grace_until_timestamp_seconds"): int(cfg["disk_from"]),
         key("submit_holds_last_success_timestamp_seconds"): int(now),
     }
     if "max_age" in cfg:

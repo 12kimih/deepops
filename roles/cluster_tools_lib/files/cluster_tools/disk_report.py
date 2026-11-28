@@ -72,15 +72,17 @@ def series(prom, expr, labels, at=None):
     }
 
 
-def _usage(prom, now, used, limits, inode_used, inode_limits, labels):
-    """{key: {used, before, warn, hard, inodes, inode_warn, inode_hard}}: the bytes now and
-    a day ago (None when it was not counted then), and the levels set (0 none)."""
+def _usage(prom, now, used, limits, inode_used, inode_limits, labels, starts=""):
+    """{key: {used, before, warn, hard, inodes, inode_warn, inode_hard, from}}: the bytes
+    now and a day ago (None when it was not counted then), the levels (0 none) and, for
+    a limit announced and not enforced yet, when it is (STARTS; 0 enforced)."""
     out = {}
     before = series(prom, used, labels, at=now - DAY)
     for k, v in series(prom, used, labels).items():
         out[k] = {"used": v, "before": before.get(k), "warn": 0, "hard": 0,
-                  "inodes": 0, "inode_warn": 0, "inode_hard": 0}  # fmt: skip
+                  "inodes": 0, "inode_warn": 0, "inode_hard": 0, "from": 0}  # fmt: skip
     for field, expr in (
+        ("from", starts),
         ("warn", f'{limits}{{kind="warn"}}'),
         ("hard", f'{limits}{{kind="hard"}}'),
         ("inodes", inode_used),
@@ -99,6 +101,7 @@ def collect(prom, now):
     users = _usage(
         prom, now, "disk_quota_used_bytes", "disk_quota_limit_bytes",
         "disk_quota_used_inodes", "disk_quota_limit_inodes", ("filesystem", "user"),
+        "disk_quota_limit_from_timestamp_seconds",
     )  # fmt: skip
     projects = _usage(
         prom, now, "disk_quota_project_used_bytes", "disk_quota_project_limit_bytes",
@@ -176,6 +179,18 @@ def past(entry):
     return out
 
 
+def enforced(entry):
+    """Whether ENTRY's hard limit is the kernel's now: else it is announced (its "from"),
+    told about as if it were, and refuses nothing and holds no one yet."""
+    return not entry.get("from")
+
+
+def starts_text(entry):
+    """When an announced limit starts: "2026-12-09부터" (on the day, until the metrics run
+    sets it, a few minutes)."""
+    return f"{datetime.fromtimestamp(entry['from']):%Y-%m-%d}부터"
+
+
 def over_warn(data):
     """[(host, filesystem, user, entry, past)] for everyone past a level, worst first."""
     rows = [(*k, e, past(e)) for k, e in data["users"].items() if past(e)]
@@ -245,8 +260,9 @@ def _level(entry, kind):
 
 def amounts(row):
     """(where, what, used, level, kind, hard limit) of a row of over_warn, in no language:
-    WHAT is space (bytes) or files, KIND warn or hard. The notices word them (describe),
-    and so does the submit hold (cluster_tools.submit_holds)."""
+    WHAT is space (bytes) or files, KIND warn or hard (announced or enforced: enforced()
+    of the row's entry). The notices word them (describe), and so does the submit hold
+    (cluster_tools.submit_holds)."""
     host, filesystem, _, entry, levels = row
     what, used, level, kind = levels[0]
     return (
@@ -262,24 +278,29 @@ def amounts(row):
 def describe(row):
     """(where, how much, how it stands, at the hard limit) for a row of over_warn: the
     state a sentence ("한도(5T)에 닿았습니다"), the level in parentheses so the particle
-    follows the word, not the figure."""
+    follows the word, not the figure. An announced limit says when it starts."""
     place, what, used, level, kind, hard = amounts(row)
     figure = size if what == "space" else (lambda n: f"파일 {n:,.0f}개")
-    if kind == "hard":
+    entry = row[3]
+    if kind == "hard" and enforced(entry):
         state = f"한도({figure(level)})에 닿았습니다"
+    elif kind == "hard":
+        state = f"{starts_text(entry)} 적용되는 한도({figure(level)})를 넘었습니다"
     else:
         state = f"경고 수준({figure(level)})을 넘었습니다" + (f" (한도 {figure(hard)})" if hard else "")
+        if hard and not enforced(entry):
+            state += f". 한도는 {starts_text(entry)} 적용됩니다"
     return place, figure(used), state, kind == "hard"
 
 
-def hold_note(hold, now):
-    """What a hard limit means for Slurm (cluster_tools.submit_holds): HOLD is None (no
-    holds) or the Unix time they start."""
-    if hold is None:
+def hold_note(holds, entry):
+    """What a hard limit means for Slurm (cluster_tools.submit_holds, with HOLDS on): held
+    while the limit is enforced, from its day while it is announced."""
+    if not holds:
         return ""
-    if now >= hold:
+    if enforced(entry):
         return "공간을 비우실 때까지 새 Slurm 잡을 제출할 수 없습니다"
-    return f"{datetime.fromtimestamp(hold):%Y-%m-%d}부터는 한도에 닿아 있는 동안 새 Slurm 잡을 제출할 수 없습니다"
+    return f"{starts_text(entry)}는 한도에 닿아 있는 동안 새 Slurm 잡을 제출할 수 없습니다"
 
 
 def past_line(row, who, mention=True, note=""):
@@ -289,12 +310,12 @@ def past_line(row, who, mention=True, note=""):
     return f"{cards.mark('act' if hard else 'warn')}{who(row[2], mention)} {place}에서: {amount}, {state}"
 
 
-def render(data, who, *, people=(), mention=None, hold=None, fill=None, fill_mention=(), stale_days=0):
+def render(data, who, *, people=(), mention=None, holds=False, fill=None, fill_mention=(), stale_days=0):
     """The summary card (text, blocks) and the thread [(text, blocks)]: every disk and
     everyone past a level on the card; each filesystem's people, every one, everyone else, the
     projects and the folders worth cleaning in the thread. With no PEOPLE (no roster)
     every user is ranked. Of those past a level, the keys in MENTION (row_key) are
-    mentioned; None mentions them all. HOLD (hold_note) says what a hard limit means for
+    mentioned; None mentions them all. HOLDS (hold_note) says what a hard limit means for
     their Slurm jobs. FILL (fill_rows) names the largest people of each fuller
     filesystem, mentioned where its fill_key is in FILL_MENTION."""
     stamp = datetime.fromtimestamp(data["now"]).strftime("%Y-%m-%d")
@@ -312,7 +333,7 @@ def render(data, who, *, people=(), mention=None, hold=None, fill=None, fill_men
         card += cards.part(
             "경고 수준을 넘은 사용량",
             "\n".join(
-                past_line(r, who, mention is None or row_key(r) in mention, hold_note(hold, data["now"]))
+                past_line(r, who, mention is None or row_key(r) in mention, hold_note(holds, r[3]))
                 for r in rows
             ),
         )
@@ -335,6 +356,9 @@ def render(data, who, *, people=(), mention=None, hold=None, fill=None, fill_men
         if data["now"] - t > STALE
     )
     notes = ["경고 수준을 넘으면 알려 드리기만 하고, 한도에 닿으면 바로 쓰기가 막힙니다."]
+    announced = sorted({starts_text(e) for e in data["users"].values() if e["hard"] and not enforced(e)})
+    if announced:
+        notes.append(f"아직 적용되지 않은 한도는 {', '.join(announced)} 적용되니, 그전에 공간을 비워 주세요.")
     if stale:
         notes.append(f"최근 보고가 없어 예전 수치입니다: {', '.join(stale)}.")
     card.append(cards.note(" ".join(notes)))
@@ -397,7 +421,11 @@ def dm_text(row, note=""):
     """The note to someone past a level: where, how much, what it means (NOTE, hold_note,
     at a hard limit) and what to do."""
     place, amount, state, hard = describe(row)
-    if hard:
+    if hard and not enforced(row[3]):
+        act = "아직 막힌 것은 없습니다. 한도가 적용되기 전에 공간을 비워 주세요." + (
+            f" {note}." if note else ""
+        )
+    elif hard:
         act = "지금은 그곳에 쓸 수 없습니다. " + (
             f"{note}." if note else "공간을 비우시면 다시 쓰실 수 있습니다."
         )

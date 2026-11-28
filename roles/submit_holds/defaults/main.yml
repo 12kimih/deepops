@@ -4,8 +4,9 @@
 # the rendered job_submit.lua reads it. A deploy sets it from deepops_components
 # (slurm_enable_submit_holds, on slurm-master). Held, new jobs refused with the reason
 # while running jobs go on: a person past their roster `ends`, from the next day; with
-# submit_holds_disk, a person at a disk hard limit (the disk quota metrics, as the daily
-# disk report reads them) from submit_holds_from on, until they free space.
+# submit_holds_disk, a person at a disk hard limit the kernel enforces (the disk quota
+# metrics, as the daily disk report reads them; an announced limit, before its from day
+# in disk_quota_filesystems, holds no one), until they free space.
 # docs/deepops/disk-quota.md, docs/deepops/accounts.md.
 submit_holds_state: present
 

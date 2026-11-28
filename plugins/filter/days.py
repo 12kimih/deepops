@@ -1,7 +1,7 @@
 """Days as a site writes them: the one reading of a date setting.
 
-    {{ submit_holds_from | day }}        "2026-12-09", or "" for none
-    {{ submit_holds_from | day_start }}  its local midnight as Unix time, 0 for none
+    {{ a_day | day }}        "2026-12-09", or "" for none
+    {{ a_day | day_start }}  its local midnight as Unix time, 0 for none
 
 A day comes from YAML: unquoted (2026-12-09) YAML reads it as a date, quoted as a
 string, and a lookup of a file (schedule.yml | from_yaml) hands on what YAML read. Every

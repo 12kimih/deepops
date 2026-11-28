@@ -101,7 +101,7 @@ class Agreement(unittest.TestCase):
         data = {"users": {("nfs1", "/home", "kim"): entry}}
         with mock.patch.object(disk_report, "collect", return_value=data):
             self.assertEqual(disk_report.past(entry)[0][3], "hard")
-            row = rules.disk("kim", {"disk": {"holds_on": True, "holds_from": 0}}, object(), NOW)
+            row = rules.disk("kim", {"disk": {"holds_on": True}}, object(), NOW)
             self.assertEqual((row.state, row.when), ("act", "새 잡 제출 보류 (줄일 때까지)"))
             entry["used"] = 4.5
             self.assertEqual(disk_report.past(entry)[0][3], "warn")
@@ -109,6 +109,10 @@ class Agreement(unittest.TestCase):
             entry["used"] = 1
             self.assertEqual(disk_report.past(entry), [])
             self.assertEqual(rules.disk("kim", {"disk": {"holds_on": True}}, object(), NOW).state, "ok")
+            entry.update(used=5, **{"from": NOW + 86400})  # announced: its day to come
+            row = rules.disk("kim", {"disk": {"holds_on": True}}, object(), NOW)
+            self.assertEqual(row.state, "warn", "past an announced hard limit: told, nothing refused")
+            self.assertTrue(row.when.endswith("부터 쓰기 거부"), row.when)
 
     def test_scratch_is_the_purge_runs_own_figures(self):
         """What the purge run published for each person (scratch_space.metrics, from the

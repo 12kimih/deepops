@@ -149,6 +149,16 @@ class RenderTests(unittest.TestCase):
         self.assertRegex(text, r"nfs1:/home\s+4\.5T\s+4T\s+5T\s+900,000\s+-\s+1,000,000")
         self.assertRegex(text, r"/home/kim/big\s+1T\s+90d\s+nfs1:/home")
 
+    def test_an_announced_limit_shows_its_day(self):
+        day = 1_796_000_000
+        series = merged(SERIES, {"disk_quota_limit_from_timestamp_seconds": [
+            {"host": "nfs1", "filesystem": "/home", "user": "kim", "value": day}]})  # fmt: skip
+        data = disk_usage.collect(FakePrometheus(series), "kim", 10)
+        self.assertEqual(data["space"][0]["from"], day)
+        self.assertNotIn("from", data["space"][1], "enforced: no day")
+        start = disk_usage.time.strftime("%Y-%m-%d", disk_usage.time.localtime(day))
+        self.assertRegex(disk_usage.render(data, self.theme()), rf"5T from {start}")
+
     def test_the_folders_say_when_their_filesystem_was_scanned(self):
         # 2026-11-27: the help said "the last daily scan"; the home filesystem's is weekly
         data = disk_usage.collect(FakePrometheus(SERIES), "kim", 10)

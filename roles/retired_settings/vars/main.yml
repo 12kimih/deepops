@@ -7,6 +7,7 @@ retired_settings:
   shared_space_data_unused_days: shared_space_data_stale_days in roles/shared_space_defaults (cluster_user_stale_days by default); a shared data entry's use is read from its files' access times, never recorded by a button
   cluster_bot_retired_bot_ids: cluster_bot_known_integrations in roles/cluster_bot, a mapping of bot_id to what the integration is; Slack lets the bot delete only its own messages, so `cluster-bot tidy` lists an integration's to delete by hand
   cluster_tools_environment: user_environment in roles/user_environment_defaults (the one list of the users' environment; a value may differ inside jobs)
+  submit_holds_from: the from day of each limit in disk_quota_filesystems (or a person's disk_quota in the roster), roles/disk_quota; the limit is announced until then and enforced, holds included, from it (docs/deepops/disk-quota.md)
   disk_quota_limits: disk_quota_filesystems in roles/disk_quota, now a mapping of each filesystem to its own limits; a person's disk_quota in the roster is per filesystem too (docs/deepops/disk-quota.md)
   allow_user_set_gpu_clocks: nothing (nvidia-smi -acp is a no-op on current drivers); clocks are locked per site with playbooks/utilities/nvidia-set-gpu-clocks.yml
   host_file_backup: nothing (the repository is the hosts file's history; rule 14)

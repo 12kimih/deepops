@@ -52,6 +52,19 @@ class Config(unittest.TestCase):
         self.assertEqual(sorted(cfg["filesystems"]["/scratch"]), ["alice", "bob", "dave"])
         self.assertEqual(cfg["filesystems"]["/scratch"]["alice"], {"block_hard": "5T"})
 
+    def test_an_announced_limit_carries_its_day_as_unix_time(self):
+        """{block_hard, from}: the day reaches the tool as its local midnight, quoted or not."""
+        import datetime
+        import time
+
+        midnight = int(time.mktime(datetime.date(2026, 12, 9).timetuple()))
+        for day in ("2026-12-09", datetime.date(2026, 12, 9)):
+            with self.subTest(day=day):
+                cfg = config(disk_quota_filesystems={"/": {"block_hard": "10T", "from": day}})
+                self.assertEqual(cfg["filesystems"]["/"]["bob"], {"block_hard": "10T", "from": midnight})
+        with self.assertRaisesRegex(Exception, "from is a day"):
+            config(disk_quota_filesystems={"/": {"block_hard": "10T", "from": "next week"}})
+
     def test_the_old_list_is_refused_by_name(self):
         with self.assertRaisesRegex(Exception, "disk_quota_filesystems is filesystem"):
             config(disk_quota_filesystems=["/"])

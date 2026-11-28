@@ -15,12 +15,15 @@
 # slurm_enable_disk_quota): everyone in the roster, administrators too (their own
 # accounts; sudo is root's), never root or the system accounts. {} only counts, for the
 # disk_quota_* metrics to show how the space is used before you choose limits; a
-# person's disk_quota in people.yml overrides these. The filesystem needs its quota
+# person's disk_quota in people.yml overrides these. A limit with from (YYYY-MM-DD) is
+# announced until that day: shown, warned about and mentioned at once, set in the kernel
+# (and holding jobs) only from that day, with no deploy on it. The filesystem needs its quota
 # mount options in host_baseline_mount_options (the role stops, naming them, without):
 #host_baseline_mount_options: {"/": "defaults,noatime,errors=remount-ro,usrjquota=aquota.user,jqfmt=vfsv1"}  # example
 #disk_quota_filesystems: {"/": {}}
 #disk_quota_filesystems:  # example
 #  /: {block_hard: 20G, inode_hard: 500k}
+#  /home: {block_hard: 10T, from: 2026-12-09}
 #disk_quota_projects: {}
 # The folders worth cleaning for the daily disk report, weighed weekly: base globs per
 # filesystem (the scratch space weighs its own: never list it here).

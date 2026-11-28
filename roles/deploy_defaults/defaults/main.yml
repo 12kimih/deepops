@@ -116,10 +116,6 @@ slurm_enable_shared_space: false
 slurm_enable_submit_holds: false
 # Hold a person at a disk hard limit as well (needs the disk quota metrics). Off by default.
 submit_holds_disk: false
-# The date (YYYY-MM-DD) holds start, a grace for everyone already at a hard limit when they
-# are turned on: before it no one is held, and the disk report says from when they will
-# be. "" holds at once.
-submit_holds_from: ""
 # How long, in seconds, the rendered job_submit.lua trusts the holds file after it was
 # written: a writer that stopped then holds no one. SubmitHoldsStale warns at half of it.
 submit_holds_max_age: 1800

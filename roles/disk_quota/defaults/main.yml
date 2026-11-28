@@ -30,6 +30,11 @@ disk_quota_state: present
 # period that later refuses writes). {} sets none: quotas only count, so the metrics show
 # how the space is used before limits are chosen. A person's own disk_quota for a
 # filesystem in the roster (people.yml) overrides the site's there.
+# A limit with from (a day, YYYY-MM-DD; {block_hard: 10T, from: 2026-12-09}) is announced
+# until then: its levels and its day are exported at once, so the daily report, its
+# mentions, `usage disk` and the alerts tell people now; the kernel gets it (and submit
+# holds start) only from that day, set by the metrics run with no deploy, on a
+# filesystem whose quotas are on.
 disk_quota_filesystems: {"/": {}}
 
 # Files allowed per TiB of a block_hard where no inode_hard is set, so the file count
@@ -54,5 +59,6 @@ disk_quota_scan_on_calendar: "Sun *-*-* 01:00:00"
 # The most entries one scan looks at (a bound on time and memory).
 disk_quota_scan_max_entries: 1000000000
 
-# How often every user's usage is exported (systemd OnUnitActiveSec).
+# How often every user's usage is exported, and an announced limit come due set (systemd
+# OnUnitActiveSec).
 disk_quota_metrics_interval: 15min

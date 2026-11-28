@@ -115,10 +115,15 @@ class Language(unittest.TestCase):
         self.assertKorean("weekly, none", strings(report.render_week([], 5)))
 
     def test_the_disk_report_and_its_thread(self):
-        data = disk_report.collect(disk_fixture.site(), disk_fixture.NOW)
-        fill = disk_report.fill_rows(data, 0.7)
-        for hold in (None, 0, disk_fixture.NOW + disk_report.DAY):
-            (text, card), thread = disk_report.render(data, who, people={"alice", "bob"}, hold=hold, fill=fill,
+        announced = disk_fixture.site()
+        announced.now["disk_quota_limit_from_timestamp_seconds"] = [
+            disk_fixture.row(disk_fixture.NOW + disk_report.DAY, host="login", filesystem="/", user=u)
+            for u in ("alice", "bob", "carol")
+        ]
+        for prom, holds in ((disk_fixture.site(), False), (disk_fixture.site(), True), (announced, True)):
+            data = disk_report.collect(prom, disk_fixture.NOW)
+            fill = disk_report.fill_rows(data, 0.7)
+            (text, card), thread = disk_report.render(data, who, people={"alice", "bob"}, holds=holds, fill=fill,
                                                       stale_days=60)  # fmt: skip
             self.assertShown("disk card", (text, card))
             for _, blocks in thread:
@@ -131,7 +136,7 @@ class Language(unittest.TestCase):
     def test_the_dms(self):
         data = disk_report.collect(disk_fixture.site(), disk_fixture.NOW)
         for row in disk_report.over_warn(data):
-            self.assertKorean("disk DM", disk_report.dm_text(row, disk_report.hold_note(0, disk_fixture.NOW)))
+            self.assertKorean("disk DM", disk_report.dm_text(row, disk_report.hold_note(True, row[3])))
             self.assertKorean("disk DM", disk_report.dm_text(row))
             self.assertShown("disk DM", disk_report.dm_text(row, disk_report.hold_note(0, disk_fixture.NOW)))
         entry = {"files": 3, "bytes": 2**31, "next": disk_fixture.NOW, "stale_days": 60, "deferred": 2}

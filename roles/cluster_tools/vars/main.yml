@@ -57,8 +57,7 @@ _cluster_tools_usage_cfg:
        if _cluster_tools_usage_active['io-heavy'] else {} }}
   disk: >-
     {{ {'warn_fraction': cluster_user_warn_fraction | float,
-        'holds_on': slurm_enable_submit_holds | bool and submit_holds_disk | bool,
-        'holds_from': submit_holds_from_time | int} if _cluster_tools_usage_active['disk'] else {} }}
+        'holds_on': slurm_enable_submit_holds | bool and submit_holds_disk | bool} if _cluster_tools_usage_active['disk'] else {} }}
   scratch: >-
     {{ {'root': scratch_space_root, 'stale_days': scratch_space_stale_days | int,
         'grace_days': scratch_space_grace_days | int} if _cluster_tools_usage_active['scratch-purge'] else {} }}

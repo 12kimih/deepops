@@ -91,7 +91,7 @@ RULES = (
           "slurm_usage_report_cancel_after_hours", "slurm_usage_report_cancel_warn_hours"),
          "usage gpu", "policy/rules/#gpu-idle"),
     Rule("disk", "디스크 한도", "notice, hold", "disk_report",
-         ("cluster_user_warn_fraction", "disk_quota_filesystems", "submit_holds_disk", "submit_holds_from_time"),
+         ("cluster_user_warn_fraction", "disk_quota_filesystems", "submit_holds_disk"),
          "usage disk", "policy/rules/#disk"),
     Rule("scratch-purge", "/scratch 정리", "purge", "scratch_space",
          ("scratch_space_stale_days", "scratch_space_grace_days"), "usage disk", "policy/rules/#scratch"),
@@ -203,13 +203,19 @@ def disk(user, cfg, prom, now):
             key=lambda kv: ((kv[1]["used"] / kv[1]["hard"]) if kv[1]["hard"] else 0, kv[1]["used"]),
         )
         limit = disk_report.size(e["hard"]) if e["hard"] else "-"
+        if e["hard"] and not disk_report.enforced(e):
+            limit += f" ({disk_report.starts_text(e)})"
         return row("disk", f"{disk_report.where(host, fs)} {disk_report.size(e['used'])}", limit, "ok")
     place, used, state, at_hard = disk_report.describe(rows[0])
     _, what, _, level, kind, hard = disk_report.amounts(rows[0])
     limit = disk_report.size(hard) if what == "space" and hard else (f"{hard:,.0f}" if hard else "-")
-    holds = rule.get("holds_on") and now >= float(rule.get("holds_from") or 0)
+    if at_hard and not disk_report.enforced(rows[0][3]):
+        # Announced: told now, refused and held from its day (disk_quota "from").
+        return row(
+            "disk", f"{place} {used}", limit, "warn", f"{disk_report.starts_text(rows[0][3])} 쓰기 거부"
+        )
     if at_hard:
-        when = "새 잡 제출 보류 (줄일 때까지)" if holds else "쓰기 거부"
+        when = "새 잡 제출 보류 (줄일 때까지)" if rule.get("holds_on") else "쓰기 거부"
         return row("disk", f"{place} {used}", limit, "act", when)
     return row("disk", f"{place} {used}", limit, "warn", state)
 

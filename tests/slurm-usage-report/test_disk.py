@@ -5,6 +5,7 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
@@ -237,16 +238,38 @@ class RenderTests(unittest.TestCase):
 
     def test_a_hard_limit_says_what_it_means_for_slurm(self):
         data = disk_report.collect(site(), NOW)
-        (_, card), _ = disk_report.render(data, who, hold=NOW + 2 * disk_report.DAY)
-        self.assertIn("한도(20G)에 닿았습니다. 2027-01-17부터는 ", text_of(card))
-        self.assertIn("한도에 닿아 있는 동안 새 Slurm 잡을 제출할 수 없습니다", text_of(card))
-        (_, card), _ = disk_report.render(data, who, hold=0)
+        (_, card), _ = disk_report.render(data, who, holds=True)
         self.assertIn(". 공간을 비우실 때까지 새 Slurm 잡을 제출할 수 없습니다", text_of(card))
         (_, card), _ = disk_report.render(data, who)
         self.assertNotIn("Slurm", text_of(card), "no holds: nothing said")
         bob = disk_report.over_warn(data)[0]
         self.assertIn("지금은 그곳에 쓸 수 없습니다. 공간을 비우실 때까지 새 Slurm 잡을 제출할 수 없습니다.",
-                      disk_report.dm_text(bob, disk_report.hold_note(0, NOW)))  # fmt: skip
+                      disk_report.dm_text(bob, disk_report.hold_note(True, bob[3])))  # fmt: skip
+
+    def test_an_announced_limit_is_told_now_with_its_day(self):
+        """Owner 2026-11-28: people are told against the announced limits at once; writes
+        are refused and jobs held only from the limit's day (disk_quota "from")."""
+        prom = site()
+        day = NOW + 2 * disk_report.DAY
+        prom.now["disk_quota_limit_from_timestamp_seconds"] = [
+            row(day, host="login", filesystem="/", user=u) for u in ("alice", "bob", "carol")
+        ]
+        data = disk_report.collect(prom, NOW)
+        start = f"{datetime.fromtimestamp(day):%Y-%m-%d}부터"
+        bob, alice = disk_report.over_warn(data)
+        self.assertEqual(bob[4][0][3], "hard", "past the announced hard: told daily, as at a hard limit")
+        self.assertFalse(disk_report.enforced(bob[3]))
+        (_, card), _ = disk_report.render(data, who, holds=True)
+        text = text_of(card)
+        self.assertIn(
+            f"{start} 적용되는 한도(20G)를 넘었습니다. {start}는 한도에 닿아 있는 동안 새 Slurm 잡을", text
+        )
+        self.assertIn(f"경고 수준(15G)을 넘었습니다 (한도 20G). 한도는 {start} 적용됩니다", text)
+        self.assertIn(f"아직 적용되지 않은 한도는 {start} 적용되니", text)
+        self.assertNotIn("닿았습니다", text, "nothing is refused yet")
+        dm = disk_report.dm_text(bob, disk_report.hold_note(True, bob[3]))
+        self.assertIn("아직 막힌 것은 없습니다. 한도가 적용되기 전에 공간을 비워 주세요.", dm)
+        self.assertNotIn("쓸 수 없습니다.", dm)
 
     def test_change(self):
         self.assertEqual(disk_report.change(5 * G, None), "신규")
@@ -273,7 +296,7 @@ class RunTests(unittest.TestCase):
 
     CFG = dict(channel="#status", dm_log_channel="", prometheus_url="", slack_token="t", email_domain="",
                user_map={"alice": "UALICE", "bob": "UBOB"}, disk_notify=["mention", "dm"],
-               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0, disk_fill=0.8, disk_fill_mentions=5, stale_days=60,
+               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, disk_fill=0.8, disk_fill_mentions=5, stale_days=60,
                admin_channel="#admins", admin_mention="<!subteam^SADMINS>")  # fmt: skip
 
     def run_disk(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
